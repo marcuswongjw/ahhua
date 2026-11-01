@@ -53,6 +53,75 @@ function aliasIndex(text, alias) {
   const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return text.search(new RegExp(`\\b${escaped}\\b`, 'i'));
 }
+function recommend(text, state, language) {
+  const previous = state.recommendationContext || {};
+  const context = { pax: 4, budget: null, mild: Boolean(state.preference), noPork: false, noFish: false, noSeafood: false, noRice: false, ...previous };
+  const party = text.match(/(\d+|one|two|three|four|five|six|一|两|二|三|四|五|六|七|八|九|十)\s*(?:pax|people|persons?|人|位)/) || text.match(/(?:recommend|suggest)\s+(?:for\s+)?(\d+)/);
+  if (party) context.pax = Math.min(12, Math.max(1, Number(party[1]) || numberWords[party[1]] || ({七:7,八:8,九:9,十:10})[party[1]]));
+  const budget = text.match(/(?:budget(?:\s*(?:is|of))?|under|below|less than|within|预算|不超过|低于)[^\d]{0,12}(\d+(?:\.\d{1,2})?)/) || text.match(/(?:s\$|\$)\s*(\d+(?:\.\d{1,2})?)/);
+  if (budget) context.budget = Math.round(Number(budget[1]) * 100);
+  if (/no budget|any budget|不限预算/.test(text)) context.budget = null;
+  if (/not spicy|no spic[ey]|non.spicy|no chilli|mild|不辣|kids|children/.test(text)) context.mild = true;
+  else if (/spicy|chilli|辣/.test(text)) context.mild = false;
+  if (/no pork|without pork|不要猪|不吃猪/.test(text)) context.noPork = true;
+  else if (/pork (?:is )?(?:okay|ok)|可以.*猪/.test(text)) context.noPork = false;
+  if (/no seafood|without seafood|不吃海鲜|不要海鲜/.test(text)) context.noSeafood = true;
+  else if (/seafood (?:is )?(?:okay|ok)|可以.*海鲜/.test(text)) context.noSeafood = false;
+  if (/no fish|without fish|不吃鱼|不要鱼/.test(text)) context.noFish = true;
+  else if (/fish (?:is )?(?:okay|ok)|可以.*鱼/.test(text)) context.noFish = false;
+  if (/no rice|without rice|不要饭|不吃饭/.test(text)) context.noRice = true;
+  else if (/with rice|include rice|要白饭/.test(text)) context.noRice = false;
+  state.recommendationContext = context;
+  state.preference = context.mild ? 'No chilli requested; staff must confirm' : '';
+  const excluded = new Set(state.unavailable);
+  if (context.mild) excluded.add('kang');
+  if (context.noPork) ['pork','ribs'].forEach(id=>excluded.add(id));
+  if (context.noFish || context.noSeafood) ['grouper','pomfret','snapper'].forEach(id=>excluded.add(id));
+  if (context.noSeafood) ['chicken','kang','egg'].forEach(id=>excluded.add(id));
+  const available = menu.filter(d=>d.id!=='rice'&&!excluded.has(d.id));
+  // Prefer dishes not already ordered; suggestions remain separate from the cart.
+  const newDishes = available.filter(d=>!state.cart.some(x=>x.id===d.id));
+  const target = context.pax<=2 ? 2 : context.pax<=4 ? 3 : context.pax<=6 ? 4 : 5;
+  const pool = newDishes.length>=Math.min(target,2) ? newDishes : available;
+  const rice = !context.noRice&&!excluded.has('rice') ? [makeLine('rice', context.pax, 'Regular', state.preference)] : [];
+  const history = Array.isArray(state.recommendationHistory) ? state.recommendationHistory : [];
+  const rank = { grouper:5, pomfret:4, snapper:3, chicken:5, tofu:4, kang:3, ribs:2.5, pork:2, egg:2 };
+  const options = [];
+  function combinations(start, selected) {
+    if (selected.length) {
+      const fish = selected.filter(d=>d.category==='Steamboat').length;
+      if (fish<=1) {
+        const lines=selected.map(d=>makeLine(d.id,1,context.pax>4?'Large':'Regular',state.preference)).concat(rice);
+        const price=total(lines), signature=selected.map(d=>d.id).sort().join('|');
+        if (context.budget===null || price<=context.budget) {
+          const recent=history.slice(-4);
+          const repeatedItems=selected.reduce((n,d)=>n+recent.filter(h=>h.split('|').includes(d.id)).length,0);
+          const categoryBonus=new Set(selected.map(d=>d.category)).size*3;
+          const score=-Math.abs(target-selected.length)*100 + fish*(context.pax>2?10:0) + categoryBonus + selected.reduce((n,d)=>n+rank[d.id],0) - repeatedItems*4;
+          options.push({lines,signature,score,price});
+        }
+      }
+    }
+    if (selected.length>=target) return;
+    for(let i=start;i<pool.length;i++) combinations(i+1,[...selected,pool[i]]);
+  }
+  combinations(0,[]);
+  // Keep the best feasible number of dishes, then rotate within those options.
+  const maxCount=Math.max(0,...options.map(o=>o.lines.length));
+  const complete=options.filter(o=>o.lines.length===maxCount);
+  const fresh=complete.filter(o=>!history.slice(-8).includes(o.signature));
+  const choices=fresh.length ? fresh : complete;
+  choices.sort((a,b)=>b.score-a.score || a.price-b.price || a.signature.localeCompare(b.signature));
+  const selected=choices[0];
+  if (!selected) return {text:replyText(language,'noRecommendation'),lines:[],language};
+  state.recommendationHistory=[...history,selected.signature].slice(-12);
+  const dishes=selected.lines.map(x=>`${x.qty} × ${language==='zh'?dish(x.id).cn:x.name}`).join(language==='zh'?'、':', ');
+  const labels=language==='zh'
+    ? [context.mild?'不辣要求':null,context.noPork?'避开猪肉菜名':null,context.noFish?'避开鱼类菜品':null,context.noSeafood?'避开明显的海鲜菜品':null,context.noRice?'不配白饭':null,context.budget!==null?`建议套餐预算 ${money(context.budget)}`:null]
+    : [context.mild?'mild requested':null,context.noPork?'omitting pork dishes':null,context.noFish?'omitting fish dishes':null,context.noSeafood?'omitting obvious seafood dishes':null,context.noRice?'no rice':null,context.budget!==null?`suggested-set budget ${money(context.budget)}`:null];
+  const details=labels.filter(Boolean).join(' · ');
+  return {text:replyText(language,'recommendation',{pax:context.pax,amount:money(selected.price),dishes,details}),lines:selected.lines,language};
+}
 export function chat(text, state, selectedLanguage = state.replyLanguage) {
   const t = text.toLowerCase().trim();
   const language = normaliseLanguage(selectedLanguage);
@@ -61,14 +130,9 @@ export function chat(text, state, selectedLanguage = state.replyLanguage) {
   if (/call.*(staff|server)|human|服务员/.test(t)) return answer('call');
   if (/checkout|submit|pay|place.*order|下单|付款/.test(t)) return answer('checkout');
   if (/review|cart|订单|购物车/.test(t)) return answer(state.cart.length ? 'cart' : 'emptyCart', { count: state.cart.reduce((n,x)=>n+x.qty,0), amount: money(total(state.cart)) });
-  if (/no spicy|not spicy|non.spicy|mild|不辣|kids|children/.test(t)) state.preference = 'No chilli requested; staff must confirm';
   if (/vegetarian|vegan|素食|清真|halal/.test(t)) return answer('dietary');
-  if (/recommend|suggest|pax|people|推荐|几个人|人吃|人餐|what.*good/.test(t)) {
-    const paxMatch = t.match(/(\d+)\s*(?:pax|people|人)/); const pax = Math.min(12, Math.max(1, Number(paxMatch?.[1] || 4)));
-    const ids = ['grouper', 'chicken', 'tofu', 'rice'].filter(id => !state.unavailable.includes(id));
-    const lines = ids.map(id => makeLine(id, id === 'rice' ? pax : 1, id === 'grouper' && pax > 4 ? 'Large' : 'Regular', state.preference));
-    return answer('recommendation', {pax, amount: money(total(lines))}, lines);
-  }
+  if (/recommend|suggest|pax|people|推荐|几个人|人吃|人餐|what.*good|another|different|换一|预算|budget|under\s*\$?\d/.test(t) || state.recommendationContext&&/no pork|no fish|no seafood|no rice|spicy|chilli|辣|不吃|不要鱼/.test(t)) return recommend(t,state,language);
+  if (/no spicy|not spicy|non.spicy|mild|不辣|kids|children/.test(t)) state.preference = 'No chilli requested; staff must confirm';
   const found = menu.map(d => ({ d, at: Math.min(...d.aliases.map(a=>aliasIndex(t,a)).filter(i=>i>=0), Infinity) })).filter(x=>Number.isFinite(x.at));
   // Specific steamboat names take precedence over the generic word “steamboat”.
   const matches = found.filter(x=>x.d.id !== 'grouper' || !found.some(y=>['pomfret','snapper'].includes(y.d.id)) || /grouper|石斑/.test(t)).sort((a,b)=>a.at-b.at);

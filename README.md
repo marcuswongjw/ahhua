@@ -53,3 +53,7 @@ Automated tests exercise order approval gating, legal kitchen transitions, immut
 Voice API references: [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition), [SpeechSynthesis](https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis).
 
 This is an independent concept demo, not an official restaurant ordering service.
+
+## Recommendation behaviour
+
+The demo recommendation engine considers party size (1–12), a suggested-set budget, mild/spicy requests, named pork/fish/seafood/rice exclusions, current sample availability, dishes already in the cart, and recent suggestions. It enumerates feasible menu combinations and rotates alternatives instead of returning a fixed bundle. “Another suggestion” keeps the previous group size and preferences. Example: “Recommend for 4 people, budget $60, not spicy.” Budgets cover only the suggested set; the existing cart is excluded. Recipes and portion sizes still require staff confirmation, and allergy/dietary safety is never guaranteed. This is a local rule-based demo, not a connected LLM.

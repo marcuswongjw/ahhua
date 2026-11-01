@@ -51,9 +51,14 @@ const messages = {
     singlish: 'Vegetarian, vegan or halal ah? This sample menu cannot confirm. Please call a server and check first. I haven’t added any dishes.'
   },
   recommendation: {
-    en: ({pax,amount}) => `For ${pax}, how about a steamboat, crispy chicken, soft beancurd and rice? Here’s a sample sharing set (${amount}). Portions and recipes need staff confirmation. Review the suggestion below before adding.`,
-    zh: ({pax,amount}) => `为 ${pax} 位推荐鱼头炉、虾酱鸡、豆腐和白饭。示例套餐 ${amount}，份量与食谱需员工确认。请检查下方建议后再加入购物车。`,
-    singlish: ({pax,amount}) => `${pax} people ah? Steamboat, crispy chicken, beancurd and rice to share, can! Sample set is ${amount}. Portion and recipe must check with staff first. See the suggestion below before adding, okay?`
+    en: ({pax,amount,dishes,details}) => `For ${pax}, how about ${dishes}? Suggested set: ${amount}${details?` (${details})`:''}. This total covers the suggestion only, not your existing cart. Recipes and portions need staff confirmation. Review below, or ask for another suggestion.`,
+    zh: ({pax,amount,dishes,details}) => `为 ${pax} 位推荐 ${dishes}。建议套餐 ${amount}${details?`（${details}）`:''}，仅计算此次建议，不含购物车已有菜品。食谱和份量需员工确认。请检查下方建议，也可以换一组。`,
+    singlish: ({pax,amount,dishes,details}) => `${pax} people ah? Try ${dishes} to share, can! Suggested set is ${amount}${details?` (${details})`:''}. This total is for the suggestion only, your existing cart not included. Recipe and portion must check with staff first. Want another combination? Just ask lah.`
+  },
+  noRecommendation: {
+    en: 'I couldn’t find a dish combination within those preferences and the suggested-set budget. Try a higher budget, change the preferences, or browse the menu. Nothing has been added to your cart.',
+    zh: '目前无法在这些偏好和建议套餐预算内找到菜品组合。您可以提高预算、调整偏好，或直接浏览菜单。没有添加任何菜品。',
+    singlish: 'With these preferences and budget, I can’t put a set together leh. Can increase budget, change the preferences, or browse the menu? Nothing added to your cart yet.'
   },
   excluded: {
     en: 'I haven’t changed your cart. Use the minus controls to remove dishes, or tell me what you’d like to add.',
