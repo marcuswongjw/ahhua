@@ -328,6 +328,8 @@ function render() {
   <footer><span class="footer-mark">華</span> A little warmth. A good meal. <span>Independent concept demo · Not an official restaurant ordering service</span></footer>
   <dialog id="dish-dialog" closedby="any" aria-labelledby="dish-dialog-title"></dialog>
   <dialog id="bill-dialog" closedby="any" aria-labelledby="bill-dialog-title"></dialog>
+  <dialog id="service-dialog" closedby="any" aria-labelledby="service-dialog-title"></dialog>
+  <dialog id="order-success-dialog" closedby="any" aria-labelledby="order-success-dialog-title"></dialog>
   <dialog id="qr-dialog" closedby="any" aria-labelledby="qr-dialog-title"></dialog>
   <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
     <form method="dialog">
@@ -340,7 +342,7 @@ function render() {
     </form>
   </dialog>`;
 
-  ['#dish-dialog', '#bill-dialog', '#qr-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     draft = $('#message')?.value || draft;
@@ -348,10 +350,7 @@ function render() {
     role = b.dataset.role;
     render();
   }));
-  document.querySelectorAll('[data-action="call"]').forEach(b => b.addEventListener('click', () => act(() => {
-    requestService(state, table, 'assistance');
-    toast(`Demo server request for Table ${table} is in Staff.`);
-  })));
+  document.querySelectorAll('[data-action="call"]').forEach(b => b.addEventListener('click', () => openServiceModal()));
   document.querySelectorAll('[data-open-qr]').forEach(b => b.addEventListener('click', () => openQrDialog(b.dataset.openQr)));
   $('[data-action="reset"]').addEventListener('click', () => {
     const d = $('#reset-dialog');
@@ -441,9 +440,35 @@ function customer() {
       <button type="button" class="service-chip" data-service="soup">${esc(T('soupRefill'))}</button>
       <button type="button" class="service-chip" data-service="tea">${esc(T('teaRefill'))}</button>
       <button type="button" class="service-chip" data-service="bowls">${esc(T('extraBowls'))}</button>
+      <button type="button" class="service-chip" data-service="chilli">${esc(T('cutChilli'))}</button>
+      <button type="button" class="service-chip" data-service-more title="More table service options">🛎️ More...</button>
       <button type="button" class="service-chip bill-chip" data-open-bill>${esc(T('tableBill'))}${summary.subtotal ? ` · ${money(summary.subtotal)}` : ''}</button>
     </div>
     ${activeTableCalls.length ? `<div class="active-calls-strip" role="status"><span>Waiting for staff:</span>${activeTableCalls.map(c => `<span class="call-pill">${serviceTypes[c.type || 'assistance']?.icon || '♧'} ${esc(c.label || 'Customer would like assistance')}</span>`).join('')}</div>` : ''}
+  </section>
+
+  <section class="spotlight-strip" aria-label="Trending & Most Ordered at Ah Hua">
+    <div class="spotlight-header">
+      <span class="eyebrow">POPULAR WITH FAMILIES · 招牌热点</span>
+      <span class="spotlight-count">Top picks for table sharing</span>
+    </div>
+    <div class="spotlight-scroll">
+      ${menu.filter(d => (d.popularity || 0) >= 90).map(d => {
+        const soldOut = state.unavailable.includes(d.id);
+        const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
+        return `<div class="spotlight-card ${inCartQty ? 'in-cart' : ''}">
+          <span class="spotlight-icon">${d.icon}</span>
+          <div class="spotlight-info">
+            <small>${d.cn}</small>
+            <strong>${esc(dishName(state.replyLanguage, d))}</strong>
+            <span>${money(d.price)}</span>
+          </div>
+          <button type="button" class="spotlight-add" data-quick-add="${d.id}" ${soldOut ? 'disabled' : ''} aria-label="Add ${esc(d.name)}">
+            ${soldOut ? 'Sold out' : inCartQty ? `+${inCartQty}` : '+'}
+          </button>
+        </div>`;
+      }).join('')}
+    </div>
   </section>
 
   <div class="dining-grid">
@@ -847,6 +872,7 @@ function bindCustomer() {
     const entry = requestService(state, table, b.dataset.service);
     toast(`${entry.label} requested for Table ${table}.`);
   }));
+  document.querySelectorAll('[data-service-more]').forEach(b => b.onclick = () => openServiceModal());
   document.querySelectorAll('[data-open-bill]').forEach(b => b.onclick = () => openBillDialog());
 
   document.querySelectorAll('[data-category]').forEach(b => b.onclick = () => {
@@ -901,11 +927,16 @@ function bindCustomer() {
     $('#planner-pax').focus();
   });
   $('#dismiss-proposal')?.addEventListener('click', () => act(() => { state.proposal = []; }));
-  $('#submit-order').onclick = () => act(() => {
-    const order = submit(state, table);
-    reply(localReply('submitted', { id: order.id }));
-    toast(`${order.id} (Round ${order.round}) sent for demo staff approval.`);
-  });
+  $('#submit-order').onclick = () => {
+    let order;
+    act(() => {
+      order = submit(state, table);
+      reply(localReply('submitted', { id: order.id }));
+    });
+    if (order) {
+      openOrderSuccessDialog(order);
+    }
+  };
   $('#inline-split-pax')?.addEventListener('change', e => {
     splitPax = Number(e.target.value) || 4;
     render();
@@ -937,13 +968,19 @@ function openDish(id) {
     <div class="allergen-note"><b>Sample allergens:</b> ${esc(d.allergens)}. Recipe unverified. For allergies, call a server; no safety guarantee.</div>
     <div class="dish-options">
       <label>Portion
-        <select name="size">
-          <option value="Regular">Regular · ${money(d.price)}</option>
-          ${!d.singleSize ? `<option value="Large">Large · ${money(d.price + 800)}</option>` : ''}
+        <select name="size" id="dish-size-select">
+          <option value="Regular" data-price="${d.price}">Regular · ${money(d.price)}</option>
+          ${!d.singleSize ? `<option value="Large" data-price="${d.price + 800}">Large · ${money(d.price + 800)}</option>` : ''}
         </select>
         <small>${d.category === 'Steamboat' ? 'Sample sharing portion; ask staff to confirm.' : 'Sample portion; ask staff to confirm.'}</small>
       </label>
-      <label>Quantity<input name="qty" type="number" min="1" max="20" value="1" required></label>
+      <label>Quantity
+        <div class="modal-stepper">
+          <button type="button" id="modal-qty-minus" aria-label="Decrease quantity">−</button>
+          <input name="qty" id="modal-qty-input" type="number" min="1" max="20" value="1" readonly required>
+          <button type="button" id="modal-qty-plus" aria-label="Increase quantity">+</button>
+        </div>
+      </label>
     </div>
     ${d.modifiers?.length ? `<div class="modifier-group">
       <span class="modifier-label">Traditional preparation options (tap to toggle)</span>
@@ -953,11 +990,32 @@ function openDish(id) {
     </div>` : ''}
     <label>Anything else for the kitchen?<textarea name="notes" maxlength="160" placeholder="e.g. less chilli, sauce on the side">${esc(state.preference)}</textarea></label>
     <p class="muted">Requests need staff confirmation.</p>
-    <button class="primary wide" type="submit">Add to shared cart +</button>
+    <button class="primary wide" id="modal-add-btn" type="submit">Add to shared cart · <span id="modal-price-calc">${money(d.price)}</span> +</button>
   </form>`;
 
   dialog.showModal();
   dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  const sizeSelect = dialog.querySelector('#dish-size-select');
+  const qtyInput = dialog.querySelector('#modal-qty-input');
+  const minusBtn = dialog.querySelector('#modal-qty-minus');
+  const plusBtn = dialog.querySelector('#modal-qty-plus');
+  const priceCalc = dialog.querySelector('#modal-price-calc');
+
+  function updateCalc() {
+    const basePrice = d.price + (sizeSelect?.value === 'Large' ? 800 : 0);
+    const q = Number(qtyInput?.value) || 1;
+    if (priceCalc) priceCalc.textContent = money(basePrice * q);
+  }
+
+  sizeSelect?.addEventListener('change', updateCalc);
+  minusBtn?.addEventListener('click', () => {
+    let val = Number(qtyInput.value) || 1;
+    if (val > 1) { qtyInput.value = val - 1; updateCalc(); }
+  });
+  plusBtn?.addEventListener('click', () => {
+    let val = Number(qtyInput.value) || 1;
+    if (val < 20) { qtyInput.value = val + 1; updateCalc(); }
+  });
   dialog.querySelectorAll('[data-mod]').forEach(chip => {
     chip.onclick = () => {
       const mod = chip.dataset.mod;
@@ -969,14 +1027,23 @@ function openDish(id) {
   $('#dish-form').onsubmit = e => {
     e.preventDefault();
     const form = new FormData(e.target);
+    const qty = Number(form.get('qty'));
+    const size = form.get('size');
     const customNote = String(form.get('notes') || '').trim();
     const combinedNotes = [...selectedMods, ...(customNote ? [customNote] : [])].join(', ');
+    if (!Number.isInteger(qty) || qty < 1) return;
+    const existing = state.cart.find(y => y.id === id && y.size === size && y.notes === combinedNotes);
     try {
-      addLines(state, [makeLine(id, Number(form.get('qty')), form.get('size'), combinedNotes)]);
+      if (existing) {
+        if (qty > 20) throw Error('Maximum 20 of each dish.');
+        existing.qty = qty;
+      } else {
+        addLines(state, [makeLine(id, qty, size, combinedNotes)]);
+      }
       save();
       closeTopLayer(dialog);
       render();
-      toast(`${d.name} added to your cart.`);
+      toast(existing ? `Updated ${d.name} (${qty}) in cart.` : `${d.name} added to your cart.`);
     } catch (error) {
       toast(error.message);
     }
@@ -1048,6 +1115,126 @@ function openBillDialog() {
   };
   renderBillContent();
   dialog.showModal();
+}
+
+function triggerOrderAnimation() {
+  const container = document.createElement('div');
+  container.className = 'confetti-container';
+  container.setAttribute('aria-hidden', 'true');
+  const symbols = ['🍲', '🥢', '✨', '🥟', '🦐', '🍵', '⭐️', '🔥'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('span');
+    p.className = 'confetti-item';
+    p.textContent = symbols[i % symbols.length];
+    p.style.setProperty('--x', `${(Math.random() * 100 - 50).toFixed(1)}vw`);
+    p.style.setProperty('--y', `${(Math.random() * -60 - 20).toFixed(1)}vh`);
+    p.style.setProperty('--rot', `${Math.floor(Math.random() * 360)}deg`);
+    p.style.setProperty('--delay', `${(Math.random() * 0.25).toFixed(2)}s`);
+    container.appendChild(p);
+  }
+  document.body.appendChild(container);
+  setTimeout(() => container.remove(), 2600);
+}
+
+function openServiceModal() {
+  const dialog = $('#service-dialog');
+  if (!dialog) return;
+  const activeTableCalls = state.calls.filter(c => c.table === table && !c.done);
+  dialog.innerHTML = `<div class="service-modal-body">
+    <div class="dialog-top">
+      <span class="eyebrow">TABLE ${table} · ${esc(T('callService'))}</span>
+      <button type="button" class="close-dialog" aria-label="Close table service dialog">×</button>
+    </div>
+    <h2 id="service-dialog-title">${esc(T('callService'))}</h2>
+    <p>${esc(T('callServiceDesc'))}</p>
+    <div class="service-modal-grid">
+      <button type="button" class="service-modal-card" data-service-select="soup">
+        <span class="service-icon">🍲</span>
+        <strong>${esc(T('soupRefill'))}</strong>
+        <small>Milky fish or ginger broth</small>
+      </button>
+      <button type="button" class="service-modal-card" data-service-select="tea">
+        <span class="service-icon">🍵</span>
+        <strong>${esc(T('teaRefill'))}</strong>
+        <small>Hot Chinese tea / warm water</small>
+      </button>
+      <button type="button" class="service-modal-card" data-service-select="bowls">
+        <span class="service-icon">🥢</span>
+        <strong>${esc(T('extraBowls'))}</strong>
+        <small>Clean bowls, spoons & chopsticks</small>
+      </button>
+      <button type="button" class="service-modal-card" data-service-select="chilli">
+        <span class="service-icon">🌶️</span>
+        <strong>${esc(T('cutChilli'))}</strong>
+        <small>Fresh cut chilli & garlic soy</small>
+      </button>
+      <button type="button" class="service-modal-card" data-service-select="wipe">
+        <span class="service-icon">🧻</span>
+        <strong>${esc(T('extraWipes'))}</strong>
+        <small>Hot wet towels & paper napkins</small>
+      </button>
+      <button type="button" class="service-modal-card" data-service-select="assistance">
+        <span class="service-icon">♧</span>
+        <strong>General Assistance</strong>
+        <small>Floor captain will visit table</small>
+      </button>
+    </div>
+    ${activeTableCalls.length ? `<div class="active-calls-panel">
+      <span>Currently requested for Table ${table}:</span>
+      <div class="active-calls-tags">${activeTableCalls.map(c => `<span class="call-pill">${serviceTypes[c.type || 'assistance']?.icon || '♧'} ${esc(c.label || 'Assistance')}</span>`).join('')}</div>
+    </div>` : ''}
+  </div>`;
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelectorAll('[data-service-select]').forEach(btn => {
+    btn.onclick = () => {
+      act(() => {
+        const entry = requestService(state, table, btn.dataset.serviceSelect);
+        toast(`${entry.label} requested for Table ${table}.`);
+      });
+      closeTopLayer(dialog);
+    };
+  });
+}
+
+function openOrderSuccessDialog(order) {
+  const dialog = $('#order-success-dialog');
+  if (!dialog) return;
+  triggerOrderAnimation();
+  dialog.innerHTML = `<div class="order-success-body">
+    <div class="dialog-top">
+      <span class="eyebrow">ORDER CONFIRMATION · 下单成功</span>
+      <button type="button" class="close-dialog" aria-label="Close confirmation">×</button>
+    </div>
+    <div class="success-icon-banner">
+      <span class="celebrate-badge">🎉</span>
+      <h2 id="order-success-dialog-title">${esc(T('orderPlaced'))}</h2>
+      <p>${esc(T('orderPlacedDesc'))}</p>
+    </div>
+    <div class="order-success-card">
+      <div class="order-success-header">
+        <div>
+          <small>TABLE ${order.table}</small>
+          <h3>Order ${order.id}</h3>
+        </div>
+        <span class="badge pending">Awaiting staff</span>
+      </div>
+      <ul class="order-lines">${orderLines(order, false)}</ul>
+      <div class="order-total">Round ${order.round || 1} Subtotal <strong>${money(total(order.items))}</strong></div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="secondary" id="track-orders-btn">View table tab & tracker</button>
+      <button type="button" class="primary" id="continue-dining-btn">Continue exploring menu</button>
+    </div>
+  </div>`;
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#continue-dining-btn').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#track-orders-btn').onclick = () => {
+    closeTopLayer(dialog);
+    const cartEl = document.getElementById('table-cart');
+    cartEl?.scrollIntoView({ behavior: 'smooth' });
+  };
 }
 
 function openQrDialog(targetTable) {
