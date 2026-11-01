@@ -49,3 +49,8 @@ test('avoids dishes already in the cart where alternatives exist',()=>{
   assert.ok(r.lines.every(x=>!['grouper','chicken','tofu'].includes(x.id)));
   assert.deepEqual(s.cart,before);
 });
+test('still offers alternatives with a full cart and a constrained budget',()=>{
+  const s=initialState();addLines(s,[makeLine('grouper'),makeLine('chicken'),makeLine('tofu'),makeLine('rice',4)]);
+  const first=chat('Recommend for 4 people, budget $60, not spicy',s),second=chat('Another suggestion',s);
+  assert.notEqual(signature(first),signature(second));assert.ok(total(second.lines)<=6000);
+});

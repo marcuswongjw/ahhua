@@ -80,9 +80,8 @@ function recommend(text, state, language) {
   if (context.noSeafood) ['chicken','kang','egg'].forEach(id=>excluded.add(id));
   const available = menu.filter(d=>d.id!=='rice'&&!excluded.has(d.id));
   // Prefer dishes not already ordered; suggestions remain separate from the cart.
-  const newDishes = available.filter(d=>!state.cart.some(x=>x.id===d.id));
   const target = context.pax<=2 ? 2 : context.pax<=4 ? 3 : context.pax<=6 ? 4 : 5;
-  const pool = newDishes.length>=Math.min(target,2) ? newDishes : available;
+  const pool = available;
   const rice = !context.noRice&&!excluded.has('rice') ? [makeLine('rice', context.pax, 'Regular', state.preference)] : [];
   const history = Array.isArray(state.recommendationHistory) ? state.recommendationHistory : [];
   const rank = { grouper:5, pomfret:4, snapper:3, chicken:5, tofu:4, kang:3, ribs:2.5, pork:2, egg:2 };
@@ -96,8 +95,9 @@ function recommend(text, state, language) {
         if (context.budget===null || price<=context.budget) {
           const recent=history.slice(-4);
           const repeatedItems=selected.reduce((n,d)=>n+recent.filter(h=>h.split('|').includes(d.id)).length,0);
+          const cartOverlap=selected.filter(d=>state.cart.some(x=>x.id===d.id)).length;
           const categoryBonus=new Set(selected.map(d=>d.category)).size*3;
-          const score=-Math.abs(target-selected.length)*100 + fish*(context.pax>2?10:0) + categoryBonus + selected.reduce((n,d)=>n+rank[d.id],0) - repeatedItems*4;
+          const score=-Math.abs(target-selected.length)*100 + fish*(context.pax>2?10:0) + categoryBonus + selected.reduce((n,d)=>n+rank[d.id],0) - repeatedItems*4 - cartOverlap*25;
           options.push({lines,signature,score,price});
         }
       }
