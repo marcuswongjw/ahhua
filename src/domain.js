@@ -1,3 +1,5 @@
+import { normaliseLanguage, replyText } from './languages.js';
+
 // Illustrative menu retained from the earlier Ah Hua prototype. Not verified restaurant data.
 export const menu = [
   { id: 'grouper', name: 'Grouper Fish Head Steamboat', cn: '石斑鱼头炉', price: 4800, category: 'Steamboat', icon: '🍲', desc: 'A bubbling pot of rich fish broth, tender grouper and vegetables.', tag: 'Ah Hua’s favourite', allergens: 'Fish', aliases: ['grouper', '石斑', 'fish head', '鱼头炉', 'steamboat'] },
@@ -13,7 +15,7 @@ export const menu = [
 ];
 export const money = cents => `S$${(cents / 100).toFixed(2)}`;
 export const dish = id => menu.find(x => x.id === id);
-export function initialState() { return { version: 1, cart: [], orders: [], calls: [], unavailable: [], messages: [{ role: 'host', text: 'Hello, welcome! I’m Ah Hua 阿华. A steamboat to share, something crispy on the side? Tell me what you fancy, or browse our menu. 😊' }], proposal: [], preference: '' }; }
+export function initialState() { return { version: 1, replyLanguage: 'en', cart: [], orders: [], calls: [], unavailable: [], messages: [{ role: 'host', text: replyText('en', 'welcome'), language: 'en' }], proposal: [], preference: '' }; }
 export function total(items) { return items.reduce((sum, x) => sum + x.qty * x.unitPrice, 0); }
 export function makeLine(id, qty = 1, size = 'Regular', notes = '') {
   const d = dish(id);
@@ -51,36 +53,42 @@ function aliasIndex(text, alias) {
   const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return text.search(new RegExp(`\\b${escaped}\\b`, 'i'));
 }
-export function chat(text, state) {
-  const t = text.toLowerCase().trim(); const zh = /[\u3400-\u9fff]/.test(t);
-  const answer = (en, cn, lines = []) => ({ text: zh ? cn : en, lines });
-  if (/allerg|allergic|过敏|nut.free|gluten.free|celiac/.test(t)) return answer('Please use “Call a server” for allergies. These sample recipes and allergen notes are unverified; I can’t confirm any dish is safe. I haven’t added anything.', '如有过敏，请点击“Call a server”。示例食谱和过敏原信息未经确认，我无法保证菜品安全，也没有添加菜品。');
-  if (/call.*(staff|server)|human|服务员/.test(t)) return answer('Tap “Call a server” above to create a simulated assistance request for staff.', '请点击“Call a server”发送模拟服务请求。');
-  if (/checkout|submit|pay|place.*order|下单|付款/.test(t)) return answer('Review your shared cart, then tap “Send to staff”. Only staff approval sends a demo ticket to the kitchen. There are no real payments.', '请检查购物车，再点击“Send to staff”。员工批准后才会生成模拟厨房订单。没有真实付款。');
-  if (/review|cart|订单|购物车/.test(t)) return answer(state.cart.length ? `Your cart has ${state.cart.reduce((n,x)=>n+x.qty,0)} dishes for ${money(total(state.cart))}. You can change quantities in Your table order.` : 'Your cart is empty. Shall we start with a steamboat?', state.cart.length ? `购物车共 ${state.cart.reduce((n,x)=>n+x.qty,0)} 份，示例总额 ${money(total(state.cart))}。您可以在购物车修改数量。` : '购物车还是空的。先来一份鱼头炉吗？');
+export function chat(text, state, selectedLanguage = state.replyLanguage) {
+  const t = text.toLowerCase().trim();
+  const language = normaliseLanguage(selectedLanguage);
+  const answer = (key, data = {}, lines = []) => ({ text: replyText(language, key, data), lines, language });
+  if (/allerg|allergic|过敏|nut.free|gluten.free|celiac/.test(t)) return answer('allergy');
+  if (/call.*(staff|server)|human|服务员/.test(t)) return answer('call');
+  if (/checkout|submit|pay|place.*order|下单|付款/.test(t)) return answer('checkout');
+  if (/review|cart|订单|购物车/.test(t)) return answer(state.cart.length ? 'cart' : 'emptyCart', { count: state.cart.reduce((n,x)=>n+x.qty,0), amount: money(total(state.cart)) });
   if (/no spicy|not spicy|non.spicy|mild|不辣|kids|children/.test(t)) state.preference = 'No chilli requested; staff must confirm';
-  if (/vegetarian|vegan|素食|清真|halal/.test(t)) return answer('I can’t verify vegetarian, vegan or halal suitability from this sample menu. Please call a server before choosing. No dishes added.', '此示例菜单无法确认素食或清真要求。请选择“Call a server”请员工确认。没有添加菜品。');
+  if (/vegetarian|vegan|素食|清真|halal/.test(t)) return answer('dietary');
   if (/recommend|suggest|pax|people|推荐|几个人|人吃|人餐|what.*good/.test(t)) {
     const paxMatch = t.match(/(\d+)\s*(?:pax|people|人)/); const pax = Math.min(12, Math.max(1, Number(paxMatch?.[1] || 4)));
     const ids = ['grouper', 'chicken', 'tofu', 'rice'].filter(id => !state.unavailable.includes(id));
     const lines = ids.map(id => makeLine(id, id === 'rice' ? pax : 1, id === 'grouper' && pax > 4 ? 'Large' : 'Regular', state.preference));
-    return answer(`For ${pax}, how about a steamboat, crispy chicken, soft beancurd and rice? Here’s a sample sharing set (${money(total(lines))}). Portions and recipes need staff confirmation. Review the suggestion below before adding.`, `为 ${pax} 位推荐鱼头炉、虾酱鸡、豆腐和白饭。示例套餐 ${money(total(lines))}，份量与食谱需员工确认。请检查下方建议后再加入购物车。`, lines);
+    return answer('recommendation', {pax, amount: money(total(lines))}, lines);
   }
   const found = menu.map(d => ({ d, at: Math.min(...d.aliases.map(a=>aliasIndex(t,a)).filter(i=>i>=0), Infinity) })).filter(x=>Number.isFinite(x.at));
   // Specific steamboat names take precedence over the generic word “steamboat”.
   const matches = found.filter(x=>x.d.id !== 'grouper' || !found.some(y=>['pomfret','snapper'].includes(y.d.id)) || /grouper|石斑/.test(t)).sort((a,b)=>a.at-b.at);
   if (matches.length) {
-    if (/\b(no|without|don.t|remove|cancel)\b|不要|取消|去掉/.test(t) && !/no chilli|no spicy|without chilli/.test(t)) return answer('I haven’t changed your cart. Use the minus controls to remove dishes, or tell me what you’d like to add.', '我没有更改购物车。请使用减号删除菜品，或告诉我想添加什么。');
-    if (/price|how much|多少钱|价格|what is|what.s in/.test(t)) return answer(matches.map(({d})=>`${d.name}: from ${money(d.price)}. ${d.desc} Sample allergens: ${d.allergens}.`).join('\n') + ' All details need restaurant confirmation.', matches.map(({d})=>`${d.cn}：示例起价 ${money(d.price)}。`).join('\n') + '食谱、过敏原和价格均需员工确认。');
+    if (/\b(no|without|don.t|remove|cancel)\b|不要|取消|去掉/.test(t) && !/no chilli|no spicy|without chilli/.test(t)) return answer('excluded');
+    if (/price|how much|多少钱|价格|what is|what.s in/.test(t)) {
+      const text = language === 'zh'
+        ? matches.map(({d})=>`${d.cn}：示例起价 ${money(d.price)}。`).join('\n') + '食谱、过敏原和价格均需员工确认。'
+        : matches.map(({d})=>`${d.name}: ${language === 'singlish' ? 'sample price starts from' : 'from'} ${money(d.price)}. ${d.desc} Sample allergens: ${d.allergens}.`).join('\n') + (language === 'singlish' ? ' These details must check with staff first, okay?' : ' All details need restaurant confirmation.');
+      return {text, lines: [], language};
+    }
     const lines = matches.filter(({d})=>!state.unavailable.includes(d.id)).map(({d,at},i)=>{
       const start = i ? matches[i-1].at + matches[i-1].d.aliases.find(a=>aliasIndex(t,a)===matches[i-1].at)?.length || 0 : 0;
       const prefix = t.slice(start, at); const match = prefix.match(/(\d+|one|two|three|four|five|six|a|一|两|二|三|四|五|六)\s*(?:份|碗|个|x)?\s*(?:large|regular|small)?\s*$/);
       const qty = match ? Number(match[1]) || numberWords[match[1]] : 1;
       return makeLine(d.id, qty, d.id !== 'rice' && /large|大份/.test(prefix.slice(-16)) ? 'Large' : 'Regular', state.preference);
     });
-    if (!lines.length) return answer('Those dishes are unavailable in this demo. Try another dish from the menu.', '这些菜品暂时售罄，请从菜单选择其他菜品。');
-    return answer('Can! I’ve prepared your selection below. Check quantities, sizes and notes, then add it to your cart. Nothing is sent to staff yet.', '好的！请检查下方菜品、数量和份量，再加入购物车。暂未发送给员工。', lines);
+    if (!lines.length) return answer('unavailable');
+    return answer('selected', {}, lines);
   }
-  if (/menu|菜单/.test(t)) return answer('Browse the menu beside our chat (or below on your phone). Every dish can be customised and added to the same cart.', '您可以在旁边或手机下方浏览菜单，自定义菜品后加入同一个购物车。');
-  return answer('I’m a demo menu assistant. Try “recommend for 4, not spicy”, “two rice and one prawn paste chicken”, or ask a dish’s price. You can always browse the menu or call a server.', '我是示例菜单助手。试试“推荐四人餐”或“两碗白饭和一份虾酱鸡”。也可以直接浏览菜单或呼叫服务员。');
+  if (/menu|菜单/.test(t)) return answer('menu');
+  return answer('fallback');
 }

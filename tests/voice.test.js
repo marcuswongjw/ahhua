@@ -27,3 +27,9 @@ test('English greetings with a Chinese name keep an English voice; Mandarin uses
   assert.equal(speechLanguage('好的，请检查购物车。'),'zh-CN');
   const {player,spoken}=setup();player.play('好的，请检查购物车。');assert.equal(spoken[0].voice.lang,'zh-CN');
 });
+test('selected language explicitly controls speech even when the text contains another script',()=>{
+  const {player,spoken}=setup();
+  player.play('Hello!', 'zh');assert.equal(spoken.at(-1).lang,'zh-CN');
+  player.play('Can lah!', 'singlish');assert.equal(spoken.at(-1).lang,'en-SG');
+  player.play('阿华 says hello.', 'en');assert.equal(spoken.at(-1).lang,'en-GB');
+});

@@ -1,3 +1,4 @@
+import { languages, normaliseLanguage } from './languages.js';
 // Browser speech adapter with explicit playback lifecycle for the avatar.
 export function speechLanguage(text) {
   const han = (text.match(/[\u3400-\u9fff]/g) || []).length;
@@ -7,12 +8,12 @@ export function speechLanguage(text) {
 export function createVoicePlayer({ synthesis, Utterance, onState, onError }) {
   let generation = 0;
   function stop() { generation++; synthesis?.cancel(); onState(false); }
-  function play(text) {
+  function play(text, language) {
     stop();
     if (!synthesis || !Utterance) { onError(); return; }
     const current = generation;
     const utterance = new Utterance(text.replace(/[😊🍲]/gu, ''));
-    utterance.lang = speechLanguage(text); utterance.rate = .94;
+    utterance.lang = language ? languages[normaliseLanguage(language)].speech : speechLanguage(text); utterance.rate = .94;
     const voices = synthesis.getVoices();
     const voice = voices.find(x => x.lang === utterance.lang) || voices.find(x => x.lang.startsWith(utterance.lang.slice(0,2)));
     if (voice) utterance.voice = voice;

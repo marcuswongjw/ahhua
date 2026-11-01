@@ -1,6 +1,7 @@
 import { menu, money, dish, initialState, total, makeLine, addLines, submit, transition, chat } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
+import { languages, normaliseLanguage, replyText } from './languages.js';
 
 const $ = s => document.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -8,7 +9,8 @@ const key = 'ah-hua-demo-v1';
 let state = initialState();
 try { const saved = JSON.parse(localStorage.getItem(key)); if (saved?.version === 1 && ['cart','orders','messages','calls','unavailable','proposal'].every(k => Array.isArray(saved[k]))) state = saved; } catch { /* A fresh session also works when browser storage is blocked. */ }
 let role = 'customer', category = 'All dishes', draft = '', speaking = false, listening = false, recognition, lastVoiceError = '', search = '';
-let language = 'en-SG';
+state.replyLanguage = normaliseLanguage(state.replyLanguage);
+const localReply = (key, data) => replyText(state.replyLanguage, key, data);
 let voicePlaying = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechSupported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
@@ -21,9 +23,9 @@ const count = () => state.cart.reduce((n,x)=>n+x.qty,0);
 function save() { try { localStorage.setItem(key, JSON.stringify(state)); } catch { toast('Browser storage is unavailable. Keep this page open to retain your demo.'); } }
 function toast(text) { $('#toast').textContent = text; $('#toast').classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(()=>$('#toast').classList.remove('show'), 5000); }
 function act(fn) { try { fn(); save(); render(); } catch (e) { toast(e.message); } }
-function speak(text) {
+function speak(text, language = state.replyLanguage) {
   recognition?.abort(); listening = false; updateVoice();
-  voicePlayer.play(text);
+  voicePlayer.play(text, language);
 }
 function updateAvatar() {
   const avatar = $('#ah-hua-avatar');
@@ -38,7 +40,7 @@ function updateSpeaker() {
   button.setAttribute('aria-pressed', String(speaking));
   if ($('#voice-reply-help')) $('#voice-reply-help').textContent = !speechSupported ? 'Spoken replies aren’t available in this browser. Every reply appears in chat.' : speaking ? 'Ah Hua will read new replies aloud. Tap the avatar or Listen to replay.' : 'Want to hear Ah Hua? Turn on voice replies, or tap the avatar to try it.';
 }
-function reply(text) { state.messages.push({role:'host',text}); if (speaking) speak(text); }
+function reply(text) { state.messages.push({role:'host',text,language:state.replyLanguage}); if (speaking) speak(text); }
 function send(text) {
   text = text.trim().slice(0, 500); if (!text) return;
   act(()=>{ state.messages.push({role:'customer',text}); const response = chat(text,state); state.proposal = response.lines; reply(response.text); state.messages = state.messages.slice(-80); draft = ''; });
@@ -49,7 +51,7 @@ function startVoice() {
   if (listening) { recognition?.stop(); return; }
   if (!SpeechRecognition || !window.isSecureContext) { toast('Speech input is unavailable here. Please type or choose from the menu.'); return; }
   voicePlayer.stop(); lastVoiceError = '';
-  recognition = new SpeechRecognition(); recognition.lang = language; recognition.continuous = false; recognition.interimResults = false;
+  recognition = new SpeechRecognition(); recognition.lang = languages[normaliseLanguage(state.replyLanguage)].speech; recognition.continuous = false; recognition.interimResults = false;
   recognition.onstart = () => { listening = true; updateVoice(); };
   recognition.onresult = event => { draft = event.results[0][0].transcript.slice(0,500); const input = $('#message'); if (input) { input.value = draft; input.focus(); } toast('Speech captured. Review your words, then press Send.'); };
   recognition.onerror = event => { lastVoiceError = ({ 'not-allowed': 'Microphone permission was denied. You can still type or browse the menu.', 'no-speech': 'No speech detected. Tap Speak to try again, or type.', 'network': 'The browser speech service could not connect. Please type or choose dishes.', 'audio-capture': 'No microphone was found. Please type or browse the menu.', 'language-not-supported': 'That speech language is unavailable on this browser.' })[event.error] || 'Speech input stopped. You can still type or browse the menu.'; toast(lastVoiceError); };
@@ -61,6 +63,7 @@ const statusLabel = { pending:'Awaiting staff', approved:'Approved', preparing:'
 function badge(status) { return `<span class="badge ${status}">${statusLabel[status]}</span>`; }
 function orderLines(order) { return order.items.map(x=>`<li><b>${x.qty} × ${esc(x.name)}</b><span>${esc(x.size)}${x.notes ? ' · '+esc(x.notes) : ''}</span><strong>${money(x.qty*x.unitPrice)}</strong></li>`).join(''); }
 function render() {
+  state.replyLanguage = normaliseLanguage(state.replyLanguage);
   const pending = state.orders.filter(x=>x.status==='pending').length;
   $('#app').innerHTML = `
   <div class="demo-bar"><span class="dot"></span> DEMO EXPERIENCE <span class="demo-detail">Sample menu · No real orders or charges</span></div>
@@ -78,10 +81,10 @@ function render() {
 function customer() {
   const shown = menu.filter(d=>(category==='All dishes'||d.category===category)&&`${d.name} ${d.cn}`.toLowerCase().includes(search.toLowerCase()));
   return `<section class="welcome"><div><div class="eyebrow">GOOD FOOD, GOOD COMPANY</div><h1>Come in. Make yourself at home.</h1><p>Speak to Ah Hua, drop a message, or find your next favourite below.</p></div><label class="table-select">TABLE NUMBER<select id="table" aria-label="Table number">${Array.from({length:20},(_,i)=>`<option ${String(i+1).padStart(2,'0')===table?'selected':''}>${String(i+1).padStart(2,'0')}</option>`).join('')}</select></label></section>
-  <div class="dining-grid"><div class="left-column"><section class="host-card"><div class="host-heading">${avatarMarkup()}<div><h2>Have a chat with Ah Hua <span class="online-dot"></span></h2><p>English, 中文 & a little Singlish · Demo menu assistant</p></div><div class="reply-controls"><button id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported?'':'disabled'}>${speaking?'Voice replies: on':'Turn on voice replies'}</button><button id="stop-playback" class="text-button" hidden>Stop voice</button></div></div><div class="avatar-caption"><span id="avatar-status" role="status"></span><p id="voice-reply-help"></p></div>
-  <div class="chat-log" role="log" aria-label="Conversation with Ah Hua" aria-live="polite">${state.messages.map((m,i)=>`<div class="message ${m.role}"><small>${m.role==='host'?'AH HUA':'YOU'}</small><div>${esc(m.text)}</div>${m.role==='host'&&speechSupported?`<button class="replay" data-replay="${i}" aria-label="Read response ${i+1} aloud">Listen ↗</button>`:''}</div>`).join('')}</div>
-  ${state.proposal.length?`<div class="proposal"><b>A suggestion for your table</b><ul>${state.proposal.map(x=>`<li>${x.qty} × ${esc(x.name)} <span>${esc(x.size)} · ${money(x.qty*x.unitPrice)}${x.notes?' · '+esc(x.notes):''}</span></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button id="dismiss-proposal" class="text-button">Dismiss</button><button id="accept-proposal" class="primary small">Add suggestion to cart +</button></div></div>`:''}
-  <div class="chat-bottom"><div class="suggestions"><button data-chat="Recommend for 4, not spicy">✧ Recommend for 4</button><button data-chat="Two rice and one prawn paste chicken">Try a sample order</button><button data-chat="Review my cart">Review my cart</button></div><form id="chat-form"><label class="sr-only" for="message">Message Ah Hua</label><input id="message" maxlength="500" placeholder="Ah Hua, what’s good for four people?" value="${esc(draft)}" autocomplete="off"><button class="send" type="submit" aria-label="Send message">↑</button></form><div class="voice-controls"><button id="mic" class="voice-button" ${SpeechRecognition&&window.isSecureContext?'':'disabled'} aria-pressed="false">♩ Speak</button><select id="language" aria-label="Speech input language"><option value="en-SG" ${language==='en-SG'?'selected':''}>English / Singlish</option><option value="zh-CN" ${language==='zh-CN'?'selected':''}>普通话 Mandarin</option></select><span id="voice-status"></span></div><details class="voice-privacy"><summary>About voice & this demo</summary><p>Your browser may send audio to its speech provider. Ah Hua stores no recordings. Spoken replies use your device’s available voices. This is a limited, rule-based menu assistant; no AI service is connected. Allergy and dietary details need staff confirmation.</p></details></div></section>
+  <div class="dining-grid"><div class="left-column"><section class="host-card"><div class="host-heading">${avatarMarkup()}<div><h2>Have a chat with Ah Hua <span class="online-dot"></span></h2><p>English, 中文 & a little Singlish · Demo menu assistant</p></div><div class="reply-controls"><button id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported?'':'disabled'}>${speaking?'Voice replies: on':'Turn on voice replies'}</button><button id="stop-playback" class="text-button" hidden>Stop voice</button></div></div><div class="avatar-caption"><label class="reply-language-label">Ah Hua’s language · 回复语言<select id="reply-language" aria-label="Ah Hua reply language">${Object.entries(languages).map(([id,l])=>`<option value="${id}" ${state.replyLanguage===id?'selected':''}>${l.label}</option>`).join('')}</select></label><div class="language-voice-note">${state.replyLanguage==='zh'?'中文文字回复与普通话语音 · 麦克风识别普通话':state.replyLanguage==='singlish'?'Singlish replies · Singapore English voice where available':'English replies and speech input'}</div><span id="avatar-status" role="status"></span><p id="voice-reply-help"></p></div>
+  <div class="chat-log" role="log" aria-label="Conversation with Ah Hua" aria-live="polite">${state.messages.map((m,i)=>`<div class="message ${m.role}" ${m.role==='host'?`lang="${languages[normaliseLanguage(m.language)].html}"`:''}><small>${m.role==='host'?'AH HUA':'YOU'}</small><div>${esc(m.text)}</div>${m.role==='host'&&speechSupported?`<button class="replay" data-replay="${i}" aria-label="Read response ${i+1} aloud">Listen ↗</button>`:''}</div>`).join('')}</div>
+  ${state.proposal.length?`<div class="proposal"><b>${state.replyLanguage==='zh'?'为您推荐':'A suggestion for your table'}</b><ul>${state.proposal.map(x=>`<li>${x.qty} × ${esc(state.replyLanguage==='zh'?dish(x.id).cn:x.name)} <span>${esc(x.size)} · ${money(x.qty*x.unitPrice)}${x.notes?' · '+esc(x.notes):''}</span></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button id="dismiss-proposal" class="text-button">Dismiss</button><button id="accept-proposal" class="primary small">Add suggestion to cart +</button></div></div>`:''}
+  <div class="chat-bottom"><div class="suggestions"><button data-chat="Recommend for 4, not spicy">${state.replyLanguage==='zh'?'✧ 推荐四人餐':state.replyLanguage==='singlish'?'✧ Four pax, what’s good?':'✧ Recommend for 4'}</button><button data-chat="Two rice and one prawn paste chicken">${state.replyLanguage==='zh'?'试试示例点餐':'Try a sample order'}</button><button data-chat="Review my cart">${state.replyLanguage==='zh'?'查看购物车':'Review my cart'}</button></div><form id="chat-form"><label class="sr-only" for="message">Message Ah Hua</label><input id="message" maxlength="500" placeholder="${esc(localReply('placeholder'))}" value="${esc(draft)}" autocomplete="off"><button class="send" type="submit" aria-label="Send message">↑</button></form><div class="voice-controls"><button id="mic" class="voice-button" ${SpeechRecognition&&window.isSecureContext?'':'disabled'} aria-pressed="false">♩ Speak</button><span id="voice-status"></span></div><details class="voice-privacy"><summary>About voice & this demo</summary><p>Your browser may send audio to its speech provider. Ah Hua stores no recordings. Spoken replies use your device’s available voices. This is a limited, rule-based menu assistant; no AI service is connected. Allergy and dietary details need staff confirmation.</p></details></div></section>
   <section class="menu-section"><div class="section-top"><div><div class="eyebrow">MADE FOR SHARING</div><h2>Something for everyone.</h2></div><span class="sample-label">Illustrative menu & prices</span></div><div class="menu-tools"><div class="categories" aria-label="Menu category">${['All dishes','Steamboat','Favourites','Greens & sides'].map(c=>`<button data-category="${c}" aria-pressed="${category===c}" class="${category===c?'active':''}">${c}</button>`).join('')}</div><input id="search" aria-label="Search dishes" placeholder="Search dishes…" value="${esc(search)}"></div><div class="menu-grid">${shown.map(d=>`<article class="dish-card ${state.unavailable.includes(d.id)?'sold-out':''}"><div class="dish-art ${d.id}"><span>${d.icon}</span>${d.tag?`<em>${esc(d.tag)}</em>`:''}</div><div class="dish-info"><small>${d.cn}</small><h3>${d.name}</h3><p>${d.desc}</p><div class="dish-bottom"><strong>${money(d.price)} <small>${d.id==='rice'?'/ bowl':'from'}</small></strong><button class="add-dish" data-dish="${d.id}" ${state.unavailable.includes(d.id)?'disabled':''} aria-label="${state.unavailable.includes(d.id)?'Unavailable':'Customise'} ${d.name}">${state.unavailable.includes(d.id)?'Sold out':'+'}</button></div></div></article>`).join('')||'<p class="empty">No dishes match. Try another search.</p>'}</div><p class="menu-footnote">All prices, portions, recipes and allergen notes are illustrative and unverified. No GST or service charge is applied in this demo.</p></section></div>${cart()}</div>`;
 }
 function cart() {
@@ -102,19 +105,19 @@ function bindCustomer() {
   $('#message').oninput=e=>draft=e.target.value;
   $('#table').onchange=e=>{table=e.target.value;const url=new URL(location.href);url.searchParams.set('table',table);history.replaceState(null,'',url);render();};
   $('#mic').onclick=startVoice;
-  $('#language').onchange=e=>{stopVoice();language=e.target.value;updateVoice();};
-  $('#speaker').onclick=()=>{speaking=!speaking;updateSpeaker();if(speaking)speak('Hello! I’m Ah Hua. I’ll read my replies aloud for you. What would you like to eat?');else voicePlayer.stop();};
+  $('#reply-language').onchange=e=>act(()=>{draft=$('#message').value;stopVoice();state.replyLanguage=normaliseLanguage(e.target.value);reply(localReply('switched'));state.messages=state.messages.slice(-80);});
+  $('#speaker').onclick=()=>{speaking=!speaking;updateSpeaker();if(speaking)speak(localReply('voiceEnabled'));else voicePlayer.stop();};
   $('#stop-playback').onclick=()=>voicePlayer.stop();
-  $('#ah-hua-avatar').onclick=()=>{if(!speechSupported){toast('Voice isn’t available in this browser. Chat with me below.');return;}speaking=true;updateSpeaker();speak(state.messages.findLast(m=>m.role==='host')?.text || 'Hello, welcome!');};
-  document.querySelectorAll('[data-replay]').forEach(b=>b.onclick=()=>speak(state.messages[+b.dataset.replay].text));
+  $('#ah-hua-avatar').onclick=()=>{if(!speechSupported){toast('Voice isn’t available in this browser. Chat with me below.');return;}speaking=true;updateSpeaker();const message=state.messages.findLast(m=>m.role==='host');speak(message?.text || localReply('welcome'),message?.language || null);};
+  document.querySelectorAll('[data-replay]').forEach(b=>b.onclick=()=>{const m=state.messages[+b.dataset.replay];speak(m.text,m.language || null);});
   document.querySelectorAll('[data-chat]').forEach(b=>b.onclick=()=>send(b.dataset.chat));
   document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{draft=$('#message').value;category=b.dataset.category;render();});
   $('#search').oninput=e=>{const start=e.target.selectionStart;search=e.target.value;render();$('#search').focus();$('#search').setSelectionRange(start,start);};
   document.querySelectorAll('[data-dish]').forEach(b=>b.onclick=()=>openDish(b.dataset.dish));
   document.querySelectorAll('[data-qty]').forEach(b=>b.onclick=()=>act(()=>{const line=state.cart[+b.dataset.qty];line.qty+=+b.dataset.delta;if(line.qty<=0)state.cart.splice(+b.dataset.qty,1);}));
-  $('#accept-proposal')?.addEventListener('click',()=>act(()=>{addLines(state,state.proposal);state.proposal=[];reply('Added to your cart. Have a look, make any changes, then send it to staff when you’re ready.');toast('Suggestion added to your shared cart.');}));
+  $('#accept-proposal')?.addEventListener('click',()=>act(()=>{addLines(state,state.proposal);state.proposal=[];reply(localReply('added'));toast('Suggestion added to your shared cart.');}));
   $('#dismiss-proposal')?.addEventListener('click',()=>act(()=>{state.proposal=[];}));
-  $('#submit-order').onclick=()=>act(()=>{const order=submit(state,table);reply(`Order ${order.id} is waiting for staff approval. Switch to Staff to review it, then Kitchen to follow the cooking simulation.`);toast(`${order.id} sent for demo staff approval.`);});
+  $('#submit-order').onclick=()=>act(()=>{const order=submit(state,table);reply(localReply('submitted',{id:order.id}));toast(`${order.id} sent for demo staff approval.`);});
   document.querySelectorAll('[data-receipt]').forEach(b=>b.onclick=()=>act(()=>{const o=state.orders.find(x=>x.id===b.dataset.receipt);if(o.status==='served')o.paid=true;toast('Simulated receipt created. Amount charged: S$0.00.');}));
   const log=$('.chat-log');log.scrollTop=log.scrollHeight;updateVoice();updateSpeaker();
 }

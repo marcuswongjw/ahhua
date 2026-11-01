@@ -11,6 +11,8 @@ A warm, responsive restaurant experience built from the menu and workflow in the
 
 ## Safe demo boundaries
 
+Customers can choose **English**, **中文（普通话）**, or **Singlish** in the visible **Ah Hua’s language · 回复语言** selector above the conversation. The selection is saved locally and governs new chat replies, order confirmations, spoken replies and microphone recognition. Switching languages leaves the cart and conversation history intact. Older messages replay in their original language. Singlish uses Singapore-style phrasing and requests `en-SG` speech; English requests `en-GB`, and Chinese requests `zh-CN`. Available voices and accents depend on the device/browser. This is reply-language selection, not a full translation of staff/kitchen screens.
+
 - No payment SDK, payment credentials, real charges, restaurant APIs, kitchen printers, database or AI API is connected.
 - Prices, recipes, allergens and portions are illustrative and unverified. The assistant never guarantees allergy, vegan, vegetarian or halal suitability.
 - Staff and Kitchen are **public simulation controls**, not authenticated production staff systems.
