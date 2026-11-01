@@ -4,10 +4,10 @@ A warm, responsive restaurant experience built from the menu and workflow in the
 
 ## Explore
 
-1. **Customer:** choose the explicitly labelled **Table number**, type a request, dictate it with **Speak**, or customise dishes directly from the menu. Speech fills an editable draft; press Send yourself. Chat suggestions require an explicit **Add suggestion to cart** click. All three methods share one cart. Enable **Turn on voice replies** to hear new replies automatically, or tap Ah Hua’s animated avatar to enable voice and replay the latest reply. **Stop voice** stops current playback.
-2. **Staff:** review submitted orders, tick the review box and approve them, or decline with a reason. Change sample availability and acknowledge simulated server requests.
-3. **Kitchen:** only approved orders appear. Move them through cooking, ready and served.
-4. Return to Customer to follow the status and create a simulated receipt after serving. Amount charged is always **S$0.00**.
+1. **Customer:** choose the explicitly labelled **Table number** (or tap the table badge to view the Table QR standee), type a request, dictate it with **Speak**, quick-add dishes (`Quick +1`), or customise dishes with traditional preparation chips (broth style, spice level, ice/sweetness) from the menu. Use the **At your table** service bar to request a steamboat broth refill, hot tea top-up, or extra bowls and chilli. Submit multiple ordering rounds to a shared table tab and open **View & split bill** to calculate per-diner shares and generate a simulated S$0.00 receipt.
+2. **Staff:** view the live **20-table floor map** (idle, approval waiting, calling server, or dining), filter by table, review submitted rounds, tick the review box and approve them, or decline with a reason. Acknowledge categorised table service requests and toggle sample dish availability.
+3. **Kitchen:** monitor active production counts (steamboat pots, wok dishes, steamed rice, drinks), check off individual dishes as they are plated at the pass, and move approved tickets through cooking, ready and served.
+4. Return to Customer to see plated dish indicators, track round progress, and settle the simulated receipt after serving. Amount charged is always **S$0.00**.
 
 ## Safe demo boundaries
 

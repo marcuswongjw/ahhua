@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, makeLine, addLines, chat, total, submit, transition } from '../src/domain.js';
+import { initialState, makeLine, addLines, chat, total, submit, transition, requestService, tableSummary, settleTable, toggleOrderItem } from '../src/domain.js';
+import { handleRequest } from '../server.mjs';
+import { EventEmitter } from 'node:events';
 
 test('typed multilingual order proposals require confirmation and share manual cart', () => {
   const s=initialState();
@@ -52,4 +54,67 @@ test('price inquiries do not accidentally match rice inside the word price', () 
 });
 test('submitted order snapshots cannot change when a later cart changes', () => {
   const s=initialState();addLines(s,[makeLine('rice',2)]);const order=submit(s,'08');addLines(s,[makeLine('rice',3)]);assert.equal(order.items[0].qty,2);assert.equal(s.cart[0].qty,3);
+});
+test('multi-round communal table tab, bill splitting and S$0.00 settlement', () => {
+  const s = initialState();
+  addLines(s, [makeLine('grouper', 1, 'Regular', 'Charcoal milky broth'), makeLine('tea', 1)]);
+  const round1 = submit(s, '08');
+  assert.equal(round1.round, 1);
+  addLines(s, [makeLine('yam', 1), makeLine('rice', 4)]);
+  const round2 = submit(s, '08');
+  assert.equal(round2.round, 2);
+  const summary = tableSummary(s, '08', 4);
+  assert.equal(summary.rounds, 2);
+  assert.equal(summary.subtotal, 6600);
+  assert.equal(summary.subtotalPerPax, 1650);
+  assert.equal(summary.serviceCharge, 660);
+  assert.equal(summary.gst, 653);
+  assert.equal(summary.grandTotal, 7913);
+  assert.equal(summary.amountCharged, 0);
+  assert.throws(() => settleTable(s, '08'));
+  for (const status of ['approved', 'preparing', 'ready', 'served']) transition(s, round1.id, status);
+  assert.equal(settleTable(s, '08'), 1);
+  assert.equal(round1.paid, true);
+  assert.equal(round2.paid, false);
+});
+test('actionable table service requests and kitchen item check-offs', () => {
+  const s = initialState();
+  const soup = requestService(s, '05', 'soup');
+  assert.equal(soup.type, 'soup');
+  assert.match(soup.label, /broth/);
+  assert.throws(() => requestService(s, '05', 'soup'));
+  const tea = requestService(s, '05', 'tea');
+  assert.equal(tea.type, 'tea');
+  assert.equal(s.calls.filter(c => c.table === '05' && !c.done).length, 2);
+
+  addLines(s, [makeLine('chicken', 1), makeLine('barley', 2)]);
+  assert.throws(() => makeLine('barley', 1, 'Large'));
+  const order = submit(s, '05');
+  assert.deepEqual(toggleOrderItem(s, order.id, 1), [1]);
+  assert.deepEqual(toggleOrderItem(s, order.id, 0), [0, 1]);
+  assert.deepEqual(toggleOrderItem(s, order.id, 1), [0]);
+});
+test('hybrid live sync server broadcasts state updates across connected clients', async () => {
+  const sseChunks = [];
+  const sseReq = Object.assign(new EventEmitter(), { url: '/api/events', method: 'GET' });
+  const sseRes = { writeHead() {}, write(chunk) { sseChunks.push(chunk); } };
+  await handleRequest(sseReq, sseRes);
+  assert.ok(sseChunks.length >= 1);
+
+  const s = initialState();
+  addLines(s, [makeLine('calamansi', 2)]);
+  const postReq = Object.assign(new EventEmitter(), { url: '/api/state', method: 'POST', setEncoding() {} });
+  let postStatus = 0;
+  const postPromise = handleRequest(postReq, { writeHead(code) { postStatus = code; }, end() {} });
+  postReq.emit('data', JSON.stringify({ state: s, senderId: 'test-client' }));
+  postReq.emit('end');
+  await postPromise;
+  assert.equal(postStatus, 200);
+
+  let getBody = '';
+  await handleRequest({ url: '/api/state', method: 'GET' }, { writeHead() {}, end(b) { getBody = b; } });
+  const data = JSON.parse(getBody);
+  assert.equal(data.state.cart[0].id, 'calamansi');
+  assert.equal(data.state.cart[0].qty, 2);
+  sseReq.emit('close');
 });
