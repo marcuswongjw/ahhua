@@ -1,0 +1,51 @@
+# Ah Hua 阿华 — Restaurant ordering demo
+
+A warm, responsive restaurant experience built from the menu and workflow in the earlier Ah Hua prototype. The earlier downloadable `ah-hua-chat-enabled.zip` was not accessible from this workspace; this is a fresh implementation of that concept.
+
+## Explore
+
+1. **Customer:** type a request, dictate it with **Speak**, or customise dishes directly from the menu. Speech fills an editable draft; press Send yourself. Chat suggestions require an explicit **Add suggestion to cart** click. All three methods share one cart.
+2. **Staff:** review submitted orders, tick the review box and approve them, or decline with a reason. Change sample availability and acknowledge simulated server requests.
+3. **Kitchen:** only approved orders appear. Move them through cooking, ready and served.
+4. Return to Customer to follow the status and create a simulated receipt after serving. Amount charged is always **S$0.00**.
+
+## Safe demo boundaries
+
+- No payment SDK, payment credentials, real charges, restaurant APIs, kitchen printers, database or AI API is connected.
+- Prices, recipes, allergens and portions are illustrative and unverified. The assistant never guarantees allergy, vegan, vegetarian or halal suitability.
+- Staff and Kitchen are **public simulation controls**, not authenticated production staff systems.
+- State is local to this browser profile and website origin using `localStorage`. Tabs on the same origin synchronize. Separate devices/visitors do not share orders. The cart belongs to this browser; the table selector assigns a table when submitting an order.
+- Menu chat is a limited deterministic assistant supporting English, common Mandarin menu phrases and Singlish-style requests. It is not a connected LLM. Unknown requests receive an honest fallback. Every proposed cart update requires customer confirmation.
+- Speech recognition requires HTTPS (or localhost), a supported browser and microphone permission. It is feature-detected; typing and manual selection remain available when unsupported or denied. Some browser implementations send audio to their speech service. This app does not record audio. Voice playback uses browser speech synthesis and installed voices; enable Sound or press Listen to hear replies.
+- No personal details are requested. Reset demo clears local sample state.
+
+## Run, test and build
+
+Requires Node.js 22 or newer; no third-party runtime or build dependencies.
+
+```sh
+npm ci
+npm test
+npm run build
+npm run dev
+# Open http://127.0.0.1:4173
+```
+
+Use `/?table=03` through `/?table=20` for table-specific entry links. Invalid values default to Table 08. You can change tables in Customer.
+
+`npm run build` creates the deployable `dist/` directory. `vercel.json` configures Vercel to build and serve it. No environment variables are required. Font loading falls back to system fonts if unavailable.
+
+## Technical structure
+
+- `src/domain.js`: menu, grounded chat proposals, integer-cent pricing, cart validation and order state transitions.
+- `src/app.js`: interface, safe text escaping, browser speech, persistence and simulation controls.
+- `src/styles.css`: responsive layout and visual design.
+- `tests/domain.test.js`: meaningful workflow, multilingual cart, availability, pricing and validation coverage.
+
+## Verification scope
+
+Automated tests exercise order approval gating, legal kitchen transitions, immutable submitted snapshots, quantity limits, current availability, multilingual proposals and safe dietary handling. Browser checks cover the actual customer → staff → kitchen → customer flow and responsive display. Real microphone capture and audible voice quality depend on the end-user device and require a human listening test; they are not established by a successful build.
+
+Voice API references: [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition), [SpeechSynthesis](https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis).
+
+This is an independent concept demo, not an official restaurant ordering service.
