@@ -45,6 +45,11 @@ test('specific fish selections override generic steamboat matching', () => {
   const s=initialState();assert.deepEqual(chat('one pomfret steamboat',s).lines.map(x=>x.id),['pomfret']);
   const r=chat('Recommend for 5 pax, not spicy',s);assert.equal(r.lines.find(x=>x.id==='rice').qty,5);assert.equal(r.lines.find(x=>x.id==='grouper').size,'Large');assert.ok(r.lines.every(x=>x.notes));
 });
+test('price inquiries do not accidentally match rice inside the word price', () => {
+  const response=chat('What is the price of tofu?',initialState());
+  assert.match(response.text,/Homemade Beancurd/);assert.doesNotMatch(response.text,/Steamed Rice/);
+  assert.equal(response.lines.length,0);
+});
 test('submitted order snapshots cannot change when a later cart changes', () => {
   const s=initialState();addLines(s,[makeLine('rice',2)]);const order=submit(s,'08');addLines(s,[makeLine('rice',3)]);assert.equal(order.items[0].qty,2);assert.equal(s.cart[0].qty,3);
 });

@@ -46,6 +46,11 @@ export function transition(state, id, status, reason = '') {
   order.status = status; order.reason = reason.trim().slice(0, 160);
 }
 const numberWords = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, 一: 1, 两: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
+function aliasIndex(text, alias) {
+  if (/[\u3400-\u9fff]/.test(alias)) return text.indexOf(alias);
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.search(new RegExp(`\\b${escaped}\\b`, 'i'));
+}
 export function chat(text, state) {
   const t = text.toLowerCase().trim(); const zh = /[\u3400-\u9fff]/.test(t);
   const answer = (en, cn, lines = []) => ({ text: zh ? cn : en, lines });
@@ -61,14 +66,14 @@ export function chat(text, state) {
     const lines = ids.map(id => makeLine(id, id === 'rice' ? pax : 1, id === 'grouper' && pax > 4 ? 'Large' : 'Regular', state.preference));
     return answer(`For ${pax}, how about a steamboat, crispy chicken, soft beancurd and rice? Here’s a sample sharing set (${money(total(lines))}). Portions and recipes need staff confirmation. Review the suggestion below before adding.`, `为 ${pax} 位推荐鱼头炉、虾酱鸡、豆腐和白饭。示例套餐 ${money(total(lines))}，份量与食谱需员工确认。请检查下方建议后再加入购物车。`, lines);
   }
-  const found = menu.map(d => ({ d, at: Math.min(...d.aliases.map(a=>t.indexOf(a)).filter(i=>i>=0), Infinity) })).filter(x=>Number.isFinite(x.at));
+  const found = menu.map(d => ({ d, at: Math.min(...d.aliases.map(a=>aliasIndex(t,a)).filter(i=>i>=0), Infinity) })).filter(x=>Number.isFinite(x.at));
   // Specific steamboat names take precedence over the generic word “steamboat”.
   const matches = found.filter(x=>x.d.id !== 'grouper' || !found.some(y=>['pomfret','snapper'].includes(y.d.id)) || /grouper|石斑/.test(t)).sort((a,b)=>a.at-b.at);
   if (matches.length) {
     if (/\b(no|without|don.t|remove|cancel)\b|不要|取消|去掉/.test(t) && !/no chilli|no spicy|without chilli/.test(t)) return answer('I haven’t changed your cart. Use the minus controls to remove dishes, or tell me what you’d like to add.', '我没有更改购物车。请使用减号删除菜品，或告诉我想添加什么。');
     if (/price|how much|多少钱|价格|what is|what.s in/.test(t)) return answer(matches.map(({d})=>`${d.name}: from ${money(d.price)}. ${d.desc} Sample allergens: ${d.allergens}.`).join('\n') + ' All details need restaurant confirmation.', matches.map(({d})=>`${d.cn}：示例起价 ${money(d.price)}。`).join('\n') + '食谱、过敏原和价格均需员工确认。');
     const lines = matches.filter(({d})=>!state.unavailable.includes(d.id)).map(({d,at},i)=>{
-      const start = i ? matches[i-1].at + matches[i-1].d.aliases.find(a=>t.indexOf(a)===matches[i-1].at)?.length || 0 : 0;
+      const start = i ? matches[i-1].at + matches[i-1].d.aliases.find(a=>aliasIndex(t,a)===matches[i-1].at)?.length || 0 : 0;
       const prefix = t.slice(start, at); const match = prefix.match(/(\d+|one|two|three|four|five|six|a|一|两|二|三|四|五|六)\s*(?:份|碗|个|x)?\s*(?:large|regular|small)?\s*$/);
       const qty = match ? Number(match[1]) || numberWords[match[1]] : 1;
       return makeLine(d.id, qty, d.id !== 'rice' && /large|大份/.test(prefix.slice(-16)) ? 'Large' : 'Regular', state.preference);
