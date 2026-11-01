@@ -1,4 +1,6 @@
 import { menu, money, dish, initialState, total, makeLine, addLines, submit, transition, chat } from './domain.js';
+import { avatarMarkup } from './avatar.js';
+import { createVoicePlayer } from './voice.js';
 
 const $ = s => document.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -7,8 +9,12 @@ let state = initialState();
 try { const saved = JSON.parse(localStorage.getItem(key)); if (saved?.version === 1 && ['cart','orders','messages','calls','unavailable','proposal'].every(k => Array.isArray(saved[k]))) state = saved; } catch { /* A fresh session also works when browser storage is blocked. */ }
 let role = 'customer', category = 'All dishes', draft = '', speaking = false, listening = false, recognition, lastVoiceError = '', search = '';
 let language = 'en-SG';
+let voicePlaying = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechSupported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+const voicePlayer = createVoicePlayer({ synthesis: window.speechSynthesis, Utterance: window.SpeechSynthesisUtterance,
+  onState: active => { voicePlaying = active; updateAvatar(); },
+  onError: () => toast('Spoken playback is unavailable. You can read every response in chat.') });
 const queryTable = new URLSearchParams(location.search).get('table');
 let table = /^\d{1,2}$/.test(queryTable || '') && +queryTable > 0 && +queryTable <= 20 ? queryTable.padStart(2, '0') : '08';
 const count = () => state.cart.reduce((n,x)=>n+x.qty,0);
@@ -16,13 +22,21 @@ function save() { try { localStorage.setItem(key, JSON.stringify(state)); } catc
 function toast(text) { $('#toast').textContent = text; $('#toast').classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(()=>$('#toast').classList.remove('show'), 5000); }
 function act(fn) { try { fn(); save(); render(); } catch (e) { toast(e.message); } }
 function speak(text) {
-  if (!speechSupported) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text.replace(/[😊🍲]/gu, ''));
-  utterance.lang = /[\u3400-\u9fff]/.test(text) ? 'zh-CN' : 'en-SG'; utterance.rate = .94;
-  const voice = window.speechSynthesis.getVoices().find(x=>x.lang.startsWith(utterance.lang.slice(0,2))); if (voice) utterance.voice = voice;
-  utterance.onerror = e => { if (!['canceled','interrupted'].includes(e.error)) toast('Spoken playback is unavailable. You can read every response in chat.'); };
-  window.speechSynthesis.speak(utterance);
+  recognition?.abort(); listening = false; updateVoice();
+  voicePlayer.play(text);
+}
+function updateAvatar() {
+  const avatar = $('#ah-hua-avatar');
+  if (avatar) avatar.dataset.state = listening ? 'listening' : voicePlaying ? 'speaking' : 'idle';
+  const status = $('#avatar-status');
+  if (status) status.textContent = listening ? 'I’m listening…' : voicePlaying ? 'Ah Hua is speaking…' : speechSupported ? 'Tap Ah Hua to hear my latest reply' : 'I’m here to help you choose';
+  const stop = $('#stop-playback'); if (stop) stop.hidden = !voicePlaying;
+}
+function updateSpeaker() {
+  const button = $('#speaker'); if (!button) return;
+  button.textContent = !speechSupported ? 'Voice unavailable' : speaking ? 'Voice replies: on' : 'Turn on voice replies';
+  button.setAttribute('aria-pressed', String(speaking));
+  if ($('#voice-reply-help')) $('#voice-reply-help').textContent = !speechSupported ? 'Spoken replies aren’t available in this browser. Every reply appears in chat.' : speaking ? 'Ah Hua will read new replies aloud. Tap the avatar or Listen to replay.' : 'Want to hear Ah Hua? Turn on voice replies, or tap the avatar to try it.';
 }
 function reply(text) { state.messages.push({role:'host',text}); if (speaking) speak(text); }
 function send(text) {
@@ -30,11 +44,11 @@ function send(text) {
   act(()=>{ state.messages.push({role:'customer',text}); const response = chat(text,state); state.proposal = response.lines; reply(response.text); state.messages = state.messages.slice(-80); draft = ''; });
   $('#message')?.focus();
 }
-function stopVoice() { recognition?.abort(); listening = false; window.speechSynthesis?.cancel(); }
+function stopVoice() { recognition?.abort(); listening = false; voicePlayer.stop(); updateVoice(); }
 function startVoice() {
   if (listening) { recognition?.stop(); return; }
   if (!SpeechRecognition || !window.isSecureContext) { toast('Speech input is unavailable here. Please type or choose from the menu.'); return; }
-  window.speechSynthesis?.cancel(); lastVoiceError = '';
+  voicePlayer.stop(); lastVoiceError = '';
   recognition = new SpeechRecognition(); recognition.lang = language; recognition.continuous = false; recognition.interimResults = false;
   recognition.onstart = () => { listening = true; updateVoice(); };
   recognition.onresult = event => { draft = event.results[0][0].transcript.slice(0,500); const input = $('#message'); if (input) { input.value = draft; input.focus(); } toast('Speech captured. Review your words, then press Send.'); };
@@ -42,7 +56,7 @@ function startVoice() {
   recognition.onend = () => { listening = false; updateVoice(); };
   try { recognition.start(); } catch { listening = false; toast('Could not start the microphone. Try again or type your message.'); }
 }
-function updateVoice() { const btn = $('#mic'); if (btn) { btn.textContent = listening ? '■ Stop listening' : '♩ Speak'; btn.classList.toggle('listening', listening); btn.setAttribute('aria-pressed', String(listening)); } if ($('#voice-status')) $('#voice-status').textContent = listening ? 'Listening… speak now. Your transcript will appear above.' : lastVoiceError || (SpeechRecognition ? 'Tap Speak, then review the transcript before sending.' : 'Speech input isn’t supported here. Typing and menu selection are ready.'); }
+function updateVoice() { const btn = $('#mic'); if (btn) { btn.textContent = listening ? '■ Stop listening' : '🎙 Speak'; btn.classList.toggle('listening', listening); btn.setAttribute('aria-pressed', String(listening)); } if ($('#voice-status')) $('#voice-status').textContent = listening ? 'Listening… speak now. Your transcript will appear above.' : lastVoiceError || (SpeechRecognition ? 'Tap Speak, then review the transcript before sending.' : 'Speech input isn’t supported here. Typing and menu selection are ready.'); updateAvatar(); }
 const statusLabel = { pending:'Awaiting staff', approved:'Approved', preparing:'Cooking', ready:'Ready to serve', served:'Served', rejected:'Declined' };
 function badge(status) { return `<span class="badge ${status}">${statusLabel[status]}</span>`; }
 function orderLines(order) { return order.items.map(x=>`<li><b>${x.qty} × ${esc(x.name)}</b><span>${esc(x.size)}${x.notes ? ' · '+esc(x.notes) : ''}</span><strong>${money(x.qty*x.unitPrice)}</strong></li>`).join(''); }
@@ -63,8 +77,8 @@ function render() {
 }
 function customer() {
   const shown = menu.filter(d=>(category==='All dishes'||d.category===category)&&`${d.name} ${d.cn}`.toLowerCase().includes(search.toLowerCase()));
-  return `<section class="welcome"><div><div class="eyebrow">GOOD FOOD, GOOD COMPANY</div><h1>Come in. Make yourself at home.</h1><p>Speak to Ah Hua, drop a message, or find your next favourite below.</p></div><label class="table-select">YOU’RE ORDERING FOR<select id="table" aria-label="Table number">${Array.from({length:20},(_,i)=>`<option ${String(i+1).padStart(2,'0')===table?'selected':''}>${String(i+1).padStart(2,'0')}</option>`).join('')}</select></label></section>
-  <div class="dining-grid"><div class="left-column"><section class="host-card"><div class="host-heading"><div class="avatar">👨🏻‍🍳</div><div><h2>Have a chat with Ah Hua <span class="online-dot"></span></h2><p>English, 中文 & a little Singlish · Demo menu assistant</p></div><button id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported?'':'disabled'}>${speaking?'◖ Sound on':'◖ Sound off'}</button></div>
+  return `<section class="welcome"><div><div class="eyebrow">GOOD FOOD, GOOD COMPANY</div><h1>Come in. Make yourself at home.</h1><p>Speak to Ah Hua, drop a message, or find your next favourite below.</p></div><label class="table-select">TABLE NUMBER<select id="table" aria-label="Table number">${Array.from({length:20},(_,i)=>`<option ${String(i+1).padStart(2,'0')===table?'selected':''}>${String(i+1).padStart(2,'0')}</option>`).join('')}</select></label></section>
+  <div class="dining-grid"><div class="left-column"><section class="host-card"><div class="host-heading">${avatarMarkup()}<div><h2>Have a chat with Ah Hua <span class="online-dot"></span></h2><p>English, 中文 & a little Singlish · Demo menu assistant</p></div><div class="reply-controls"><button id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported?'':'disabled'}>${speaking?'Voice replies: on':'Turn on voice replies'}</button><button id="stop-playback" class="text-button" hidden>Stop voice</button></div></div><div class="avatar-caption"><span id="avatar-status" role="status"></span><p id="voice-reply-help"></p></div>
   <div class="chat-log" role="log" aria-label="Conversation with Ah Hua" aria-live="polite">${state.messages.map((m,i)=>`<div class="message ${m.role}"><small>${m.role==='host'?'AH HUA':'YOU'}</small><div>${esc(m.text)}</div>${m.role==='host'&&speechSupported?`<button class="replay" data-replay="${i}" aria-label="Read response ${i+1} aloud">Listen ↗</button>`:''}</div>`).join('')}</div>
   ${state.proposal.length?`<div class="proposal"><b>A suggestion for your table</b><ul>${state.proposal.map(x=>`<li>${x.qty} × ${esc(x.name)} <span>${esc(x.size)} · ${money(x.qty*x.unitPrice)}${x.notes?' · '+esc(x.notes):''}</span></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button id="dismiss-proposal" class="text-button">Dismiss</button><button id="accept-proposal" class="primary small">Add suggestion to cart +</button></div></div>`:''}
   <div class="chat-bottom"><div class="suggestions"><button data-chat="Recommend for 4, not spicy">✧ Recommend for 4</button><button data-chat="Two rice and one prawn paste chicken">Try a sample order</button><button data-chat="Review my cart">Review my cart</button></div><form id="chat-form"><label class="sr-only" for="message">Message Ah Hua</label><input id="message" maxlength="500" placeholder="Ah Hua, what’s good for four people?" value="${esc(draft)}" autocomplete="off"><button class="send" type="submit" aria-label="Send message">↑</button></form><div class="voice-controls"><button id="mic" class="voice-button" ${SpeechRecognition&&window.isSecureContext?'':'disabled'} aria-pressed="false">♩ Speak</button><select id="language" aria-label="Speech input language"><option value="en-SG" ${language==='en-SG'?'selected':''}>English / Singlish</option><option value="zh-CN" ${language==='zh-CN'?'selected':''}>普通话 Mandarin</option></select><span id="voice-status"></span></div><details class="voice-privacy"><summary>About voice & this demo</summary><p>Your browser may send audio to its speech provider. Ah Hua stores no recordings. Spoken replies use your device’s available voices. This is a limited, rule-based menu assistant; no AI service is connected. Allergy and dietary details need staff confirmation.</p></details></div></section>
@@ -89,7 +103,9 @@ function bindCustomer() {
   $('#table').onchange=e=>{table=e.target.value;const url=new URL(location.href);url.searchParams.set('table',table);history.replaceState(null,'',url);render();};
   $('#mic').onclick=startVoice;
   $('#language').onchange=e=>{stopVoice();language=e.target.value;updateVoice();};
-  $('#speaker').onclick=()=>{speaking=!speaking;if(speaking)speak('Hello! I’m Ah Hua. Spoken replies are now on.');else window.speechSynthesis?.cancel();$('#speaker').textContent=speaking?'◖ Sound on':'◖ Sound off';$('#speaker').setAttribute('aria-pressed',String(speaking));};
+  $('#speaker').onclick=()=>{speaking=!speaking;updateSpeaker();if(speaking)speak('Hello! I’m Ah Hua. I’ll read my replies aloud for you. What would you like to eat?');else voicePlayer.stop();};
+  $('#stop-playback').onclick=()=>voicePlayer.stop();
+  $('#ah-hua-avatar').onclick=()=>{if(!speechSupported){toast('Voice isn’t available in this browser. Chat with me below.');return;}speaking=true;updateSpeaker();speak(state.messages.findLast(m=>m.role==='host')?.text || 'Hello, welcome!');};
   document.querySelectorAll('[data-replay]').forEach(b=>b.onclick=()=>speak(state.messages[+b.dataset.replay].text));
   document.querySelectorAll('[data-chat]').forEach(b=>b.onclick=()=>send(b.dataset.chat));
   document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{draft=$('#message').value;category=b.dataset.category;render();});
@@ -100,7 +116,7 @@ function bindCustomer() {
   $('#dismiss-proposal')?.addEventListener('click',()=>act(()=>{state.proposal=[];}));
   $('#submit-order').onclick=()=>act(()=>{const order=submit(state,table);reply(`Order ${order.id} is waiting for staff approval. Switch to Staff to review it, then Kitchen to follow the cooking simulation.`);toast(`${order.id} sent for demo staff approval.`);});
   document.querySelectorAll('[data-receipt]').forEach(b=>b.onclick=()=>act(()=>{const o=state.orders.find(x=>x.id===b.dataset.receipt);if(o.status==='served')o.paid=true;toast('Simulated receipt created. Amount charged: S$0.00.');}));
-  const log=$('.chat-log');log.scrollTop=log.scrollHeight;updateVoice();
+  const log=$('.chat-log');log.scrollTop=log.scrollHeight;updateVoice();updateSpeaker();
 }
 function openDish(id) {
   const d=dish(id), dialog=$('#dish-dialog');

@@ -4,7 +4,7 @@ A warm, responsive restaurant experience built from the menu and workflow in the
 
 ## Explore
 
-1. **Customer:** type a request, dictate it with **Speak**, or customise dishes directly from the menu. Speech fills an editable draft; press Send yourself. Chat suggestions require an explicit **Add suggestion to cart** click. All three methods share one cart.
+1. **Customer:** choose the explicitly labelled **Table number**, type a request, dictate it with **Speak**, or customise dishes directly from the menu. Speech fills an editable draft; press Send yourself. Chat suggestions require an explicit **Add suggestion to cart** click. All three methods share one cart. Enable **Turn on voice replies** to hear new replies automatically, or tap Ah Hua’s animated avatar to enable voice and replay the latest reply. **Stop voice** stops current playback.
 2. **Staff:** review submitted orders, tick the review box and approve them, or decline with a reason. Change sample availability and acknowledge simulated server requests.
 3. **Kitchen:** only approved orders appear. Move them through cooking, ready and served.
 4. Return to Customer to follow the status and create a simulated receipt after serving. Amount charged is always **S$0.00**.
@@ -16,7 +16,8 @@ A warm, responsive restaurant experience built from the menu and workflow in the
 - Staff and Kitchen are **public simulation controls**, not authenticated production staff systems.
 - State is local to this browser profile and website origin using `localStorage`. Tabs on the same origin synchronize. Separate devices/visitors do not share orders. The cart belongs to this browser; the table selector assigns a table when submitting an order.
 - Menu chat is a limited deterministic assistant supporting English, common Mandarin menu phrases and Singlish-style requests. It is not a connected LLM. Unknown requests receive an honest fallback. Every proposed cart update requires customer confirmation.
-- Speech recognition requires HTTPS (or localhost), a supported browser and microphone permission. It is feature-detected; typing and manual selection remain available when unsupported or denied. Some browser implementations send audio to their speech service. This app does not record audio. Voice playback uses browser speech synthesis and installed voices; enable Sound or press Listen to hear replies.
+- Speech recognition requires HTTPS (or localhost), a supported browser and microphone permission. It is feature-detected; typing and manual selection remain available when unsupported or denied. Some browser implementations send audio to their speech service. This app does not record audio. Voice playback uses browser speech synthesis and installed voices; enable Turn on voice replies or press Listen to hear replies.
+- Ah Hua is an original, locally animated SVG chef. He blinks and waves, tilts while listening, and moves his mouth during actual speech playback events. This is simple speech-state animation, not phoneme-level lip sync or a generated video avatar. Reduced-motion preferences disable animation while keeping status text visible.
 - No personal details are requested. Reset demo clears local sample state.
 
 ## Run, test and build
@@ -40,6 +41,7 @@ Use `/?table=03` through `/?table=20` for table-specific entry links. Invalid va
 - `src/domain.js`: menu, grounded chat proposals, integer-cent pricing, cart validation and order state transitions.
 - `src/app.js`: interface, safe text escaping, browser speech, persistence and simulation controls.
 - `src/styles.css`: responsive layout and visual design.
+- `src/avatar.js`, `src/voice.js`: vector chef and speech playback lifecycle.
 - `tests/domain.test.js`: meaningful workflow, multilingual cart, availability, pricing and validation coverage.
 
 ## Verification scope
