@@ -1,7 +1,9 @@
 export const languages = {
   en: { label: 'English', speech: 'en-GB', html: 'en' },
   zh: { label: '中文（普通话）', speech: 'zh-CN', html: 'zh-Hans' },
-  singlish: { label: 'Singlish', speech: 'en-SG', html: 'en-SG' }
+  singlish: { label: 'Singlish', speech: 'en-SG', html: 'en-SG' },
+  ms: { label: 'Bahasa Melayu', speech: 'ms-MY', html: 'ms' },
+  fr: { label: 'Français', speech: 'fr-FR', html: 'fr' }
 };
 export const normaliseLanguage = value => Object.hasOwn(languages, value) ? value : 'en';
 const messages = {
@@ -101,8 +103,73 @@ const messages = {
     singlish: 'Ah Hua, four pax, what you recommend ah?'
   }
 };
+const extraMessages = {
+  ms: {
+    welcome: 'Selamat datang! Saya Ah Hua. Nak makan apa? Minta cadangan atau lihat menu. 😊',
+    switched: 'Baik, saya akan membalas dalam Bahasa Melayu. Troli anda tidak berubah. Nak makan apa?',
+    voiceEnabled: 'Hai, saya Ah Hua. Saya akan membacakan jawapan dalam Bahasa Melayu. Apa yang anda ingin makan?',
+    allergy: 'Jika ada alahan, sila tekan “Call a server” dan semak dengan staf. Resipi dan maklumat alergen contoh ini belum disahkan. Saya tidak boleh menjamin mana-mana hidangan selamat. Tiada hidangan ditambah.',
+    call: 'Tekan “Call a server” di atas untuk menghantar permintaan bantuan simulasi kepada staf.',
+    checkout: 'Semak troli, kemudian tekan “Send to staff”. Tiket dapur simulasi hanya dihantar selepas kelulusan staf. Tiada bayaran sebenar.',
+    cart: ({count,amount}) => `Troli anda ada ${count} item dengan jumlah contoh ${amount}. Kuantiti boleh diubah dalam troli.`,
+    emptyCart: 'Troli anda masih kosong. Nak cuba hidangan untuk dikongsi?',
+    dietary: 'Saya tidak dapat mengesahkan status halal, vegetarian atau vegan berdasarkan menu contoh ini. Sila semak dengan staf sebelum memilih. Tiada hidangan ditambah.',
+    recommendation: ({pax,amount,dishes,details}) => `Untuk ${pax} orang, bagaimana dengan ${dishes}? Jumlah cadangan: ${amount}${details?` (${details})`:''}. Jumlah ini tidak termasuk hidangan sedia ada dalam troli. Resipi dan saiz hidangan perlu disahkan oleh staf. Semak di bawah atau minta pilihan lain.`,
+    noRecommendation: 'Tiada gabungan hidangan yang memenuhi pilihan dan bajet ini. Cuba naikkan bajet, ubah pilihan atau lihat menu. Troli anda tidak berubah.',
+    excluded: 'Troli anda tidak berubah. Gunakan butang tolak untuk membuang hidangan, atau beritahu saya apa yang hendak ditambah.',
+    unavailable: 'Hidangan itu tidak tersedia dalam demo ini. Sila pilih hidangan lain daripada menu.',
+    selected: 'Pilihan anda tersedia di bawah. Semak kuantiti, saiz dan nota sebelum menambahkannya ke troli. Belum dihantar kepada staf.',
+    menu: 'Lihat menu di sebelah perbualan ini, atau di bawah pada telefon. Setiap hidangan boleh disesuaikan dan ditambah ke troli yang sama.',
+    fallback: 'Saya pembantu menu demo. Cuba “cadangan untuk 4 orang, tidak pedas”, tanya harga, atau gunakan perancang hidangan di atas. Anda juga boleh memanggil staf.',
+    added: 'Sudah ditambah ke troli. Semak dan ubah jika perlu, kemudian hantar kepada staf apabila sedia.',
+    submitted: ({id}) => `Pesanan ${id} menunggu kelulusan staf. Buka Staff untuk menyemaknya, kemudian Kitchen untuk mengikuti simulasi memasak.`,
+    placeholder: 'Ah Hua, cadangan untuk empat orang?',
+  },
+  fr: {
+    welcome: 'Bienvenue ! Je suis Ah Hua. Que souhaitez-vous manger ? Demandez-moi une suggestion ou consultez le menu. 😊',
+    switched: 'Bien sûr, je vous répondrai en français. Votre panier reste inchangé. Que souhaitez-vous manger ?',
+    voiceEnabled: 'Bonjour, je suis Ah Hua. Je vais lire mes réponses en français. Que souhaitez-vous manger ?',
+    allergy: 'En cas d’allergie, utilisez « Call a server » et consultez le personnel. Les recettes et allergènes de ce menu de démonstration ne sont pas vérifiés. Je ne peux garantir la sécurité d’aucun plat. Aucun ajout au panier.',
+    call: 'Appuyez sur « Call a server » pour envoyer une demande d’aide simulée au personnel.',
+    checkout: 'Vérifiez votre panier, puis appuyez sur « Send to staff ». La commande simulée ne passe en cuisine qu’après validation du personnel. Aucun paiement réel.',
+    cart: ({count,amount}) => `Votre panier contient ${count} articles pour un total indicatif de ${amount}. Vous pouvez modifier les quantités dans le panier.`,
+    emptyCart: 'Votre panier est vide. Commençons par quelques plats à partager ?',
+    dietary: 'Ce menu de démonstration ne permet pas de confirmer qu’un plat est végétarien, végétalien ou halal. Veuillez consulter le personnel avant de choisir. Aucun plat ajouté.',
+    recommendation: ({pax,amount,dishes,details}) => `Pour ${pax} personnes, que diriez-vous de ${dishes} ? Total proposé : ${amount}${details?` (${details})`:''}. Ce total exclut les plats déjà dans votre panier. Les recettes et les portions doivent être confirmées par le personnel. Vérifiez ci-dessous ou demandez une autre suggestion.`,
+    noRecommendation: 'Aucune combinaison ne correspond à ces préférences et à ce budget. Essayez un budget plus élevé, modifiez vos préférences ou consultez le menu. Aucun ajout au panier.',
+    excluded: 'Je n’ai pas modifié votre panier. Utilisez les boutons moins pour retirer des plats, ou dites-moi ce que vous souhaitez ajouter.',
+    unavailable: 'Ces plats ne sont pas disponibles dans cette démonstration. Veuillez en choisir d’autres dans le menu.',
+    selected: 'Votre sélection est prête ci-dessous. Vérifiez les quantités, les portions et les notes avant de l’ajouter au panier. Rien n’a encore été envoyé au personnel.',
+    menu: 'Le menu se trouve à côté de la conversation, ou en dessous sur votre téléphone. Personnalisez vos plats et ajoutez-les au même panier.',
+    fallback: 'Je suis un assistant de menu de démonstration. Essayez « conseillez-moi pour 4 personnes, pas épicé », demandez un prix ou utilisez le planificateur ci-dessus. Vous pouvez aussi appeler le personnel.',
+    added: 'La sélection a été ajoutée au panier. Vérifiez-la et apportez vos modifications avant de l’envoyer au personnel.',
+    submitted: ({id}) => `La commande ${id} attend la validation du personnel. Ouvrez Staff pour la vérifier, puis Kitchen pour suivre la préparation simulée.`,
+    placeholder: 'Ah Hua, que conseillez-vous pour quatre personnes ?',
+  }
+};
+for (const [language, entries] of Object.entries(extraMessages)) {
+  for (const [key, value] of Object.entries(entries)) messages[key][language] = value;
+}
 export function replyText(language, key, data = {}) {
   const entry = messages[key]?.[normaliseLanguage(language)];
   if (!entry) throw Error(`Unknown reply message: ${key}`);
   return typeof entry === 'function' ? entry(data) : entry;
 }
+
+const ui = {
+  en: { plan:'Let’s plan your meal', people:'People', budget:'Budget for this suggestion', any:'Any', spice:'Spice preference', mild:'Mild', spicy:'Spicy', avoid:'Leave out', none:'Nothing', pork:'Pork dishes', fish:'Fish dishes', build:'Find my meal →', another:'Another suggestion', cheaper:'Try a lower budget', edit:'Change preferences', remove:'Remove', suggestion:'A suggestion for your table', add:'Add suggestion to cart +', dismiss:'Dismiss', recommend:'✧ Help me choose', review:'Review my cart', voiceNote:'Replies and microphone use your selected language. Voices depend on your device.', price:'Sample price', verify:'Recipes, allergens and prices need staff confirmation.' },
+  zh: { plan:'一起选一桌好菜', people:'人数', budget:'此次建议预算', any:'不限', spice:'辣度偏好', mild:'不辣', spicy:'辣', avoid:'避开菜品', none:'无', pork:'猪肉菜品', fish:'鱼类菜品', build:'为我推荐 →', another:'换一组推荐', cheaper:'试试更低预算', edit:'修改偏好', remove:'移除', suggestion:'为您推荐', add:'加入购物车 +', dismiss:'暂不选择', recommend:'✧ 帮我选菜', review:'查看购物车', voiceNote:'回复和麦克风使用所选语言，语音取决于设备。', price:'示例起价', verify:'食谱、过敏原和价格均需员工确认。' },
+  singlish: { plan:'Come, we plan your makan', people:'How many people?', budget:'Budget for this set', any:'Anything can', spice:'Want spicy?', mild:'Not spicy', spicy:'Spicy can', avoid:'Leave out', none:'Nothing', pork:'Pork dishes', fish:'Fish dishes', build:'Help me choose lah →', another:'Another combination, can?', cheaper:'Try cheaper, can?', edit:'Change my preferences', remove:'Remove', suggestion:'How about this for your table?', add:'Add to cart +', dismiss:'Maybe later', recommend:'✧ What’s good ah?', review:'Check my cart', voiceNote:'Singlish replies · Singapore English voice where available.', price:'Sample price starts from', verify:'These details must check with staff first, okay?' },
+  ms: { plan:'Jom rancang hidangan anda', people:'Bilangan orang', budget:'Bajet cadangan ini', any:'Tiada had', spice:'Tahap kepedasan', mild:'Tidak pedas', spicy:'Pedas', avoid:'Elakkan', none:'Tiada', pork:'Hidangan daging babi', fish:'Hidangan ikan', build:'Cadangkan hidangan →', another:'Cadangan lain', cheaper:'Cuba bajet lebih rendah', edit:'Ubah pilihan', remove:'Buang', suggestion:'Cadangan untuk meja anda', add:'Tambah ke troli +', dismiss:'Batal', recommend:'✧ Bantu saya memilih', review:'Semak troli saya', voiceNote:'Jawapan dan mikrofon menggunakan bahasa pilihan anda. Suara bergantung pada peranti.', price:'Harga contoh bermula', verify:'Resipi, alergen dan harga perlu disahkan oleh staf.' },
+  fr: { plan:'Composons votre repas', people:'Nombre de personnes', budget:'Budget de cette suggestion', any:'Sans limite', spice:'Préférence épicée', mild:'Doux', spicy:'Épicé', avoid:'Écarter', none:'Aucune', pork:'Plats de porc', fish:'Plats de poisson', build:'Proposer mon repas →', another:'Une autre suggestion', cheaper:'Essayer un budget plus bas', edit:'Modifier mes préférences', remove:'Retirer', suggestion:'Une suggestion pour votre table', add:'Ajouter au panier +', dismiss:'Ignorer', recommend:'✧ Aidez-moi à choisir', review:'Voir mon panier', voiceNote:'Réponses et microphone dans la langue choisie. Les voix dépendent de votre appareil.', price:'Prix indicatif à partir de', verify:'Recettes, allergènes et prix à confirmer auprès du personnel.' }
+};
+export const uiText = (language, key) => ui[normaliseLanguage(language)][key] || ui.en[key];
+export function plannerMessage(language, pax, budget) {
+  const amount = budget!==null ? `S$${(budget/100).toFixed(2)}` : uiText(language,'any');
+  return ({en:`Help me plan a meal for ${pax}. Budget: ${amount}.`,zh:`请为 ${pax} 位推荐，预算：${amount}。`,singlish:`${pax} people, help me choose ah. Budget: ${amount}.`,ms:`Cadangkan hidangan untuk ${pax} orang. Bajet: ${amount}.`,fr:`Proposez un repas pour ${pax} personnes. Budget : ${amount}.`})[normaliseLanguage(language)];
+}
+const dishNames = {
+  ms: {grouper:'Sup steamboat kepala ikan kerapu',pomfret:'Steamboat ikan bawal',snapper:'Steamboat ikan merah',chicken:'Ayam pes udang',pork:'Perut babi istimewa',ribs:'Rusuk babi masam manis',tofu:'Tauhu buatan sendiri',kang:'Kangkung sambal',egg:'Telur dadar tiram',rice:'Nasi putih'},
+  fr: {grouper:'Fondue de tête de mérou',pomfret:'Fondue de pomfret',snapper:'Fondue de vivaneau',chicken:'Poulet à la pâte de crevettes',pork:'Poitrine de porc maison',ribs:'Travers de porc aigre-doux',tofu:'Tofu maison',kang:'Liseron d’eau au sambal',egg:'Omelette aux huîtres',rice:'Riz blanc'}
+};
+export const dishName = (language, dish) => language==='zh' ? dish.cn : dishNames[language]?.[dish.id] || dish.name;

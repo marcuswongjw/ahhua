@@ -57,3 +57,9 @@ This is an independent concept demo, not an official restaurant ordering service
 ## Recommendation behaviour
 
 The demo recommendation engine considers party size (1–12), a suggested-set budget, mild/spicy requests, named pork/fish/seafood/rice exclusions, current sample availability, dishes already in the cart, and recent suggestions. It enumerates feasible menu combinations and rotates alternatives instead of returning a fixed bundle. “Another suggestion” keeps the previous group size and preferences. Example: “Recommend for 4 people, budget $60, not spicy.” Budgets cover only the suggested set; the existing cart is excluded. Recipes and portion sizes still require staff confirmation, and allergy/dietary safety is never guaranteed. This is a local rule-based demo, not a connected LLM.
+
+## Interactive multilingual meal planning
+
+The language selector now includes **Bahasa Melayu** (`ms-MY`) and **Français** (`fr-FR`) alongside English, Mandarin and Singlish. New assistant messages, dish names in suggestions, price answers, planner controls and suggestion actions are localized. Common French/Malay ordering, budget and spice phrases are recognized; this remains a limited rule-based demo. Microphone and speech playback request the selected locale, subject to browser/device voice availability.
+
+Customers can open the meal planner, select 1–12 guests, a suggested-set budget, spice preference and named pork/fish exclusions, then request a meal. Suggestions can be refined with another combination, a lower budget, preference editing, or individual dish removal before adding to the shared cart. These actions do not place an order or charge money. Removing named ingredients does not establish allergy, halal or other dietary suitability.

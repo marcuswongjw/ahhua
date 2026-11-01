@@ -32,4 +32,6 @@ test('selected language explicitly controls speech even when the text contains a
   player.play('Hello!', 'zh');assert.equal(spoken.at(-1).lang,'zh-CN');
   player.play('Can lah!', 'singlish');assert.equal(spoken.at(-1).lang,'en-SG');
   player.play('阿华 says hello.', 'en');assert.equal(spoken.at(-1).lang,'en-GB');
+  player.play('Selamat datang!', 'ms');assert.equal(spoken.at(-1).lang,'ms-MY');
+  player.play('Bonjour !', 'fr');assert.equal(spoken.at(-1).lang,'fr-FR');
 });

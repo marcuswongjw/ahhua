@@ -1,4 +1,4 @@
-import { normaliseLanguage, replyText } from './languages.js';
+import { normaliseLanguage, replyText, dishName, uiText } from './languages.js';
 
 // Illustrative menu retained from the earlier Ah Hua prototype. Not verified restaurant data.
 export const menu = [
@@ -48,6 +48,32 @@ export function transition(state, id, status, reason = '') {
   order.status = status; order.reason = reason.trim().slice(0, 160);
 }
 const numberWords = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, 一: 1, 两: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
+const plain = text => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+for(const d of menu) d.aliases.push(plain(dishName('ms',d)),plain(dishName('fr',d)));
+const shortAliases={rice:['nasi','riz'],chicken:['ayam','poulet'],tofu:['tauhu'],pork:['perut babi','poitrine de porc'],ribs:['rusuk babi','travers de porc'],grouper:['kerapu','merou'],pomfret:['bawal'],snapper:['ikan merah','vivaneau'],kang:['kangkung'],egg:['tiram','huitres']};
+for(const [id,aliases] of Object.entries(shortAliases)) dish(id).aliases.push(...aliases);
+export function normaliseQuery(text) {
+  let t=plain(text);
+  const phrases=[
+    [/pas epice|non epice|tidak pedas|tak pedas/g,'not spicy'],
+    [/sans fruits de mer|tanpa makanan laut/g,'no seafood'],
+    [/sans porc|tanpa (?:daging )?babi/g,'no pork'],[/sans poisson|tanpa ikan/g,'no fish'],[/sans riz|tanpa nasi/g,'no rice'],
+    [/une autre suggestion|autre suggestion|autre proposition|cadangan lain|pilihan lain/g,'another suggestion'],
+    [/recommandez|recommande|recommandation|conseillez|conseilles|conseille|suggerez|cadangkan|cadangan|syorkan/g,'recommend'],
+    [/\bpersonnes?\b|\borang\b/g,'people'],[/\bbajet\b|moins de/g,'budget'],[/\bepice\b|\bpedas\b/g,'spicy'],
+    [/allergie|allergique|alahan/g,'allergy'],[/vegetarien|vegetalien/g,'vegetarian'],[/panier|troli/g,'cart'],
+    [/quel est le prix|combien coute|berapa harga|\bharga\b/g,'price'],[/panggil pelayan|appeler un serveur/g,'call server']
+  ];
+  for(const [pattern,replacement] of phrases)t=t.replace(pattern,replacement);
+  const numbers={un:'one',une:'one',deux:'two',trois:'three',quatre:'four',cinq:'five',six:'six',satu:'one',dua:'two',tiga:'three',empat:'four',lima:'five',enam:'six'};
+  t=t.replace(/\b(un|une|deux|trois|quatre|cinq|six|satu|dua|tiga|empat|lima|enam)\b/g,word=>numbers[word]);
+  return t;
+}
+export function configureRecommendation(state,{pax,budget,spice,avoid}) {
+  if(!Number.isInteger(pax)||pax<1||pax>12||budget!==null&&(!Number.isInteger(budget)||budget<0)||!['any','mild','spicy'].includes(spice)||!['none','pork','fish'].includes(avoid))throw Error('Please check the meal preferences.');
+  state.recommendationContext={pax,budget,spice,mild:spice==='mild',noPork:avoid==='pork',noFish:avoid==='fish',noSeafood:false,noRice:false};
+  state.preference=spice==='mild'?'No chilli requested; staff must confirm':'';
+}
 function aliasIndex(text, alias) {
   if (/[\u3400-\u9fff]/.test(alias)) return text.indexOf(alias);
   const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -63,6 +89,7 @@ function recommend(text, state, language) {
   if (/no budget|any budget|不限预算/.test(text)) context.budget = null;
   if (/not spicy|no spic[ey]|non.spicy|no chilli|mild|不辣|kids|children/.test(text)) context.mild = true;
   else if (/spicy|chilli|辣/.test(text)) context.mild = false;
+  context.spice=context.mild?'mild':/spicy|chilli|辣/.test(text)?'spicy':previous.spice==='spicy'?'spicy':'any';
   if (/no pork|without pork|不要猪|不吃猪/.test(text)) context.noPork = true;
   else if (/pork (?:is )?(?:okay|ok)|可以.*猪/.test(text)) context.noPork = false;
   if (/no seafood|without seafood|不吃海鲜|不要海鲜/.test(text)) context.noSeafood = true;
@@ -115,15 +142,19 @@ function recommend(text, state, language) {
   const selected=choices[0];
   if (!selected) return {text:replyText(language,'noRecommendation'),lines:[],language};
   state.recommendationHistory=[...history,selected.signature].slice(-12);
-  const dishes=selected.lines.map(x=>`${x.qty} × ${language==='zh'?dish(x.id).cn:x.name}`).join(language==='zh'?'、':', ');
+  const dishes=selected.lines.map(x=>`${x.qty} × ${dishName(language,dish(x.id))}`).join(language==='zh'?'、':', ');
   const labels=language==='zh'
     ? [context.mild?'不辣要求':null,context.noPork?'避开猪肉菜名':null,context.noFish?'避开鱼类菜品':null,context.noSeafood?'避开明显的海鲜菜品':null,context.noRice?'不配白饭':null,context.budget!==null?`建议套餐预算 ${money(context.budget)}`:null]
     : [context.mild?'mild requested':null,context.noPork?'omitting pork dishes':null,context.noFish?'omitting fish dishes':null,context.noSeafood?'omitting obvious seafood dishes':null,context.noRice?'no rice':null,context.budget!==null?`suggested-set budget ${money(context.budget)}`:null];
-  const details=labels.filter(Boolean).join(' · ');
+  let details=labels.filter(Boolean).join(' · ');
+  if(language==='ms'||language==='fr') {
+    const terms=language==='ms'?['tidak pedas','tanpa hidangan babi','tanpa hidangan ikan','tanpa hidangan makanan laut yang jelas','tanpa nasi','bajet cadangan']:['doux demandé','sans plats de porc','sans plats de poisson','sans plats de fruits de mer identifiables','sans riz','budget proposé'];
+    details=[context.mild?terms[0]:null,context.noPork?terms[1]:null,context.noFish?terms[2]:null,context.noSeafood?terms[3]:null,context.noRice?terms[4]:null,context.budget!==null?`${terms[5]} ${money(context.budget)}`:null].filter(Boolean).join(' · ');
+  }
   return {text:replyText(language,'recommendation',{pax:context.pax,amount:money(selected.price),dishes,details}),lines:selected.lines,language};
 }
 export function chat(text, state, selectedLanguage = state.replyLanguage) {
-  const t = text.toLowerCase().trim();
+  const t = normaliseQuery(text).trim();
   const language = normaliseLanguage(selectedLanguage);
   const answer = (key, data = {}, lines = []) => ({ text: replyText(language, key, data), lines, language });
   if (/allerg|allergic|过敏|nut.free|gluten.free|celiac/.test(t)) return answer('allergy');
@@ -139,9 +170,7 @@ export function chat(text, state, selectedLanguage = state.replyLanguage) {
   if (matches.length) {
     if (/\b(no|without|don.t|remove|cancel)\b|不要|取消|去掉/.test(t) && !/no chilli|no spicy|without chilli/.test(t)) return answer('excluded');
     if (/price|how much|多少钱|价格|what is|what.s in/.test(t)) {
-      const text = language === 'zh'
-        ? matches.map(({d})=>`${d.cn}：示例起价 ${money(d.price)}。`).join('\n') + '食谱、过敏原和价格均需员工确认。'
-        : matches.map(({d})=>`${d.name}: ${language === 'singlish' ? 'sample price starts from' : 'from'} ${money(d.price)}. ${d.desc} Sample allergens: ${d.allergens}.`).join('\n') + (language === 'singlish' ? ' These details must check with staff first, okay?' : ' All details need restaurant confirmation.');
+      const text = matches.map(({d})=>`${dishName(language,d)}: ${uiText(language,'price')} ${money(d.price)}.`).join('\n') + ' ' + uiText(language,'verify');
       return {text, lines: [], language};
     }
     const lines = matches.filter(({d})=>!state.unavailable.includes(d.id)).map(({d,at},i)=>{
