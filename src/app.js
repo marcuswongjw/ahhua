@@ -5,6 +5,9 @@ import {
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
 import { languages, normaliseLanguage, replyText, uiText, plannerMessage, dishName, categoryName } from './languages.js';
+import {
+  QUICK_CHIPS, LORE_ANSWERS, STORY_CARDS, SCARCITY_BADGES, GUEST_PERSONAS, POPULAR_MODIFIERS
+} from './lore.js';
 
 const $ = s => document.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -29,6 +32,21 @@ let splitPax = 4;
 let staffTableFilter = 'all';
 let syncMode = 'local';
 let connectedPeers = 1;
+
+let customerGear = 'dock'; // 'dock' (Gear 1: Menu Browsing) | 'stage' (Gear 2: Post-Order Concierge)
+let activeStoryIndex = 0;
+let currentGuest = null;
+try {
+  const savedGuest = sessionStorage.getItem('ah-hua-guest');
+  if (savedGuest) currentGuest = JSON.parse(savedGuest);
+} catch {}
+if (!currentGuest || !currentGuest.name) {
+  const hash = Array.from(clientId).reduce((a, c) => a + c.charCodeAt(0), 0);
+  currentGuest = GUEST_PERSONAS[Math.abs(hash) % GUEST_PERSONAS.length];
+  try { sessionStorage.setItem('ah-hua-guest', JSON.stringify(currentGuest)); } catch {}
+}
+let dockSpeechText = 'Table 08 · Charcoal steamboat simmering fresh—1 pot is great to share!';
+
 
 state.replyLanguage = normaliseLanguage(state.replyLanguage);
 const localReply = (keyName, data) => replyText(state.replyLanguage, keyName, data);
@@ -371,6 +389,8 @@ function render() {
   <dialog id="qr-dialog" closedby="any" aria-labelledby="qr-dialog-title"></dialog>
   <dialog id="steamboat-guide-dialog" closedby="any" aria-labelledby="steamboat-guide-title"></dialog>
   <dialog id="mobile-cart-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="mobile-cart-dialog-title"></dialog>
+  <dialog id="ah-hua-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="ah-hua-dialog-title"></dialog>
+  <dialog id="cart-check-dialog" closedby="any" aria-labelledby="cart-check-dialog-title"></dialog>
   <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
     <form method="dialog">
       <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -382,7 +402,7 @@ function render() {
     </form>
   </dialog>`;
 
-  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     draft = $('#message')?.value || draft;
@@ -457,20 +477,508 @@ function matchesFilter(d) {
   return true;
 }
 
+function updateDockSpeech() {
+  const activeOrders = state.orders.filter(o => o.table === table && ['pending', 'approved', 'preparing'].includes(o.status));
+  if (activeOrders.length) {
+    const o = activeOrders[activeOrders.length - 1];
+    dockSpeechText = `Round ${o.round || 1} is cooking (~12m)! Tap me for heritage story & service →`;
+  } else if (state.cart.length) {
+    dockSpeechText = `Table ${table} · ${count()} items in cart! Looking delicious!`;
+  } else {
+    dockSpeechText = `Table ${table}? Our charcoal steamboat is simmering fresh—1 pot is great to share!`;
+  }
+  const dockTextEl = document.getElementById('dock-speech-text');
+  if (dockTextEl) dockTextEl.innerHTML = `<span>${esc(dockSpeechText)}</span>`;
+}
+
+function handleLoreChip(chipId) {
+  const langKey = state.replyLanguage === 'zh' ? 'zh' : state.replyLanguage === 'singlish' ? 'singlish' : 'en';
+  const ans = LORE_ANSWERS[chipId]?.[langKey] || LORE_ANSWERS[chipId]?.en || 'Nan Hwa Chong has served authentic Teochew charcoal steamboat since 1927.';
+  const qChip = [...QUICK_CHIPS.viewing, ...QUICK_CHIPS.waiting].find(c => c.id === chipId);
+  const questionText = qChip?.label || 'Dish question';
+
+  act(() => {
+    state.messages.push({ role: 'customer', text: questionText, language: state.replyLanguage });
+    state.messages.push({ role: 'host', text: ans, language: state.replyLanguage });
+    save();
+  });
+
+  const bubbleEl = document.getElementById('stage-speech-bubble');
+  if (bubbleEl) {
+    bubbleEl.textContent = ans;
+    bubbleEl.classList.remove('pulse-highlight');
+    void bubbleEl.offsetWidth;
+    bubbleEl.classList.add('pulse-highlight');
+  }
+
+  dockSpeechText = ans.slice(0, 85) + '...';
+  const dockTextEl = document.getElementById('dock-speech-text');
+  if (dockTextEl) dockTextEl.innerHTML = `<span>${esc(dockSpeechText)}</span>`;
+
+  if (speaking && speechSupported) {
+    voicePlayer.speak(ans, state.replyLanguage);
+  }
+  toast(`Ah Hua: ${ans.slice(0, 60)}...`);
+  render();
+}
+
+function checkCartRules(cartItems) {
+  const ziCharIds = ['kang', 'pork', 'ribs', 'tofu', 'egg', 'sambal-prawn', 'chicken'];
+  const ziCharCount = cartItems.filter(x => ziCharIds.includes(x.id)).reduce((n, x) => n + x.qty, 0);
+  const riceCount = cartItems.filter(x => x.id === 'rice').reduce((n, x) => n + x.qty, 0);
+
+  if (ziCharCount >= 2 && riceCount === 0 && !state.unavailable.includes('rice')) {
+    const isZh = state.replyLanguage === 'zh';
+    const isSinglish = state.replyLanguage === 'singlish';
+    return {
+      type: 'missing_rice',
+      dishId: 'rice',
+      suggestQty: 2,
+      title: isZh ? '点白饭了吗？' : 'Missing White Rice?',
+      message: isZh
+        ? `您点了 ${ziCharCount} 道浓香多汁的经典煮炒，但尚未添加米饭。确认不需要来 2 碗茉莉香米饭（每碗 S$1.50）吗？`
+        : isSinglish
+          ? `Wah, you ordered ${ziCharCount} zi char dishes with rich gravy but zero rice leh! Sure don't need fluffy Jasmine rice (S$1.50) to eat together?`
+          : `You ordered ${ziCharCount} savoury zi char dishes with rich gravy, but zero white rice! Confirm no need fragrant Jasmine rice (S$1.50)?`,
+      actionLabel: isZh ? '+ 添加2碗白饭并下单' : '+ Add 2 White Rice (S$3.00) & Send Order',
+      skipLabel: isZh ? '不需要米饭，直接下单 →' : 'No rice needed, Send as is →'
+    };
+  }
+
+  const steamboatCount = cartItems.filter(x => ['pomfret', 'grouper', 'snapper', 'song-fish-head'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+  const starterCount = cartItems.filter(x => ['chicken', 'prawn-paste', 'tofu'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+
+  if (steamboatCount >= 1 && starterCount === 0 && !state.unavailable.includes('chicken')) {
+    const isZh = state.replyLanguage === 'zh';
+    const isSinglish = state.replyLanguage === 'singlish';
+    return {
+      type: 'missing_starter',
+      dishId: 'chicken',
+      suggestQty: 1,
+      title: isZh ? '等候鱼头炉时的开胃前菜？' : 'Starter while Steamboat Simmers?',
+      message: isZh
+        ? `提示：炭火鱼头炉起炭慢煨需约12分钟。要不要先来一份招牌现炸虾酱鸡（S$13.00），边吃边等？`
+        : isSinglish
+          ? `Heads up ah! Charcoal steamboat takes ~12 mins to fire up and simmer. Want me to send out some Har Cheong Gai (Prawn Paste Chicken) first so you can makan while waiting?`
+          : `Heads up! The charcoal steamboat takes ~12 mins to fire up and simmer. Want to send out our signature Har Cheong Gai (Prawn Paste Chicken) first so you can makan while waiting?`,
+      actionLabel: isZh ? '+ 添加招牌虾酱鸡并下单' : '+ Add Har Cheong Gai (S$13.00) & Send',
+      skipLabel: isZh ? '不需要前菜，直接下单 →' : 'Steamboat only, Send as is →'
+    };
+  }
+
+  return null;
+}
+
+function executeOrderSubmission() {
+  let order;
+  act(() => {
+    order = submit(state, table);
+    reply(localReply('submitted', { id: order.id }));
+  });
+  if (order) {
+    customerGear = 'stage';
+    updateDockSpeech();
+    triggerOrderAnimation();
+    hapticPulse();
+    render();
+    toast(`🎉 Order ${order.id} sent to kitchen! Ah Hua is now on Center Stage.`);
+  }
+}
+
+function handleOrderSubmit() {
+  const check = checkCartRules(state.cart);
+  if (check) {
+    openCartCheckDialog(check);
+  } else {
+    executeOrderSubmission();
+  }
+}
+
+function openCartCheckDialog(check) {
+  const dialog = $('#cart-check-dialog');
+  if (!dialog) {
+    executeOrderSubmission();
+    return;
+  }
+  dialog.innerHTML = `<div class="cart-check-body">
+    <div class="dialog-top">
+      <span class="eyebrow">AH HUA CART CHECK · 点单贴心提示</span>
+      <button type="button" class="close-dialog" aria-label="Close cart check">×</button>
+    </div>
+    <div class="cart-check-hero">
+      ${avatarMarkup()}
+      <div class="cart-check-speech">
+        <strong>${esc(check.title)}</strong>
+        <p>${esc(check.message)}</p>
+      </div>
+    </div>
+    <div class="cart-check-actions">
+      <button type="button" class="primary wide" id="cart-check-accept-btn">${esc(check.actionLabel)}</button>
+      <button type="button" class="secondary wide" id="cart-check-skip-btn">${esc(check.skipLabel)}</button>
+    </div>
+  </div>`;
+
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#cart-check-accept-btn').onclick = () => {
+    act(() => {
+      addLines(state, [{
+        id: check.dishId,
+        qty: check.suggestQty,
+        size: 'Regular',
+        notes: 'Added via Ah Hua recommendation',
+        addedBy: currentGuest.name,
+        guestEmoji: currentGuest.emoji
+      }]);
+    });
+    closeTopLayer(dialog);
+    executeOrderSubmission();
+  };
+  dialog.querySelector('#cart-check-skip-btn').onclick = () => {
+    closeTopLayer(dialog);
+    executeOrderSubmission();
+  };
+}
+
+function getStageGreeting(latestOrder) {
+  if (state.replyLanguage === 'zh') {
+    return latestOrder
+      ? `您的第 ${latestOrder.round || 1} 轮订单已下发厨房！百年传统炭火慢炖大约需要12分钟。在此期间，您可以探索潮州老饕吃法，或随时轻触呼叫桌边服务。`
+      : '欢迎来到南华昌！您可以随时浏览菜单点单，或向我咨询潮州鱼头炉的经典搭配。';
+  }
+  if (state.replyLanguage === 'singlish') {
+    return latestOrder
+      ? `Order ${latestOrder.id} fired to kitchen already! Charcoal pot simmering fresh ~12 mins. While waiting, check out how regulars makan this or ask me any questions lah!`
+      : 'Welcome to Nan Hwa Chong! Feel free to browse menu or tap me for recommendation lah!';
+  }
+  return latestOrder
+    ? `Order ${latestOrder.id} is cooking in the kitchen! The charcoal braziers take ~12 minutes to gently simmer the broth. Meanwhile, discover our heritage eating guide or tap for table service below.`
+    : 'Welcome to Nan Hwa Chong! Explore our menu or let Ah Hua assist your table.';
+}
+
+function renderStoryCardContent(story) {
+  if (!story) return '';
+  if (story.id === 'masterclass') {
+    return `
+      <div class="story-badge">${esc(story.badge)}</div>
+      <h3>${esc(story.title)}</h3>
+      <p class="story-subtitle">${esc(story.subtitle)}</p>
+      <div class="masterclass-steps">
+        ${story.steps.map(s => `
+          <div class="mc-step">
+            <span class="mc-step-num">${s.num}</span>
+            <div>
+              <strong>${esc(s.head)}</strong>
+              <p>${esc(s.body)}</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  if (story.id === 'charcoal') {
+    return `
+      <div class="story-badge">${esc(story.badge)}</div>
+      <h3>${esc(story.title)}</h3>
+      <p class="story-subtitle">${esc(story.subtitle)}</p>
+      <blockquote class="story-quote">${esc(story.quote)}</blockquote>
+      <p class="story-text">${esc(story.text)}</p>
+    `;
+  }
+  if (story.id === 'loop') {
+    return `
+      <div class="story-badge">${esc(story.badge)}</div>
+      <h3>${esc(story.title)}</h3>
+      <p class="story-subtitle">${esc(story.subtitle)}</p>
+      <div class="walk-spots">
+        ${story.spots.map(s => `
+          <div class="walk-spot">
+            <span class="walk-icon">${s.icon}</span>
+            <div>
+              <strong>${esc(s.name)}</strong>
+              <small>${esc(s.dist)}</small>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  if (story.id === 'slang') {
+    return `
+      <div class="story-badge">${esc(story.badge)}</div>
+      <h3>${esc(story.title)}</h3>
+      <p class="story-subtitle">${esc(story.subtitle)}</p>
+      <div class="slang-list">
+        ${story.slangs.map(s => `
+          <div class="slang-item">
+            <span class="slang-word">${esc(s.word)}</span>
+            <p>${esc(s.meaning)}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  return '';
+}
+
+function renderStoryCard() {
+  const cardEl = $('#active-story-card');
+  if (cardEl) {
+    cardEl.innerHTML = renderStoryCardContent(STORY_CARDS[activeStoryIndex]);
+  }
+  document.querySelectorAll('.story-tab-pill').forEach((pill, i) => {
+    pill.classList.toggle('active', i === activeStoryIndex);
+  });
+  document.querySelectorAll('.story-dot').forEach((dot, i) => {
+    dot.classList.toggle('active', i === activeStoryIndex);
+  });
+}
+
+function renderCenterStage(summary) {
+  const activeOrders = state.orders.filter(o => o.table === table && ['pending', 'approved', 'preparing', 'ready'].includes(o.status));
+  const latestOrder = activeOrders[activeOrders.length - 1] || state.orders.filter(o => o.table === table).slice(-1)[0];
+  const nextRound = summary.rounds + 1;
+  const story = STORY_CARDS[activeStoryIndex] || STORY_CARDS[0];
+
+  return `<section class="welcome">
+    <div>
+      <div class="eyebrow-row">
+        <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
+        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${currentGuest.name}</strong></span>
+      </div>
+      <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
+      <p>Concierge Stage · Table companionship while kitchen prepares your meal</p>
+    </div>
+    <div class="welcome-controls">
+      <label class="table-select">TABLE NUMBER
+        <select id="table" aria-label="Table number">${Array.from({ length: 20 }, (_, i) => `<option value="${String(i + 1).padStart(2, '0')}" ${String(i + 1).padStart(2, '0') === table ? 'selected' : ''}>Table ${String(i + 1).padStart(2, '0')}</option>`).join('')}</select>
+      </label>
+    </div>
+  </section>
+
+  <div class="stage-container">
+    ${latestOrder ? `
+      <div class="stage-order-tracker">
+        <div class="tracker-top">
+          <div>
+            <div class="eyebrow">ORDER IN PROGRESS · TABLE ${table}</div>
+            <h2>Order ${latestOrder.id} ${latestOrder.round ? `· Round ${latestOrder.round}` : ''}</h2>
+          </div>
+          ${badge(latestOrder.status)}
+        </div>
+        <div class="tracker-stepper">
+          ${['pending', 'approved', 'preparing', 'ready', 'served'].map((s, idx) => {
+            const currentIdx = ['pending', 'approved', 'preparing', 'ready', 'served'].indexOf(latestOrder.status);
+            const isDone = currentIdx >= idx;
+            const isCurrent = currentIdx === idx;
+            const labels = {
+              pending: 'Pending Staff',
+              approved: 'Approved',
+              preparing: 'Charcoal Simmering (~12m)',
+              ready: 'Ready',
+              served: 'Served'
+            };
+            return `<div class="step-point ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}">
+              <div class="step-dot"></div>
+              <span>${labels[s]}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="tracker-items-summary">
+          <span><b>Items in this round:</b> ${latestOrder.items.map(x => `${x.qty}× ${esc(dishName(state.replyLanguage, dish(x.id)))}`).join(', ')}</span>
+          <strong>${money(total(latestOrder.items))}</strong>
+        </div>
+        <div class="tracker-actions">
+          <button type="button" class="primary small" id="stage-back-to-menu-btn">← Add More Dishes (Round ${nextRound})</button>
+          <button type="button" class="secondary small bill-chip" data-open-bill>🧾 Table Bill & PayNow SGQR (${money(summary.subtotal)})</button>
+        </div>
+      </div>
+    ` : `
+      <div class="stage-order-tracker">
+        <div class="eyebrow">TABLE ${table} · READY TO ORDER</div>
+        <h2>No orders submitted yet</h2>
+        <p>Explore our heritage dishes and start Round 1!</p>
+        <div class="tracker-actions" style="margin-top:12px;">
+          <button type="button" class="primary" id="stage-back-to-menu-btn">Browse Full Menu & Order →</button>
+        </div>
+      </div>
+    `}
+
+    <div class="stage-hero-card">
+      <div class="stage-hero-top">
+        ${avatarMarkup()}
+        <div class="stage-hero-speech">
+          <div class="speech-bubble-tag">AH HUA CONCIERGE · 阿华说</div>
+          <p id="stage-speech-bubble" class="stage-bubble-text">${esc(getStageGreeting(latestOrder))}</p>
+        </div>
+      </div>
+
+      <div class="stage-chips-bar">
+        <span class="stage-chips-title">Tap for instant 0ms answers from Ah Hua:</span>
+        <div class="stage-chips-scroll">
+          ${QUICK_CHIPS.waiting.map(c => `<button type="button" class="stage-chip-btn" data-stage-chip="${c.id}">${c.label}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="story-carousel-container" aria-label="Heritage story feed">
+        <div class="story-tabs">
+          ${STORY_CARDS.map((card, i) => `
+            <button type="button" class="story-tab-pill ${activeStoryIndex === i ? 'active' : ''}" data-story-tab="${i}">
+              ${card.badge}
+            </button>
+          `).join('')}
+        </div>
+        <div class="story-card" id="active-story-card">
+          ${renderStoryCardContent(story)}
+        </div>
+        <div class="story-carousel-nav">
+          <button type="button" class="story-nav-btn prev" id="story-prev-btn" aria-label="Previous story">← Prev Story</button>
+          <div class="story-dots">
+            ${STORY_CARDS.map((_, i) => `<span class="story-dot ${activeStoryIndex === i ? 'active' : ''}"></span>`).join('')}
+          </div>
+          <button type="button" class="story-nav-btn next" id="story-next-btn" aria-label="Next story">Next Story →</button>
+        </div>
+      </div>
+
+      <div class="human-escalation-panel">
+        <div class="escalation-header">
+          <div>
+            <span class="eyebrow">HUMAN STAFF ASSISTANCE · 桌面叫人</span>
+            <h3>1-Tap Floor Staff Escalation</h3>
+          </div>
+          <small>Fires instant alert to floor staff terminal</small>
+        </div>
+        <div class="escalation-grid">
+          <button type="button" class="escalation-btn" data-quick-service="tea">
+            <span class="esc-icon">🍵</span>
+            <strong>Refill Broth / Tea</strong>
+            <small>加高汤 / 续茶水</small>
+          </button>
+          <button type="button" class="escalation-btn" data-quick-service="bowls">
+            <span class="esc-icon">🥢</span>
+            <strong>Extra Bowls & Chilli</strong>
+            <small>加小碗 / 辣椒酱油</small>
+          </button>
+          <button type="button" class="escalation-btn" data-quick-service="plates">
+            <span class="esc-icon">🍽️</span>
+            <strong>Clear Empty Plates</strong>
+            <small>换骨碟 / 收空盘</small>
+          </button>
+          <button type="button" class="escalation-btn" data-quick-service="takeaway">
+            <span class="esc-icon">🥡</span>
+            <strong>Takeaway Boxes</strong>
+            <small>打包盒 / 打包袋</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="tracker-actions" style="margin-top: 10px; justify-content: center;">
+        <button type="button" class="secondary" id="stage-bottom-menu-btn">← Browse Menu to Add More Dishes</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function openAhHuaDialog() {
+  const dialog = $('#ah-hua-dialog');
+  if (!dialog) return;
+  const renderContent = () => {
+    dialog.innerHTML = `<div class="ah-hua-sheet-body">
+      <div class="dialog-top">
+        <span class="eyebrow">AH HUA CONCIERGE · 智能点餐助手</span>
+        <button type="button" class="close-dialog" aria-label="Close Ah Hua">×</button>
+      </div>
+      <div class="ah-hua-sheet-header">
+        ${avatarMarkup()}
+        <div>
+          <h3>Chat with Ah Hua <span class="online-dot"></span></h3>
+          <p>Nan Hwa Chong Host · English · 中文 · Singlish</p>
+          <small class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></small>
+        </div>
+        <button type="button" id="sheet-speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice: on' : 'Voice: off'}</button>
+      </div>
+      <div class="quick-chips-section">
+        <span class="quick-chips-label">Instant 0ms Questions (Tap to ask):</span>
+        <div class="quick-chips-row">
+          ${QUICK_CHIPS.viewing.map(c => `<button type="button" class="quick-chip-btn" data-lore-chip="${c.id}">${c.label}</button>`).join('')}
+        </div>
+      </div>
+      ${mealPlanner()}
+      <div class="chat-log sheet-chat-log" role="log" aria-label="Conversation with Ah Hua">
+        ${state.messages.map((m, i) => `<div class="message ${m.role}"><small>${m.role === 'host' ? 'AH HUA' : 'YOU'}</small><div>${esc(m.text)}</div>${m.role === 'host' && speechSupported ? `<button type="button" class="replay" data-replay="${i}">Listen ↗</button>` : ''}</div>`).join('')}
+      </div>
+      ${state.proposal.length ? `<div class="proposal"><b>${esc(T('suggestion'))}</b><ul>${state.proposal.map((x, i) => `<li><div>${x.qty} × ${esc(dishName(state.replyLanguage, dish(x.id)))} <span>${esc(x.size)} · ${money(x.qty * x.unitPrice)}${x.notes ? ' · ' + esc(x.notes) : ''}</span></div><button type="button" class="proposal-remove" data-remove-proposal="${i}">×</button></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button type="button" id="sheet-accept-proposal" class="primary small">${esc(T('add'))}</button></div></div>` : ''}
+      <div class="chat-bottom">
+        <form id="sheet-chat-form">
+          <input id="sheet-message" maxlength="500" placeholder="${esc(localReply('placeholder'))}" value="">
+          <button class="send" type="submit" aria-label="Send message">↑</button>
+        </form>
+        <div class="voice-controls">
+          <button type="button" id="sheet-mic" class="voice-button" ${SpeechRecognition && window.isSecureContext ? '' : 'disabled'}>🎙 Speak</button>
+          <span id="sheet-voice-status"></span>
+        </div>
+      </div>
+    </div>`;
+
+    dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+    dialog.querySelector('#sheet-speaker').onclick = () => {
+      speaking = !speaking;
+      updateSpeaker();
+      renderContent();
+      if (speaking) speak(localReply('voiceEnabled')); else voicePlayer.stop();
+    };
+    dialog.querySelectorAll('[data-lore-chip]').forEach(b => {
+      b.onclick = () => {
+        handleLoreChip(b.dataset.loreChip);
+        renderContent();
+      };
+    });
+    dialog.querySelector('#sheet-chat-form').onsubmit = e => {
+      e.preventDefault();
+      const val = dialog.querySelector('#sheet-message').value;
+      if (val) {
+        send(val);
+        dialog.querySelector('#sheet-message').value = '';
+        renderContent();
+      }
+    };
+    dialog.querySelector('#sheet-accept-proposal')?.addEventListener('click', () => act(() => {
+      addLines(state, state.proposal);
+      state.proposal = [];
+      reply(localReply('added'));
+      renderContent();
+      render();
+      toast('Suggestion added to shared cart.');
+    }));
+    bindPlanner();
+    const log = dialog.querySelector('.sheet-chat-log');
+    if (log) log.scrollTop = log.scrollHeight;
+  };
+
+  renderContent();
+  dialog.showModal();
+}
+
 function customer() {
+  const summary = tableSummary(state, table, splitPax);
+  if (customerGear === 'stage') {
+    return renderCenterStage(summary);
+  }
+  const activeOrders = state.orders.filter(o => o.table === table && ['pending', 'approved', 'preparing', 'ready'].includes(o.status));
+  const latestOrder = activeOrders[activeOrders.length - 1];
+
   const shown = menu.filter(d =>
     (category === 'All dishes' || d.category === category) &&
     matchesFilter(d) &&
     `${d.name} ${d.cn} ${dishName(state.replyLanguage, d)} ${d.desc}`.toLowerCase().includes(search.toLowerCase())
   );
   const activeTableCalls = state.calls.filter(c => c.table === table && !c.done);
-  const summary = tableSummary(state, table, splitPax);
 
   return `<section class="welcome">
     <div>
       <div class="eyebrow-row">
         <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
-        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''}</span>
+        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${currentGuest.name}</strong></span>
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>${esc(T('tableSubtitle'))}</p>
@@ -481,6 +989,11 @@ function customer() {
       </label>
     </div>
   </section>
+
+  ${latestOrder ? `<div class="active-stage-banner">
+    <span>🍲 Round ${latestOrder.round || 1} (${latestOrder.id}) is simmering in the kitchen (~12 mins)</span>
+    <button type="button" id="switch-to-stage-btn" class="stage-switch-btn">Enter Concierge Stage →</button>
+  </div>` : ''}
 
   <section class="service-bar" aria-label="Quick table service">
     <div class="service-bar-label">
@@ -525,7 +1038,7 @@ function customer() {
 
   <div class="dining-grid">
     <div class="left-column">
-      <section class="host-card">
+      <section class="host-card dock-collapsed">
         <div class="host-heading">
           ${avatarMarkup()}
           <div>
@@ -617,11 +1130,13 @@ function customer() {
             const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
             const tableOrders = state.orders.filter(o => o.table === table);
             const tableOrderedQty = tableOrders.flatMap(o => o.items.filter(x => x.id === d.id)).reduce((n, x) => n + x.qty, 0);
+            const scarcityBadge = SCARCITY_BADGES[d.id];
             return `<article class="dish-card ${soldOut ? 'sold-out' : ''} ${inCartQty ? 'in-cart' : ''}">
               <div class="dish-art ${d.id} ${d.image ? 'has-photo' : ''}">
                 ${d.image ? `<img class="dish-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
                 <div class="dish-badges-overlay">
                   ${(d.popularity || 0) >= 95 ? `<span class="dish-badge bestseller" title="Top table favourite">👑 Top Pick</span>` : d.tag ? `<span class="dish-badge tag">${esc(d.tag)}</span>` : ''}
+                  ${scarcityBadge ? `<span class="dish-badge scarcity" title="Real-time table demand">${scarcityBadge}</span>` : ''}
                   ${d.spicyLevel === 1 ? `<span class="dish-badge spice-mild" title="Mild spicy">🌶️ Mild</span>` : d.spicyLevel >= 2 ? `<span class="dish-badge spice-hot" title="Spicy heat">🌶️🌶️ Spicy</span>` : ''}
                   ${d.category === 'Steamboat' && !['grouper', 'pomfret', 'snapper', 'song-fish-head'].includes(d.id) ? `<span class="dish-badge steamboat-side" title="Add to steamboat broth">🍲 Pot Side</span>` : ''}
                   ${tableOrderedQty ? `<span class="dish-badge prev-ordered" title="Already ordered by Table ${table}">✓ ${tableOrderedQty} ${esc(T('orderedBadge'))}</span>` : ''}
@@ -661,7 +1176,18 @@ function customer() {
       </section>
     </div>
     ${cart(summary)}
-  </div>`;
+  </div>
+  <aside class="ah-hua-floating-dock" id="ah-hua-dock" aria-label="Ah Hua Assistant">
+    <button type="button" class="dock-avatar-btn" id="dock-avatar-trigger" aria-label="Open Ah Hua Concierge">
+      <div class="dock-avatar-circle">
+        <span class="dock-avatar-emoji">👨‍🍳</span>
+        <span class="dock-online-dot"></span>
+      </div>
+      <div class="dock-speech-bubble" id="dock-speech-text">
+        <span>${esc(dockSpeechText)}</span>
+      </div>
+    </button>
+  </aside>`;
 }
 
 function cart(summary) {
@@ -682,6 +1208,7 @@ function cart(summary) {
             <h3>${esc(x.name)}</h3>
             <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
             <small>${money(x.unitPrice)} each</small>
+            <div><span class="cart-guest-tag">${x.guestEmoji || currentGuest.emoji || '👤'} ${esc(x.addedBy || currentGuest.name)}</span></div>
           </div>
           <div class="cart-line-end">
             <strong>${money(x.qty * x.unitPrice)}</strong>
@@ -990,8 +1517,17 @@ function bindCustomer() {
   });
   document.querySelectorAll('[data-quick-add]').forEach(b => b.onclick = () => act(() => {
     const d = dish(b.dataset.quickAdd);
-    addLines(state, [makeLine(d.id, 1, 'Regular', state.preference)]);
-    toast(`${d.name} added to your cart.`);
+    const isDuplicate = state.cart.some(y => y.id === d.id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === d.id));
+    if (isDuplicate) {
+      dockSpeechText = `Eh! Someone at Table ${table} already added ${d.name}! Another portion or sharing?`;
+      toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
+    }
+    const newLine = makeLine(d.id, 1, 'Regular', state.preference);
+    newLine.addedBy = currentGuest.name;
+    newLine.guestEmoji = currentGuest.emoji;
+    addLines(state, [newLine]);
+    updateDockSpeech();
+    toast(`${currentGuest.emoji} ${currentGuest.name} added ${d.name} to shared cart.`);
   }));
   document.querySelectorAll('[data-card-qty]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
@@ -999,7 +1535,10 @@ function bindCustomer() {
     const delta = +b.dataset.delta;
     act(() => {
       if (delta > 0) {
-        addLines(state, [makeLine(id, 1, 'Regular', state.preference)]);
+        const newLine = makeLine(id, 1, 'Regular', state.preference);
+        newLine.addedBy = currentGuest.name;
+        newLine.guestEmoji = currentGuest.emoji;
+        addLines(state, [newLine]);
         toast(`Added 1 ${dish(id).name} to cart.`);
       } else {
         const targetIdx = state.cart.map(x => x.id).lastIndexOf(id);
@@ -1009,6 +1548,7 @@ function bindCustomer() {
           toast(`Removed 1 ${dish(id).name} from cart.`);
         }
       }
+      updateDockSpeech();
     });
   });
   document.querySelectorAll('[data-dish]').forEach(b => b.onclick = () => openDish(b.dataset.dish));
@@ -1016,11 +1556,13 @@ function bindCustomer() {
     const line = state.cart[+b.dataset.qty];
     line.qty += +b.dataset.delta;
     if (line.qty <= 0) state.cart.splice(+b.dataset.qty, 1);
+    updateDockSpeech();
   }));
   $('#accept-proposal')?.addEventListener('click', () => act(() => {
     addLines(state, state.proposal);
     state.proposal = [];
     reply(localReply('added'));
+    updateDockSpeech();
     toast('Suggestion added to your shared cart.');
   }));
   document.querySelectorAll('[data-remove-proposal]').forEach(b => b.onclick = () => act(() => {
@@ -1040,16 +1582,47 @@ function bindCustomer() {
     $('#planner-pax').focus();
   });
   $('#dismiss-proposal')?.addEventListener('click', () => act(() => { state.proposal = []; }));
-  $('#submit-order').onclick = () => {
-    let order;
-    act(() => {
-      order = submit(state, table);
-      reply(localReply('submitted', { id: order.id }));
+  if ($('#submit-order')) {
+    $('#submit-order').onclick = handleOrderSubmit;
+  }
+  $('#switch-to-stage-btn')?.addEventListener('click', () => {
+    customerGear = 'stage';
+    render();
+  });
+  $('#stage-back-to-menu-btn')?.addEventListener('click', () => {
+    customerGear = 'dock';
+    render();
+  });
+  $('#stage-bottom-menu-btn')?.addEventListener('click', () => {
+    customerGear = 'dock';
+    render();
+  });
+  $('#dock-avatar-trigger')?.addEventListener('click', () => {
+    openAhHuaDialog();
+  });
+  document.querySelectorAll('[data-stage-chip]').forEach(b => {
+    b.onclick = () => handleLoreChip(b.dataset.stageChip);
+  });
+  document.querySelectorAll('[data-quick-service]').forEach(b => {
+    b.onclick = () => act(() => {
+      const entry = requestService(state, table, b.dataset.quickService);
+      toast(`${entry.label} requested for Table ${table}. Floor staff notified!`);
     });
-    if (order) {
-      openOrderSuccessDialog(order);
-    }
-  };
+  });
+  document.querySelectorAll('[data-story-tab]').forEach(b => {
+    b.onclick = () => {
+      activeStoryIndex = +b.dataset.storyTab;
+      renderStoryCard();
+    };
+  });
+  $('#story-prev-btn')?.addEventListener('click', () => {
+    activeStoryIndex = (activeStoryIndex - 1 + STORY_CARDS.length) % STORY_CARDS.length;
+    renderStoryCard();
+  });
+  $('#story-next-btn')?.addEventListener('click', () => {
+    activeStoryIndex = (activeStoryIndex + 1) % STORY_CARDS.length;
+    renderStoryCard();
+  });
   $('#inline-split-pax')?.addEventListener('change', e => {
     splitPax = Number(e.target.value) || 4;
     render();
@@ -1069,6 +1642,13 @@ function openDish(id) {
   const d = dish(id);
   const dialog = $('#dish-dialog');
   const selectedMods = new Set();
+
+  const allModifiers = [
+    ...POPULAR_MODIFIERS.map(m => m.label),
+    ...(d.modifiers || [])
+  ];
+  const uniqueMods = [...new Set(allModifiers)];
+
   dialog.innerHTML = `<form id="dish-form">
     <div class="dialog-top">
       <span class="eyebrow">FOR YOUR TABLE · ${esc(d.category.toUpperCase())}</span>
@@ -1097,13 +1677,16 @@ function openDish(id) {
         </div>
       </label>
     </div>
-    ${d.modifiers?.length ? `<div class="modifier-group">
-      <span class="modifier-label">Traditional preparation options (tap to toggle)</span>
+    <div class="modifier-group">
+      <span class="modifier-label">1-Tap Modifiers (Zero typing required):</span>
       <div class="modifier-chips">
-        ${d.modifiers.map(mod => `<button type="button" class="mod-chip" data-mod="${esc(mod)}" aria-pressed="false">${esc(mod)}</button>`).join('')}
+        ${uniqueMods.map(mod => `<button type="button" class="mod-chip" data-mod="${esc(mod)}" aria-pressed="false">${esc(mod)}</button>`).join('')}
       </div>
-    </div>` : ''}
-    <label>Anything else for the kitchen?<textarea name="notes" maxlength="160" placeholder="e.g. less chilli, sauce on the side">${esc(state.preference)}</textarea></label>
+    </div>
+    <details class="custom-note-details">
+      <summary>Other special request for kitchen? (optional)</summary>
+      <textarea name="notes" maxlength="160" placeholder="e.g. sauce on side, less salty">${esc(state.preference)}</textarea>
+    </details>
     <p class="muted">Requests need staff confirmation.</p>
     <button class="primary wide" id="modal-add-btn" type="submit">Add to shared cart · <span id="modal-price-calc">${money(d.price)}</span> +</button>
   </form>`;
@@ -1147,18 +1730,29 @@ function openDish(id) {
     const customNote = String(form.get('notes') || '').trim();
     const combinedNotes = [...selectedMods, ...(customNote ? [customNote] : [])].join(', ');
     if (!Number.isInteger(qty) || qty < 1) return;
+
+    const isDuplicate = state.cart.some(y => y.id === id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === id));
+    if (isDuplicate) {
+      dockSpeechText = `Eh! Someone at Table ${table} already added ${d.name}! Another portion or sharing?`;
+      toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
+    }
+
     const existing = state.cart.find(y => y.id === id && y.size === size && y.notes === combinedNotes);
     try {
       if (existing) {
         if (qty > 20) throw Error('Maximum 20 of each dish.');
         existing.qty = qty;
       } else {
-        addLines(state, [makeLine(id, qty, size, combinedNotes)]);
+        const newLine = makeLine(id, qty, size, combinedNotes);
+        newLine.addedBy = currentGuest.name;
+        newLine.guestEmoji = currentGuest.emoji;
+        addLines(state, [newLine]);
       }
       save();
+      updateDockSpeech();
       closeTopLayer(dialog);
       render();
-      toast(existing ? `Updated ${d.name} (${qty}) in cart.` : `${d.name} added to your cart.`);
+      toast(existing ? `Updated ${d.name} (${qty}) in cart.` : `${currentGuest.emoji} Added ${d.name} to shared cart.`);
     } catch (error) {
       toast(error.message);
     }
@@ -1213,6 +1807,43 @@ function openBillDialog() {
             <small>With illustrative SC & GST: ${money(summary.grandTotalPerPax)} / pax</small>
           </div>
         </div>
+        <div class="sgqr-standee-card">
+          <div class="sgqr-header-strip">
+            <span class="sgqr-brand-tag">SGQR · PAYNOW</span>
+            <span class="sgqr-paynow-emblem">PayNow</span>
+          </div>
+          <div class="sgqr-body-view">
+            <div class="sgqr-qr-wrap">
+              <svg viewBox="0 0 140 140" class="qr-svg" width="130" height="130" aria-label="SGQR PayNow Code">
+                <rect width="140" height="140" rx="6" fill="#fff" stroke="#982226" stroke-width="2"/>
+                <rect x="14" y="14" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
+                <rect x="23" y="23" width="14" height="14" fill="#202422"/>
+                <rect x="94" y="14" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
+                <rect x="103" y="23" width="14" height="14" fill="#202422"/>
+                <rect x="14" y="94" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
+                <rect x="23" y="103" width="14" height="14" fill="#202422"/>
+                <rect x="52" y="52" width="36" height="36" rx="6" fill="#7b1828"/>
+                <text x="70" y="75" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">SGQR</text>
+                <path d="M54 18h6v6h-6zM66 18h8v6h-8zM54 30h12v6H54zM18 54h10v6H18zM34 58h8v8h-8zM94 54h12v6H94zM110 62h10v10h-10zM54 94h8v10h-8zM70 98h10v8H70zM94 94h14v14H94zM102 114h16v8h-16z" fill="#202422"/>
+              </svg>
+            </div>
+            <div class="sgqr-details">
+              <div class="sgqr-entity-name">NAN HWA CHONG STEAMBOAT PTE. LTD.</div>
+              <div class="sgqr-uen">UEN: 201619270H</div>
+              <div class="sgqr-ref">Ref: T${table}-R${summary.rounds || 1}</div>
+              <div class="sgqr-amount-pill">Total: ${money(summary.subtotal)} · Demo: S$0.00</div>
+            </div>
+          </div>
+          <div class="sgqr-action-row">
+            <button type="button" class="sgqr-btn-pay" id="apple-pay-btn">
+              <span>Pay / GPay</span>
+              <small>(1-Tap)</small>
+            </button>
+            <button type="button" class="sgqr-btn-save" id="save-sgqr-btn">
+              <span>📸 Save SGQR</span>
+            </button>
+          </div>
+        </div>
         <div class="pay-share-row">
           <button type="button" class="pay-share-btn" id="pay-my-share-btn">
             <span>💳 ${esc(T('payShare'))} · ${money(summary.grandTotalPerPax)}</span>
@@ -1251,6 +1882,15 @@ function openBillDialog() {
       splitPax = Number(e.target.value) || 4;
       renderBillContent();
       render();
+    });
+    dialog.querySelector('#apple-pay-btn')?.addEventListener('click', () => {
+      triggerOrderAnimation();
+      hapticPulse();
+      toast('Simulated Apple Pay / Google Pay successful! Amount charged: S$0.00.');
+    });
+    dialog.querySelector('#save-sgqr-btn')?.addEventListener('click', () => {
+      hapticPulse();
+      toast('SGQR saved to photos. Scan with DBS PayLah!, OCBC Pay Anyone or UOB TMRW.');
     });
     dialog.querySelector('#pay-my-share-btn')?.addEventListener('click', () => {
       triggerOrderAnimation();
@@ -1486,6 +2126,7 @@ function openMobileCart() {
             <h3>${esc(x.name)}</h3>
             <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
             <small>${money(x.unitPrice)} each</small>
+            <div><span class="cart-guest-tag">${x.guestEmoji || currentGuest.emoji || '👤'} ${esc(x.addedBy || currentGuest.name)}</span></div>
           </div>
           <div class="cart-line-end">
             <strong>${money(x.qty * x.unitPrice)}</strong>
@@ -1523,6 +2164,7 @@ function openMobileCart() {
       act(() => {
         state.cart[idx].qty += delta;
         if (state.cart[idx].qty <= 0) state.cart.splice(idx, 1);
+        updateDockSpeech();
         renderContent();
         render();
       });
@@ -1530,19 +2172,18 @@ function openMobileCart() {
     dialog.querySelectorAll('[data-modal-quick-add]').forEach(b => b.onclick = () => {
       const d = dish(b.dataset.modalQuickAdd);
       act(() => {
-        addLines(state, [makeLine(d.id, 1, 'Regular', state.preference)]);
+        const newLine = makeLine(d.id, 1, 'Regular', state.preference);
+        newLine.addedBy = currentGuest.name;
+        newLine.guestEmoji = currentGuest.emoji;
+        addLines(state, [newLine]);
+        updateDockSpeech();
         renderContent();
         render();
       });
     });
     dialog.querySelector('#modal-submit-order')?.addEventListener('click', () => {
-      let order;
-      act(() => {
-        order = submit(state, table);
-        reply(localReply('submitted', { id: order.id }));
-        closeTopLayer(dialog);
-        openSuccessDialog(order);
-      });
+      closeTopLayer(dialog);
+      handleOrderSubmit();
     });
   };
 

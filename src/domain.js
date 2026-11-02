@@ -2541,6 +2541,8 @@ export const serviceTypes = {
   tea: { id: 'tea', icon: '🍵', label: 'Refill hot Chinese tea / water' },
   bowls: { id: 'bowls', icon: '🥢', label: 'Extra bowls, spoons & chilli' },
   chilli: { id: 'chilli', icon: '🌶️', label: 'Cut red chilli & garlic soy dip' },
+  plates: { id: 'plates', icon: '🍽️', label: 'Clear empty plates / 换骨碟' },
+  takeaway: { id: 'takeaway', icon: '🥡', label: 'Takeaway boxes / 打包盒' },
   wipe: { id: 'wipe', icon: '🧻', label: 'Extra wet wipes & napkins' },
   bill: { id: 'bill', icon: '🧾', label: 'Table bill & split check' },
   assistance: { id: 'assistance', icon: '♧', label: 'Customer would like assistance' }
@@ -2559,6 +2561,7 @@ export function addLines(state, lines) {
   for (const raw of lines) {
     if (state.unavailable.includes(raw.id)) throw Error(`${dish(raw.id)?.name || 'Dish'} is unavailable. Please choose another dish.`);
     const x = makeLine(raw.id, raw.qty, raw.size, raw.notes);
+    if (raw.addedBy) { x.addedBy = raw.addedBy; x.guestEmoji = raw.guestEmoji; }
     const existing = next.find(y => y.id === x.id && y.size === x.size && y.notes === x.notes);
     if (existing) { if (existing.qty + x.qty > 20) throw Error('Maximum 20 of each dish.'); existing.qty += x.qty; } else next.push(x);
   }
