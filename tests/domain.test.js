@@ -5,7 +5,10 @@ import {
   requestService, tableSummary, settleTable, toggleOrderItem,
   getTableSession, applyOp, STATIONS, getDishStation, SET_MENUS,
   fireHeldItem, hurryItem, voidItem, guestBreakdown, closeTableSession,
-  getEReceipt, dish
+  getEReceipt, dish, STORED_VALUE_TIERS, COUPON_TEMPLATES,
+  getMember, registerMember, topUpMemberBalance, applyCoupon,
+  removeCoupon, payWithMemberBalance, submitReview, createBanquetBooking,
+  createQueueTicket, transferQueueToTable
 } from '../src/domain.js';
 import { computeDishBadge } from '../src/lore.js';
 import { handleRequest } from '../server.mjs';
@@ -380,4 +383,132 @@ test('getEReceipt formats formal Singapore tax invoice with GST Reg No', () => {
   assert.equal(receipt.gst, 178); // 9% of (1800 + 180) = 178.2 -> 178
   assert.equal(receipt.grandTotal, 2158);
   assert.equal(receipt.items.length, 2);
+});
+
+test('member registration saves profile, awards welcome points and waives tea fee', () => {
+  const s = initialState();
+  const m = registerMember(s, { phone: '91234567', name: 'Marcus Wong', email: 'marcus@example.com' });
+  assert.equal(m.phone, '91234567');
+  assert.equal(m.name, 'Marcus Wong');
+  assert.equal(m.points, 100);
+  assert.equal(m.teaWaived, true);
+  assert.ok(m.coupons.includes('WELCOME-TEA'));
+
+  // Fetching member
+  const found = getMember(s, '91234567');
+  assert.equal(found.phone, '91234567');
+
+  // Verify applyOp handles REGISTER_MEMBER
+  applyOp(s, { type: 'REGISTER_MEMBER', phone: '87654321', name: 'Tan Ah Huat' });
+  assert.equal(getMember(s, '87654321').name, 'Tan Ah Huat');
+});
+
+test('stored value top-up adds credit, tier upgrades and bonus points', () => {
+  const s = initialState();
+  registerMember(s, { phone: '91234567', name: 'Marcus' });
+
+  // Top up S$200 get S$230
+  const m = topUpMemberBalance(s, '91234567', 20000, 23000);
+  assert.equal(m.balance, 23000);
+  assert.equal(m.tier, 'Silver');
+  assert.equal(m.points, 100 + 200); // welcome + 1 pt per S$1
+
+  // Top up S$500 get S$600 via applyOp
+  applyOp(s, { type: 'TOP_UP_STORED_VALUE', phone: '91234567', payCents: 50000, creditCents: 60000 });
+  const updated = getMember(s, '91234567');
+  assert.equal(updated.balance, 83000);
+  assert.equal(updated.tier, 'Gold');
+});
+
+test('coupon application adjusts table summary subtotal and tax calculation accurately', () => {
+  const s = initialState();
+  addLines(s, [makeLine('pomfret', 1), makeLine('chicken', 1)], '12'); // 5800 + 1500 = 7300
+  submit(s, '12', { autoFire: true });
+
+  const rawSummary = tableSummary(s, '12');
+  assert.equal(rawSummary.subtotal, 7300);
+  assert.equal(rawSummary.discount, 0);
+
+  // Apply STEAMBOAT-10 (S$10 off min S$60)
+  applyCoupon(s, '12', 'STEAMBOAT-10');
+  const discountedSummary = tableSummary(s, '12');
+  assert.equal(discountedSummary.rawSubtotal, 7300);
+  assert.equal(discountedSummary.discount, 1000);
+  assert.equal(discountedSummary.subtotal, 6300); // 7300 - 1000
+  assert.equal(discountedSummary.serviceCharge, 630); // 10% of 6300
+  assert.equal(discountedSummary.gst, 624); // 9% of (6300 + 630) = 623.7 -> 624
+  assert.equal(discountedSummary.grandTotal, 6300 + 630 + 624);
+
+  // Remove coupon
+  removeCoupon(s, '12');
+  assert.equal(tableSummary(s, '12').subtotal, 7300);
+});
+
+test('pay with member balance settles bill and deducts exact grandTotal', () => {
+  const s = initialState();
+  registerMember(s, { phone: '91234567', name: 'Marcus' });
+  topUpMemberBalance(s, '91234567', 10000, 11000); // balance = 11000 (S$110)
+
+  addLines(s, [makeLine('chicken', 1), makeLine('rice', 2)], '14'); // Subtotal 1800, Grand Total 2158
+  const ord = submit(s, '14', { autoFire: true });
+  transition(s, ord.id, 'preparing');
+  transition(s, ord.id, 'ready');
+  transition(s, ord.id, 'served');
+
+  const payment = payWithMemberBalance(s, '14', '91234567');
+  assert.equal(payment.success, true);
+  assert.equal(payment.remainingBalance, 11000 - 2158);
+  assert.equal(ord.paid, true);
+});
+
+test('review capture stores 5-star rating and awards member bonus points', () => {
+  const s = initialState();
+  registerMember(s, { phone: '91234567', name: 'Marcus' });
+  const pointsBefore = getMember(s, '91234567').points;
+
+  const rev = submitReview(s, {
+    table: '15',
+    phone: '91234567',
+    rating: 5,
+    tags: ['Charcoal Broth', 'Fast Service'],
+    comment: 'Best fish head steamboat in Singapore!'
+  });
+
+  assert.equal(rev.rating, 5);
+  assert.equal(s.reviews.length, 1);
+  assert.equal(getMember(s, '91234567').points, pointsBefore + 50);
+});
+
+test('banquet booking reserves CNY/celebration sets with deposit', () => {
+  const s = initialState();
+  const booking = createBanquetBooking(s, {
+    name: 'Wong Family',
+    phone: '91234567',
+    date: '2026-02-15',
+    time: '18:30',
+    pax: 8,
+    setId: 'set-8pax',
+    notes: 'Near entrance please'
+  });
+
+  assert.ok(booking.id.startsWith('NHC-BANQ-'));
+  assert.equal(booking.depositPaid, true);
+  assert.equal(booking.pax, 8);
+  assert.equal(s.banquets.length, 1);
+});
+
+test('queue ticket creates pre-order cart and transfers seamlessly to seated table', () => {
+  const s = initialState();
+  const ticket = createQueueTicket(s, 4, 'Wong Party');
+  assert.equal(ticket.queueId, 'Q-01');
+  assert.equal(ticket.pax, 4);
+
+  // Add items in queue
+  ticket.cart.push(makeLine('grouper', 1), makeLine('chicken', 1));
+
+  // Customer is seated at Table 16
+  const session = transferQueueToTable(s, 'Q-01', '16');
+  assert.equal(session.cart.length, 2);
+  assert.equal(ticket.status, 'seated');
+  assert.equal(ticket.table, '16');
 });

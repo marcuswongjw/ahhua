@@ -2549,8 +2549,38 @@ export const serviceTypes = {
 };
 export const money = cents => `S$${(cents / 100).toFixed(2)}`;
 export const dish = id => menu.find(x => x.id === id);
-export function initialState() { return { version: 1, replyLanguage: 'en', cart: [], orders: [], calls: [], unavailable: [], messages: [{ role: 'host', text: replyText('en', 'welcome'), language: 'en' }], proposal: [], preference: '', sessions: {} }; }
+export function initialState() {
+  return {
+    version: 1,
+    replyLanguage: 'en',
+    cart: [],
+    orders: [],
+    calls: [],
+    unavailable: [],
+    messages: [{ role: 'host', text: replyText('en', 'welcome'), language: 'en' }],
+    proposal: [],
+    preference: '',
+    sessions: {},
+    members: {},
+    coupons: [],
+    reviews: [],
+    banquets: [],
+    queues: {}
+  };
+}
 export function total(items) { return items.reduce((sum, x) => sum + x.qty * x.unitPrice, 0); }
+
+export const STORED_VALUE_TIERS = [
+  { id: 'topup-100', pay: 10000, credit: 11000, bonus: 1000, label: 'Top-up S$100 get S$110 (充S$100送S$10)', tag: '+10% Bonus' },
+  { id: 'topup-200', pay: 20000, credit: 23000, bonus: 3000, label: 'Top-up S$200 get S$230 (充S$200送S$30)', tag: '+15% Bonus · Popular' },
+  { id: 'topup-500', pay: 50000, credit: 60000, bonus: 10000, label: 'Top-up S$500 get S$600 (充S$500送S$100)', tag: '+20% Bonus · Best Value' }
+];
+
+export const COUPON_TEMPLATES = [
+  { code: 'WELCOME-TEA', title: 'Free Table Pu’er Tea (免茶位费)', discount: 300, minSpend: 0, desc: 'Complimentary Chinese Tea for your whole table' },
+  { code: 'STEAMBOAT-10', title: 'S$10 Off Steamboat (满S$60立减S$10)', discount: 1000, minSpend: 6000, desc: 'Valid on charcoal fish head steamboat orders' },
+  { code: 'RETURN-15', title: 'S$15 Return Voucher (30天复购券)', discount: 1500, minSpend: 8000, desc: 'S$15 off on your next visit within 30 days' }
+];
 export const STATIONS = {
   all: { id: 'all', label: 'All Stations · 全部档口', icon: '📋' },
   steamboat: { id: 'steamboat', label: 'Steamboat & Charcoal · 炭火炉档', icon: '🍲' },
@@ -2687,7 +2717,7 @@ export const SET_MENUS = [
 ];
 
 export function getTableSession(state, tableId) {
-  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false };
+  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null };
   if (!state.sessions) state.sessions = {};
   if (!state.sessions[tableId]) {
     state.sessions[tableId] = {
@@ -2698,6 +2728,7 @@ export function getTableSession(state, tableId) {
       status: 'ordering',
       pax: 4,
       teaFeeWaived: false,
+      coupon: null,
       openedAt: new Date().toISOString()
     };
   }
@@ -2894,6 +2925,42 @@ export function applyOp(state, op) {
       settleTable(state, opTable);
       break;
     }
+    case 'REGISTER_MEMBER': {
+      registerMember(state, op);
+      break;
+    }
+    case 'TOP_UP_STORED_VALUE': {
+      topUpMemberBalance(state, op.phone, op.payCents, op.creditCents);
+      break;
+    }
+    case 'APPLY_COUPON': {
+      applyCoupon(state, opTable, op.couponCode);
+      break;
+    }
+    case 'REMOVE_COUPON': {
+      removeCoupon(state, opTable);
+      break;
+    }
+    case 'PAY_WITH_BALANCE': {
+      payWithMemberBalance(state, opTable, op.phone);
+      break;
+    }
+    case 'SUBMIT_REVIEW': {
+      submitReview(state, op);
+      break;
+    }
+    case 'CREATE_BANQUET_BOOKING': {
+      createBanquetBooking(state, op.booking || op);
+      break;
+    }
+    case 'CREATE_QUEUE_TICKET': {
+      createQueueTicket(state, op.pax, op.guestName);
+      break;
+    }
+    case 'TRANSFER_QUEUE_TO_TABLE': {
+      transferQueueToTable(state, op.queueId, opTable);
+      break;
+    }
   }
 }
 const transitions = { pending: ['approved', 'rejected'], approved: ['preparing'], preparing: ['ready'], ready: ['served'] };
@@ -2933,10 +3000,16 @@ export function tableSummary(state, table, pax = 4) {
   const safePax = Math.min(20, Math.max(1, Number.isInteger(pax) ? pax : 4));
   const tableOrders = state.orders.filter(x => x.table === table);
   const activeOrders = tableOrders.filter(x => x.status !== 'rejected');
-  const subtotal = activeOrders.reduce((sum, o) => {
+  const rawSubtotal = activeOrders.reduce((sum, o) => {
     const validItems = (o.items || []).filter(x => !x.voided);
     return sum + total(validItems);
   }, 0);
+  const coupon = session?.coupon || null;
+  let discount = 0;
+  if (coupon && rawSubtotal >= (coupon.minSpend || 0)) {
+    discount = Math.min(coupon.discount || 0, rawSubtotal);
+  }
+  const subtotal = Math.max(0, rawSubtotal - discount);
   const serviceCharge = Math.round(subtotal * 0.10);
   const gst = Math.round((subtotal + serviceCharge) * 0.09);
   const grandTotal = subtotal + serviceCharge + gst;
@@ -2950,6 +3023,9 @@ export function tableSummary(state, table, pax = 4) {
     itemCount,
     orders: tableOrders,
     activeOrders,
+    rawSubtotal,
+    discount,
+    coupon,
     subtotal,
     serviceCharge,
     gst,
@@ -3038,12 +3114,157 @@ export function getEReceipt(state, table, pax = 4) {
     dateTime: now.toLocaleString('en-SG', { timeZone: 'Asia/Singapore', dateStyle: 'medium', timeStyle: 'short' }),
     items: summary.activeOrders.flatMap(o => (o.items || []).filter(x => !x.voided)),
     voidedItems: summary.activeOrders.flatMap(o => (o.items || []).filter(x => x.voided)),
+    rawSubtotal: summary.rawSubtotal ?? summary.subtotal,
+    discount: summary.discount || 0,
+    coupon: summary.coupon || null,
     subtotal: summary.subtotal,
     serviceCharge: summary.serviceCharge,
     gst: summary.gst,
     grandTotal: summary.grandTotal,
     paymentStatus: 'PAID · FULLY SETTLED'
   };
+}
+
+export function getMember(state, phone) {
+  if (!state.members) state.members = {};
+  const clean = String(phone || '').trim().replace(/\D/g, '').slice(-8);
+  return state.members[clean] || null;
+}
+
+export function registerMember(state, { phone, name, email = '' }) {
+  const clean = String(phone || '').trim().replace(/\D/g, '').slice(-8);
+  if (!clean || clean.length < 8) throw Error('Please provide an 8-digit Singapore phone number.');
+  if (!state.members) state.members = {};
+  if (!state.members[clean]) {
+    state.members[clean] = {
+      phone: clean,
+      name: (name || 'VIP Member').trim(),
+      email: String(email).trim(),
+      balance: 0,
+      points: 100, // Welcome points
+      tier: 'Bronze',
+      visits: 1,
+      teaWaived: true,
+      coupons: ['WELCOME-TEA', 'RETURN-15'],
+      joinedAt: new Date().toISOString()
+    };
+  } else {
+    state.members[clean].visits += 1;
+    if (name) state.members[clean].name = String(name).trim();
+  }
+  return state.members[clean];
+}
+
+export function topUpMemberBalance(state, phone, payCents, creditCents) {
+  const member = getMember(state, phone);
+  if (!member) throw Error('Member account not found. Please register first.');
+  member.balance = (member.balance || 0) + Number(creditCents);
+  member.points = (member.points || 0) + Math.floor(payCents / 100);
+  if (member.balance >= 50000) member.tier = 'Gold';
+  else if (member.balance >= 20000) member.tier = 'Silver';
+  return member;
+}
+
+export function applyCoupon(state, table, couponCode) {
+  const session = getTableSession(state, table);
+  const found = COUPON_TEMPLATES.find(c => c.code === couponCode) || {
+    code: couponCode,
+    title: 'Custom Voucher',
+    discount: 500,
+    minSpend: 4000,
+    desc: 'Promotional discount'
+  };
+  session.coupon = found;
+  return found;
+}
+
+export function removeCoupon(state, table) {
+  const session = getTableSession(state, table);
+  session.coupon = null;
+}
+
+export function payWithMemberBalance(state, table, phone) {
+  const member = getMember(state, phone);
+  if (!member) throw Error('Member not found.');
+  const summary = tableSummary(state, table);
+  if (member.balance < summary.grandTotal) {
+    throw Error(`Insufficient stored value balance. Available: ${money(member.balance)}, Required: ${money(summary.grandTotal)}.`);
+  }
+  member.balance -= summary.grandTotal;
+  const pts = Math.floor(summary.grandTotal / 100);
+  member.points = (member.points || 0) + pts;
+  settleTable(state, table);
+  return { success: true, remainingBalance: member.balance, pointsEarned: pts };
+}
+
+export function submitReview(state, { table, phone, rating, tags = [], comment = '' }) {
+  if (!state.reviews) state.reviews = [];
+  const review = {
+    id: `REV-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    table,
+    phone: String(phone || '').trim().replace(/\D/g, '').slice(-8),
+    rating: Number(rating) || 5,
+    tags: Array.isArray(tags) ? tags : [],
+    comment: String(comment).trim().slice(0, 300),
+    created: new Date().toISOString()
+  };
+  state.reviews.push(review);
+  if (review.phone) {
+    const member = getMember(state, review.phone);
+    if (member) member.points = (member.points || 0) + 50;
+  }
+  return review;
+}
+
+export function createBanquetBooking(state, { name, phone, date, time, pax, setId, notes = '' }) {
+  if (!state.banquets) state.banquets = [];
+  const sm = SET_MENUS.find(s => s.id === setId);
+  const booking = {
+    id: `NHC-BANQ-${Date.now().toString().slice(-6)}`,
+    name: String(name || 'Banquet Guest').trim(),
+    phone: String(phone || '').trim(),
+    date: date || new Date().toISOString().slice(0, 10),
+    time: time || '19:00',
+    pax: Number(pax) || (sm ? sm.pax : 8),
+    setId: sm ? sm.id : 'set-8pax',
+    setName: sm ? sm.name : 'Prosperity Feast (八仙聚宝宴)',
+    notes: String(notes).trim(),
+    depositCents: 5000,
+    depositPaid: true,
+    status: 'confirmed',
+    created: new Date().toISOString()
+  };
+  state.banquets.push(booking);
+  return booking;
+}
+
+export function createQueueTicket(state, pax = 4, guestName = 'Diner') {
+  if (!state.queues) state.queues = {};
+  const count = Object.keys(state.queues).length + 1;
+  const queueId = `Q-${String(count).padStart(2, '0')}`;
+  state.queues[queueId] = {
+    queueId,
+    pax: Number(pax) || 4,
+    guestName: String(guestName || 'Diner').trim(),
+    cart: [],
+    estWaitMins: count * 8,
+    status: 'waiting',
+    created: new Date().toISOString()
+  };
+  return state.queues[queueId];
+}
+
+export function transferQueueToTable(state, queueId, tableNum) {
+  if (!state.queues || !state.queues[queueId]) throw Error(`Queue ticket ${queueId} not found.`);
+  const q = state.queues[queueId];
+  if (q.cart && q.cart.length) {
+    addLines(state, q.cart, tableNum);
+  }
+  const session = getTableSession(state, tableNum);
+  session.pax = q.pax;
+  q.status = 'seated';
+  q.table = tableNum;
+  return session;
 }
 const numberWords = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, 一: 1, 两: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
 const plain = text => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');

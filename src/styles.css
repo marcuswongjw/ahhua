@@ -1525,5 +1525,242 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
   text-transform: uppercase;
 }
 
+/* Tier 2: The Money Layer & Retention Styles */
+.member-top-pill, .banquet-top-pill {
+  border: 1px solid rgba(152, 34, 38, 0.25);
+  background: #fff8f5;
+  color: var(--brand-red);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.member-top-pill:hover, .banquet-top-pill:hover {
+  background: #faece6;
+  border-color: var(--brand-red);
+}
+
+.member-card {
+  background: linear-gradient(135deg, #1f2937, #111827);
+  color: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+.member-card::after {
+  content: '南华昌';
+  position: absolute;
+  right: -10px;
+  bottom: -15px;
+  font-size: 64px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  font-family: serif;
+}
+.member-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.member-tier-pill {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.member-tier-pill.Gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+.member-tier-pill.Silver {
+  background: linear-gradient(135deg, #9ca3af, #6b7280);
+  color: #fff;
+}
+.member-tier-pill.Bronze {
+  background: linear-gradient(135deg, #b45309, #78350f);
+  color: #fff;
+}
+.member-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+}
+.member-stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fef3c7;
+}
+.member-stat-lbl {
+  font-size: 10px;
+  color: #d1d5db;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.stored-value-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 10px 0 16px;
+}
+.stored-value-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.stored-value-card:hover {
+  border-color: var(--brand-red);
+  background: #fff9f8;
+  transform: translateY(-2px);
+}
+.stored-bonus-tag {
+  display: inline-block;
+  background: #fef2f2;
+  color: var(--brand-red);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.vouchers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+.voucher-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #fbfdf9;
+}
+.voucher-item strong {
+  font-size: 13px;
+  color: #111;
+  display: block;
+}
+.voucher-item small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.voucher-discount {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brand-red);
+}
+
+.bill-coupon-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8faf5;
+  border: 1px solid #e5e9df;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 11px;
+}
+.bill-coupon-bar select {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.star-rating-box {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0;
+}
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  color: #d1d5db;
+  transition: transform 0.15s, color 0.15s;
+  padding: 0;
+}
+.star-btn.active {
+  color: #f59e0b;
+}
+.star-btn:hover {
+  transform: scale(1.2);
+}
+
+.review-tags-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+.review-tag-chip {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.review-tag-chip.active {
+  background: #fee2e2;
+  border-color: var(--brand-red);
+  color: var(--brand-red);
+  font-weight: 600;
+}
+
+.queue-banner {
+  background: linear-gradient(90deg, #982226, #b83238);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  margin: 8px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.queue-banner button {
+  background: #fff;
+  color: var(--brand-red);
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+
 
 

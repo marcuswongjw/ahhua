@@ -2,7 +2,9 @@ import {
   menu, money, dish, initialState, total, makeLine, addLines, submit, transition,
   chat, configureRecommendation, serviceTypes, requestService, tableSummary, settleTable, toggleOrderItem,
   getTableSession, applyOp, STATIONS, getDishStation, SET_MENUS, fireHeldItem, hurryItem, voidItem,
-  guestBreakdown, closeTableSession, getEReceipt
+  guestBreakdown, closeTableSession, getEReceipt, STORED_VALUE_TIERS, COUPON_TEMPLATES,
+  getMember, registerMember, topUpMemberBalance, applyCoupon, removeCoupon, payWithMemberBalance,
+  submitReview, createBanquetBooking, createQueueTicket, transferQueueToTable
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
@@ -50,6 +52,14 @@ if (!currentGuest || !currentGuest.name) {
   try { sessionStorage.setItem('ah-hua-guest', JSON.stringify(currentGuest)); } catch {}
 }
 let dockSpeechText = 'Table 08 · Charcoal steamboat simmering fresh—1 pot is great to share!';
+let currentMemberPhone = null;
+try { currentMemberPhone = localStorage.getItem('ahhua-member-phone'); } catch {}
+let activeQueueTicket = null;
+try {
+  const urlParams = new URLSearchParams(location.search);
+  const qParam = urlParams.get('queue');
+  if (qParam) activeQueueTicket = qParam;
+} catch {}
 
 
 state.replyLanguage = normaliseLanguage(state.replyLanguage);
@@ -487,6 +497,7 @@ function render() {
   const openCalls = state.calls.filter(x => !x.done).length;
   const activeKitchen = state.orders.filter(x => ['approved', 'preparing', 'ready'].includes(x.status)).length;
   const staffBadgeCount = pending + openCalls;
+  const currentMember = currentMemberPhone ? getMember(state, currentMemberPhone) : null;
 
   $('#app').innerHTML = `
   <div class="demo-bar"><span class="dot"></span> NAN HWA CHONG (南华昌) · EST. 1927 <span class="demo-detail">Interactive table ordering · Authentic fish head steamboat</span></div>
@@ -502,6 +513,12 @@ function render() {
           ${Object.entries(languages).map(([id, l]) => `<option value="${id}" ${state.replyLanguage === id ? 'selected' : ''}>${l.label}</option>`).join('')}
         </select>
       </div>
+      <button type="button" class="member-top-pill" id="open-member-btn" title="VIP Member Privileges · 会员权益">
+        ${currentMember ? `⭐️ ${esc(currentMember.name.split(' ')[0])} (${money(currentMember.balance)})` : `🎁 VIP Member (免茶位)`}
+      </button>
+      <button type="button" class="banquet-top-pill" id="open-banquet-btn" title="Banquet & CNY Pre-order · 年菜宴席">
+        🏮 Banquet
+      </button>
       <button type="button" class="font-toggle-btn ${largeFont ? 'active' : ''}" id="toggle-large-font" aria-label="Toggle large text mode · 大字模式" title="Large text mode for elders · 长辈大字模式">
         <span class="font-icon" aria-hidden="true">Aa</span><span>${largeFont ? esc(T('standardMode')) : esc(T('elderMode'))}</span>
       </button>
@@ -541,6 +558,10 @@ function render() {
   <dialog id="set-menu-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="set-menu-title"></dialog>
   <dialog id="void-dialog" closedby="any" aria-labelledby="void-dialog-title"></dialog>
   <dialog id="e-receipt-dialog" closedby="any" aria-labelledby="e-receipt-title"></dialog>
+  <dialog id="member-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="member-dialog-title"></dialog>
+  <dialog id="review-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="review-dialog-title"></dialog>
+  <dialog id="banquet-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="banquet-dialog-title"></dialog>
+  <dialog id="queue-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="queue-dialog-title"></dialog>
   <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
     <form method="dialog">
       <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -1164,6 +1185,13 @@ function customer() {
     </div>
   </section>
 
+  ${activeQueueTicket ? `
+    <div class="queue-banner">
+      <span>🚶 <strong>In Line: Ticket ${esc(activeQueueTicket)}</strong> · Pre-order food for instant fire upon seating!</span>
+      <button type="button" id="queue-seated-btn">I’m Seated at Table ${table} →</button>
+    </div>
+  ` : ''}
+
   ${latestOrder ? `<div class="active-stage-banner">
     <span>🍲 Round ${latestOrder.round || 1} (${latestOrder.id}) is simmering in the kitchen (~12 mins)</span>
     <button type="button" id="switch-to-stage-btn" class="stage-switch-btn">Enter Concierge Stage →</button>
@@ -1709,6 +1737,17 @@ function bindCustomer() {
   document.querySelectorAll('[data-open-bill]').forEach(b => b.onclick = () => openBillDialog());
   $('#open-steamboat-guide')?.addEventListener('click', () => openSteamboatGuide());
   $('#open-mobile-cart')?.addEventListener('click', () => openMobileCart());
+  $('#open-member-btn')?.addEventListener('click', () => openMemberDialog());
+  $('#open-banquet-btn')?.addEventListener('click', () => openBanquetDialog());
+  $('#queue-seated-btn')?.addEventListener('click', () => {
+    if (activeQueueTicket) {
+      transferQueueToTable(state, activeQueueTicket, table);
+      dispatchOp({ type: 'TRANSFER_QUEUE_TO_TABLE', queueId: activeQueueTicket, table });
+      activeQueueTicket = null;
+      toast(`Welcome to Table ${table}! Pre-ordered items transferred to active cart.`);
+      render();
+    }
+  });
 
   document.querySelectorAll('[data-open-set]').forEach(b => {
     b.onclick = () => openSetMenuDialog(b.dataset.openSet);
@@ -2058,8 +2097,25 @@ function openBillDialog() {
               </ul>
             </div>`).join('')}
           </div>
+          <div class="bill-coupon-bar">
+            <label for="bill-coupon-picker">🎟️ Member Voucher / 优惠券:</label>
+            <select id="bill-coupon-picker">
+              <option value="">-- No Voucher Applied --</option>
+              ${COUPON_TEMPLATES.map(c => `
+                <option value="${c.code}" ${summary.coupon?.code === c.code ? 'selected' : ''}>
+                  ${c.title} (-${money(c.discount)})
+                </option>
+              `).join('')}
+            </select>
+          </div>
           <div class="bill-totals-box">
-            <div><span>Dishes subtotal (${summary.itemCount} items)</span><strong>${money(summary.subtotal)}</strong></div>
+            <div><span>Dishes subtotal (${summary.itemCount} items)</span><strong>${money(summary.rawSubtotal ?? summary.subtotal)}</strong></div>
+            ${summary.discount > 0 ? `
+              <div class="discount-line" style="color:var(--brand-red);display:flex;justify-content:space-between">
+                <span>Voucher discount (${esc(summary.coupon?.code || 'PROMO')})</span>
+                <strong>- ${money(summary.discount)}</strong>
+              </div>
+            ` : ''}
             <div class="muted-line"><span>10% Service Charge</span><span>${money(summary.serviceCharge)}</span></div>
             <div class="muted-line"><span>9% GST (Inclusive)</span><span>${money(summary.gst)}</span></div>
             <div class="muted-line"><span>Total amount</span><span>${money(summary.grandTotal)}</span></div>
@@ -2121,6 +2177,12 @@ function openBillDialog() {
             </div>
           </div>
           <div class="pay-share-row">
+            ${currentMember && currentMember.balance >= summary.grandTotalPerPax ? `
+              <button type="button" class="pay-share-btn" id="pay-member-balance-btn" style="background:#1f2937">
+                <span>💰 VIP Balance · ${money(summary.grandTotalPerPax)}</span>
+                <small>Bal: ${money(currentMember.balance)}</small>
+              </button>
+            ` : ''}
             <button type="button" class="pay-share-btn" id="pay-my-share-btn">
               <span>💳 ${esc(T('payShare'))} · ${money(summary.grandTotalPerPax)}</span>
               <small>Simulated 1-tap checkout</small>
@@ -2151,7 +2213,10 @@ function openBillDialog() {
       ) : `<div class="cart-empty"><div>🧾</div><h3>No submitted rounds for Table ${table} yet.</h3><p>Add dishes to your cart and send them to staff first.</p></div>`}
 
       <div class="bill-modal-actions" style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
-        ${summary.activeOrders.length ? `<button type="button" class="secondary wide" id="open-e-receipt-btn">🧾 View Official GST E-Receipt (查看电子发票) →</button>` : ''}
+        ${summary.activeOrders.length ? `
+          <button type="button" class="secondary wide" id="open-e-receipt-btn">🧾 View Official GST E-Receipt (查看电子发票) →</button>
+          <button type="button" class="secondary wide" id="open-review-btn">🌟 Rate Meal &amp; Earn 50 VIP Points (好评有礼) →</button>
+        ` : ''}
       </div>
     </div>`;
 
@@ -2161,6 +2226,38 @@ function openBillDialog() {
     dialog.querySelector('#open-e-receipt-btn')?.addEventListener('click', () => {
       closeTopLayer(dialog);
       openEReceiptDialog();
+    });
+    dialog.querySelector('#open-review-btn')?.addEventListener('click', () => {
+      closeTopLayer(dialog);
+      openReviewDialog();
+    });
+    dialog.querySelector('#bill-coupon-picker')?.addEventListener('change', e => {
+      const code = e.target.value;
+      if (code) {
+        applyCoupon(state, table, code);
+        dispatchOp({ type: 'APPLY_COUPON', table, couponCode: code });
+        toast(`🎟️ Voucher ${code} applied!`);
+      } else {
+        removeCoupon(state, table);
+        dispatchOp({ type: 'REMOVE_COUPON', table });
+        toast('Voucher removed.');
+      }
+      renderBillContent();
+      render();
+    });
+    dialog.querySelector('#pay-member-balance-btn')?.addEventListener('click', () => {
+      try {
+        payWithMemberBalance(state, table, currentMemberPhone);
+        dispatchOp({ type: 'PAY_WITH_BALANCE', table, phone: currentMemberPhone });
+        triggerOrderAnimation();
+        hapticPulse();
+        toast('💰 Bill paid via VIP Stored Balance! Thank you.');
+        renderBillContent();
+        render();
+        setTimeout(() => openReviewDialog(), 600);
+      } catch (err) {
+        toast(err.message);
+      }
     });
     dialog.querySelectorAll('[data-pay-guest]').forEach(b => b.onclick = () => {
       triggerOrderAnimation();
@@ -2190,6 +2287,7 @@ function openBillDialog() {
       triggerOrderAnimation();
       hapticPulse();
       toast('Simulated Apple Pay / Google Pay successful! Amount charged: S$0.00.');
+      setTimeout(() => openReviewDialog(), 800);
     });
     dialog.querySelector('#save-sgqr-btn')?.addEventListener('click', () => {
       hapticPulse();
@@ -2199,6 +2297,7 @@ function openBillDialog() {
       triggerOrderAnimation();
       hapticPulse();
       toast(`Simulated payment of ${money(summary.grandTotalPerPax)} received for your share. Thank you!`);
+      setTimeout(() => openReviewDialog(), 800);
     });
     dialog.querySelector('#share-bill-btn')?.addEventListener('click', () => {
       hapticPulse();
@@ -2283,6 +2382,7 @@ function openEReceiptDialog() {
       <div class="e-receipt-stamp">PAID · 结账完成</div>
       <div class="dialog-actions" style="margin-top:16px">
         <button type="button" class="secondary" id="print-receipt-btn">🖨️ Save PDF / Print</button>
+        <button type="button" class="secondary" id="rate-experience-btn">🌟 Rate Meal &amp; Earn 50 Pts</button>
         <button type="button" class="primary" id="settle-and-close-btn">🔒 Close &amp; Free Table</button>
       </div>
     </div>
@@ -2292,6 +2392,10 @@ function openEReceiptDialog() {
   dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
   dialog.querySelector('#print-receipt-btn')?.addEventListener('click', () => {
     toast('PDF e-receipt generated and saved to device photos.');
+  });
+  dialog.querySelector('#rate-experience-btn')?.addEventListener('click', () => {
+    closeTopLayer(dialog);
+    openReviewDialog();
   });
   dialog.querySelector('#settle-and-close-btn')?.addEventListener('click', () => {
     dispatchOp({ type: 'CLOSE_TABLE', table });
@@ -2422,6 +2526,406 @@ function openSetMenuDialog(setId) {
     dispatchOp({ type: 'ADD_LINES', table, lines: chosenLines });
     closeTopLayer(dialog);
     toast(`🍱 ${sm.name} added to Table ${table} shared cart!`);
+  };
+}
+
+function openMemberDialog() {
+  const dialog = $('#member-dialog');
+  if (!dialog) return;
+
+  const renderMemberModal = () => {
+    const member = currentMemberPhone ? getMember(state, currentMemberPhone) : null;
+    if (!member) {
+      dialog.innerHTML = `
+        <div class="member-modal-body" style="padding:14px">
+          <div class="dialog-top">
+            <span class="eyebrow">NAN HWA CHONG VIP · 贵宾会员礼遇</span>
+            <button type="button" class="close-dialog" aria-label="Close member modal">×</button>
+          </div>
+          <div style="text-align:center;margin:12px 0 16px">
+            <div style="font-size:36px;margin-bottom:6px">🎁</div>
+            <h2 style="margin:0 0 4px">Join VIP &amp; Waive Table Tea</h2>
+            <p style="font-size:11px;color:var(--muted)">Instant privileges for Table ${table} with zero card fees:</p>
+          </div>
+          <div style="background:#fef7f5;border:1px dashed #f0c3b8;border-radius:10px;padding:12px;margin-bottom:16px;font-size:11px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span>🍵</span><strong>Free Table Tea Cover (免茶位费 · S$3.00/pot saved)</strong></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span>🎟️</span><strong>S$15 Return Steamboat Voucher (30天复购券)</strong></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span>💰</span><strong>Stored Value Bonuses: Top up S$200 get S$230</strong></div>
+            <div style="display:flex;align-items:center;gap:8px"><span>⭐️</span><strong>1 VIP Loyalty Point per S$1 spent</strong></div>
+          </div>
+          <form id="member-signup-form">
+            <label style="display:block;margin-bottom:10px;font-size:11px">Singapore Mobile (8 digits)
+              <input type="tel" id="member-phone-input" placeholder="e.g. 91234567" required pattern="[89][0-9]{7}" maxlength="8" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:4px;font-size:14px;box-sizing:border-box" />
+            </label>
+            <label style="display:block;margin-bottom:14px;font-size:11px">Full Name / Preferred Salutation
+              <input type="text" id="member-name-input" placeholder="e.g. Marcus Wong" required style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:4px;font-size:14px;box-sizing:border-box" />
+            </label>
+            <button type="submit" class="primary wide" style="background:#8f342c;border-color:#8f342c">Join VIP &amp; Claim Perks (立即入会) →</button>
+          </form>
+        </div>
+      `;
+      dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+      dialog.querySelector('#member-signup-form').onsubmit = e => {
+        e.preventDefault();
+        const phone = $('#member-phone-input').value.trim();
+        const name = $('#member-name-input').value.trim();
+        try {
+          const m = registerMember(state, { phone, name });
+          dispatchOp({ type: 'REGISTER_MEMBER', phone, name });
+          currentMemberPhone = phone;
+          try { localStorage.setItem('ahhua-member-phone', phone); } catch {}
+          toast(`🎉 Welcome ${m.name}! Free tea perk applied to Table ${table}.`);
+          renderMemberModal();
+          render();
+        } catch (err) {
+          toast(err.message);
+        }
+      };
+    } else {
+      dialog.innerHTML = `
+        <div class="member-modal-body" style="padding:14px">
+          <div class="dialog-top">
+            <span class="eyebrow">VIP PASSBOOK · 贵宾会员中心</span>
+            <button type="button" class="close-dialog" aria-label="Close member modal">×</button>
+          </div>
+          <div class="member-card">
+            <div class="member-card-header">
+              <div>
+                <strong style="font-size:16px;display:block">${esc(member.name)}</strong>
+                <small style="color:#d1d5db">+65 ${esc(member.phone)} · Member #${member.phone.slice(-4)}</small>
+              </div>
+              <span class="member-tier-pill ${member.tier}">${member.tier} VIP</span>
+            </div>
+            <div class="member-stats-row">
+              <div>
+                <div class="member-stat-val">${money(member.balance || 0)}</div>
+                <div class="member-stat-lbl">Stored Value (储值)</div>
+              </div>
+              <div>
+                <div class="member-stat-val">${member.points || 0}</div>
+                <div class="member-stat-lbl">Points (积分)</div>
+              </div>
+              <div>
+                <div class="member-stat-val">${member.visits || 1}</div>
+                <div class="member-stat-lbl">Visits (到店)</div>
+              </div>
+            </div>
+          </div>
+
+          <h3 style="font-size:13px;margin:12px 0 6px">Stored Value Perks (充值返赠 · 即充即用)</h3>
+          <div class="stored-value-grid">
+            ${STORED_VALUE_TIERS.map(t => `
+              <div class="stored-value-card" data-topup-id="${t.id}" data-pay="${t.pay}" data-credit="${t.credit}">
+                <strong style="font-size:14px;color:var(--brand-red)">${money(t.credit)}</strong>
+                <div style="font-size:11px;color:#555">Pay ${money(t.pay)}</div>
+                <span class="stored-bonus-tag">${t.tag}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <h3 style="font-size:13px;margin:14px 0 6px">Available Vouchers (我的优惠券)</h3>
+          <div class="vouchers-list">
+            ${(member.coupons || []).map(code => {
+              const tmpl = COUPON_TEMPLATES.find(c => c.code === code) || { code, title: code, discount: 500, desc: 'Special perk' };
+              return `
+                <div class="voucher-item">
+                  <div>
+                    <strong>${esc(tmpl.title)}</strong>
+                    <small>${esc(tmpl.desc)}</small>
+                  </div>
+                  <div style="text-align:right">
+                    <span class="voucher-discount">-${money(tmpl.discount)}</span>
+                    <button type="button" class="mini-btn fire" style="margin-top:4px" data-apply-voucher="${tmpl.code}">Apply to Table</button>
+                  </div>
+                </div>
+              `;
+            }).join('') || '<div style="font-size:11px;color:var(--muted)">No active vouchers.</div>'}
+          </div>
+
+          <div class="dialog-actions" style="margin-top:14px">
+            <button type="button" class="secondary small" id="member-logout-btn">Log out / Switch account</button>
+            <button type="button" class="primary small" id="done-member-btn">Done</button>
+          </div>
+        </div>
+      `;
+
+      dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+      dialog.querySelector('#done-member-btn').onclick = () => closeTopLayer(dialog);
+      dialog.querySelector('#member-logout-btn').onclick = () => {
+        currentMemberPhone = null;
+        try { localStorage.removeItem('ahhua-member-phone'); } catch {}
+        toast('Logged out of member account.');
+        renderMemberModal();
+        render();
+      };
+      dialog.querySelectorAll('[data-topup-id]').forEach(b => {
+        b.onclick = () => {
+          const pay = +b.dataset.pay;
+          const credit = +b.dataset.credit;
+          topUpMemberBalance(state, member.phone, pay, credit);
+          dispatchOp({ type: 'TOP_UP_STORED_VALUE', phone: member.phone, payCents: pay, creditCents: credit });
+          triggerOrderAnimation();
+          hapticPulse();
+          toast(`💳 Stored value topped up! Added ${money(credit)} to your card.`);
+          renderMemberModal();
+          render();
+        };
+      });
+      dialog.querySelectorAll('[data-apply-voucher]').forEach(b => {
+        b.onclick = () => {
+          applyCoupon(state, table, b.dataset.applyVoucher);
+          dispatchOp({ type: 'APPLY_COUPON', table, couponCode: b.dataset.applyVoucher });
+          toast(`🎟️ Voucher applied to Table ${table} tab!`);
+          closeTopLayer(dialog);
+          render();
+        };
+      });
+    }
+  };
+
+  renderMemberModal();
+  dialog.showModal();
+}
+
+let selectedRating = 5;
+let selectedReviewTags = new Set(['Charcoal Broth (百年炭火浓汤)', 'Fresh Sliced Fish (鱼肉鲜甜嫩滑)']);
+
+function openReviewDialog() {
+  const dialog = $('#review-dialog');
+  if (!dialog) return;
+
+  const reviewTags = [
+    'Charcoal Broth (百年炭火浓汤)',
+    'Fresh Sliced Fish (鱼肉鲜甜嫩滑)',
+    'Fast Service (上菜迅速周到)',
+    'Ah Hua AI (阿华点单贴心)',
+    'Crispy Tofu & Chicken (小吃酥脆)',
+    'Rich Broth Refill (免费续汤极赞)'
+  ];
+
+  const renderReviewContent = () => {
+    dialog.innerHTML = `
+      <div class="review-modal-body" style="padding:14px;text-align:center">
+        <div class="dialog-top">
+          <span class="eyebrow">DINING FEEDBACK · 好评有礼</span>
+          <button type="button" class="close-dialog" aria-label="Close review modal">×</button>
+        </div>
+        <div style="margin:10px 0 14px">
+          <div style="font-size:32px;margin-bottom:4px">⭐️</div>
+          <h2 style="margin:0 0 4px">Rate Your Experience</h2>
+          <p style="font-size:11px;color:var(--muted)">Your feedback helps our charcoal masters maintain 1927 standards.</p>
+        </div>
+
+        <div class="star-rating-box">
+          ${[1, 2, 3, 4, 5].map(st => `
+            <button type="button" class="star-btn ${selectedRating >= st ? 'active' : ''}" data-star="${st}">★</button>
+          `).join('')}
+        </div>
+
+        <p style="font-size:12px;font-weight:700;color:var(--brand-red);margin-bottom:8px">
+          ${selectedRating === 5 ? '🏆 Outstanding Heritage Taste!' : selectedRating === 4 ? '😊 Great Meal!' : selectedRating === 3 ? '😐 Satisfactory' : '⚠️ We Want to Improve'}
+        </p>
+
+        <div class="review-tags-cloud">
+          ${reviewTags.map(tag => `
+            <button type="button" class="review-tag-chip ${selectedReviewTags.has(tag) ? 'active' : ''}" data-tag="${esc(tag)}">
+              ${esc(tag)}
+            </button>
+          `).join('')}
+        </div>
+
+        <textarea id="review-comment-input" placeholder="Any compliments for the kitchen or suggestions? (Optional)" style="width:100%;height:60px;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:12px;box-sizing:border-box;margin-bottom:12px"></textarea>
+
+        ${selectedRating === 5 ? `
+          <div style="background:#fef9ee;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;color:#92400e">
+            🌟 <strong>5-Star Bonus:</strong> Post your review on Google Maps to earn <strong>+50 VIP Points</strong>!
+          </div>
+        ` : ''}
+
+        <div class="dialog-actions">
+          <button type="button" class="secondary" id="cancel-review-btn">Skip</button>
+          <button type="button" class="primary" id="submit-review-btn">
+            ${selectedRating === 5 ? 'Share on Google & Claim 50 Pts →' : 'Submit Feedback →'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+    dialog.querySelector('#cancel-review-btn').onclick = () => closeTopLayer(dialog);
+
+    dialog.querySelectorAll('[data-star]').forEach(b => {
+      b.onclick = () => {
+        selectedRating = +b.dataset.star;
+        renderReviewContent();
+      };
+    });
+
+    dialog.querySelectorAll('[data-tag]').forEach(b => {
+      b.onclick = () => {
+        const t = b.dataset.tag;
+        if (selectedReviewTags.has(t)) selectedReviewTags.delete(t);
+        else selectedReviewTags.add(t);
+        renderReviewContent();
+      };
+    });
+
+    dialog.querySelector('#submit-review-btn').onclick = () => {
+      const comment = $('#review-comment-input')?.value || '';
+      submitReview(state, {
+        table,
+        phone: currentMemberPhone,
+        rating: selectedRating,
+        tags: [...selectedReviewTags],
+        comment
+      });
+      dispatchOp({
+        type: 'SUBMIT_REVIEW',
+        table,
+        phone: currentMemberPhone,
+        rating: selectedRating,
+        tags: [...selectedReviewTags],
+        comment
+      });
+      closeTopLayer(dialog);
+      triggerOrderAnimation();
+      hapticPulse();
+      if (selectedRating === 5) {
+        toast('🎉 Thank you! +50 VIP points added to your member account.');
+      } else {
+        toast('Thank you for your valuable feedback. Our floor manager has been alerted.');
+      }
+    };
+  };
+
+  renderReviewContent();
+  dialog.showModal();
+}
+
+function openBanquetDialog() {
+  const dialog = $('#banquet-dialog');
+  if (!dialog) return;
+
+  dialog.innerHTML = `
+    <div class="banquet-modal-body" style="padding:14px">
+      <div class="dialog-top">
+        <span class="eyebrow">CELEBRATION &amp; CNY BANQUETS · 宴席与年菜预订</span>
+        <button type="button" class="close-dialog" aria-label="Close banquet modal">×</button>
+      </div>
+      <div style="margin:8px 0 12px">
+        <h2 style="margin:0 0 4px">Reserve a Heritage Steamboat Feast</h2>
+        <p style="font-size:11px;color:var(--muted)">Book ahead for family gatherings and festive celebrations. S$50 deposit secures your private table and brazier.</p>
+      </div>
+
+      <form id="banquet-booking-form">
+        <label style="display:block;margin-bottom:10px;font-size:11px">Select Banquet Set Menu
+          <select id="banquet-set-select" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px">
+            ${SET_MENUS.map(sm => `
+              <option value="${sm.id}">${sm.name} · ${sm.pax} Pax (${money(sm.price)})</option>
+            `).join('')}
+          </select>
+        </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <label style="font-size:11px">Reservation Date
+            <input type="date" id="banquet-date-input" value="${new Date().toISOString().slice(0, 10)}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px;box-sizing:border-box" required />
+          </label>
+          <label style="font-size:11px">Seating Time
+            <select id="banquet-time-select" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px;box-sizing:border-box">
+              <option value="17:30">17:30 (Early Dinner)</option>
+              <option value="19:00" selected>19:00 (Peak Dinner)</option>
+              <option value="20:30">20:30 (Late Feast)</option>
+            </select>
+          </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <label style="font-size:11px">Contact Name
+            <input type="text" id="banquet-name-input" placeholder="e.g. Tan Ah Seng" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px;box-sizing:border-box" required />
+          </label>
+          <label style="font-size:11px">Contact Phone
+            <input type="tel" id="banquet-phone-input" placeholder="e.g. 91234567" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px;box-sizing:border-box" required />
+          </label>
+        </div>
+
+        <label style="display:block;margin-bottom:12px;font-size:11px">Special Celebration Requests / Dietary Notes
+          <input type="text" id="banquet-notes-input" placeholder="e.g. Birthday celebration, please prepare longevity buns" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px;box-sizing:border-box" />
+        </label>
+
+        <div style="background:#f8faf5;border:1px dashed #c9d2c2;border-radius:8px;padding:10px;margin-bottom:14px;font-size:11px">
+          <strong>Deposit Requirement:</strong> S$50.00 will be held to secure charcoal allocation and fresh morning fish catch. Deducted from final banquet bill.
+        </div>
+
+        <button type="submit" class="primary wide" style="background:#8f342c;border-color:#8f342c">
+          Confirm Reservation &amp; Pay S$50 Deposit →
+        </button>
+      </form>
+    </div>
+  `;
+
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#banquet-booking-form').onsubmit = e => {
+    e.preventDefault();
+    const setId = $('#banquet-set-select').value;
+    const date = $('#banquet-date-input').value;
+    const time = $('#banquet-time-select').value;
+    const name = $('#banquet-name-input').value.trim();
+    const phone = $('#banquet-phone-input').value.trim();
+    const notes = $('#banquet-notes-input').value.trim();
+
+    const booking = createBanquetBooking(state, { name, phone, date, time, setId, notes });
+    dispatchOp({ type: 'CREATE_BANQUET_BOOKING', booking });
+    closeTopLayer(dialog);
+    triggerOrderAnimation();
+    hapticPulse();
+    toast(`🎉 Banquet booking confirmed (${booking.id}) for ${booking.name} on ${booking.date} at ${booking.time}!`);
+  };
+}
+
+function openQueueDialog() {
+  const dialog = $('#queue-dialog');
+  if (!dialog) return;
+
+  const count = Object.keys(state.queues || {}).length + 1;
+  const sampleTicket = activeQueueTicket || `Q-${String(count).padStart(2, '0')}`;
+
+  dialog.innerHTML = `
+    <div class="queue-modal-body" style="padding:14px;text-align:center">
+      <div class="dialog-top">
+        <span class="eyebrow">LINE PRE-ORDER · 排队预点单</span>
+        <button type="button" class="close-dialog" aria-label="Close queue modal">×</button>
+      </div>
+      <div style="margin:10px 0 14px">
+        <span class="queue-pill" style="font-size:24px;font-weight:900;color:var(--brand-red);display:inline-block;padding:4px 16px;border:2px solid var(--brand-red);border-radius:8px;margin-bottom:6px">${sampleTicket}</span>
+        <h2 style="margin:4px 0">Waiting in Line?</h2>
+        <p style="font-size:11px;color:var(--muted)">Pre-build your table cart while waiting. Once your table is ready, dishes auto-fire to the kitchen to cut wait time by 10 minutes!</p>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="secondary" id="browse-in-line-btn">Start Pre-Ordering Menu</button>
+        <button type="button" class="primary" id="seated-now-btn">I am Seated at Table ${table} →</button>
+      </div>
+    </div>
+  `;
+
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#browse-in-line-btn').onclick = () => {
+    activeQueueTicket = sampleTicket;
+    closeTopLayer(dialog);
+    toast(`Queue Mode Active: Building cart for Ticket ${sampleTicket}.`);
+    render();
+  };
+  dialog.querySelector('#seated-now-btn').onclick = () => {
+    if (activeQueueTicket) {
+      transferQueueToTable(state, activeQueueTicket, table);
+      dispatchOp({ type: 'TRANSFER_QUEUE_TO_TABLE', queueId: activeQueueTicket, table });
+      activeQueueTicket = null;
+      toast(`Welcome to Table ${table}! Pre-ordered items transferred to active cart.`);
+    }
+    closeTopLayer(dialog);
+    render();
   };
 }
 
