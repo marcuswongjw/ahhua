@@ -403,9 +403,9 @@ function bindPlanner() {
 }
 
 function matchesFilter(d) {
-  if (menuFilter === 'signatures') return Boolean(d.tag);
-  if (menuFilter === 'mild') return d.id !== 'kang';
-  if (menuFilter === 'nopork') return !['pork', 'ribs'].includes(d.id);
+  if (menuFilter === 'signatures') return Boolean(d.tag) || (d.popularity || 0) >= 90;
+  if (menuFilter === 'mild') return (d.spicyLevel || 0) === 0 && d.id !== 'kang';
+  if (menuFilter === 'nopork') return d.category !== 'Chicken & Pork' && !['pork', 'ribs'].includes(d.id) && !/pork|rib|intestine|trotter|猪|肉碎|排骨/i.test(`${d.name} ${d.cn}`);
   return true;
 }
 
@@ -457,7 +457,7 @@ function customer() {
         const soldOut = state.unavailable.includes(d.id);
         const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
         return `<div class="spotlight-card ${inCartQty ? 'in-cart' : ''}">
-          <span class="spotlight-icon">${d.icon}</span>
+          ${d.image ? `<img class="spotlight-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span class="spotlight-icon">${d.icon}</span>`}
           <div class="spotlight-info">
             <small>${d.cn}</small>
             <strong>${esc(dishName(state.replyLanguage, d))}</strong>
@@ -523,14 +523,25 @@ function customer() {
       <section class="menu-section">
         <div class="section-top">
           <div>
-            <div class="eyebrow">MADE FOR SHARING · 传统煮炒与鱼头炉</div>
-            <h2>Something for everyone.</h2>
+            <div class="eyebrow">NAN HWA CHONG HERITAGE · 南华昌传统鱼头炉与煮炒</div>
+            <h2>Authentic Teochew charcoal steamboat & zi char.</h2>
           </div>
-          <span class="sample-label">Illustrative menu & prices</span>
+          <span class="sample-label">100+ Authentic Dishes & Real Photos</span>
         </div>
         <search class="menu-tools" aria-label="Filter and search menu">
           <div class="categories" aria-label="Menu category">
-            ${['All dishes', 'Steamboat', 'Favourites', 'Greens & sides', 'Drinks & Tea'].map(c => `<button type="button" data-category="${c}" aria-pressed="${category === c}" class="${category === c ? 'active' : ''}">${c}</button>`).join('')}
+            ${[
+              'All dishes',
+              'Steamboat',
+              'Specialty',
+              'Crayfish & Seafood',
+              'Chicken & Pork',
+              'Egg & Tofu',
+              'Vegetables',
+              'Rice & Noodles',
+              'Soup',
+              'Drinks & Tea'
+            ].map(c => `<button type="button" data-category="${c}" aria-pressed="${category === c}" class="${category === c ? 'active' : ''}">${c}</button>`).join('')}
           </div>
           <div class="filter-search-row">
             <div class="dietary-filters" aria-label="Quick menu filters">
@@ -549,8 +560,8 @@ function customer() {
             const soldOut = state.unavailable.includes(d.id);
             const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
             return `<article class="dish-card ${soldOut ? 'sold-out' : ''} ${inCartQty ? 'in-cart' : ''}">
-              <div class="dish-art ${d.id}">
-                <span>${d.icon}</span>
+              <div class="dish-art ${d.id} ${d.image ? 'has-photo' : ''}">
+                ${d.image ? `<img class="dish-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
                 ${d.tag ? `<em>${esc(d.tag)}</em>` : ''}
                 ${inCartQty ? `<b class="in-cart-badge">${inCartQty} in cart</b>` : ''}
               </div>
@@ -961,7 +972,9 @@ function openDish(id) {
       <span class="eyebrow">FOR YOUR TABLE · ${esc(d.category.toUpperCase())}</span>
       <button type="button" class="close-dialog" aria-label="Close dish details">×</button>
     </div>
-    <div class="dialog-art">${d.icon}</div>
+    <div class="dialog-art ${d.image ? 'has-photo' : ''}">
+      ${d.image ? `<img class="dialog-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
+    </div>
     <small>${d.cn}</small>
     <h2 id="dish-dialog-title">${esc(d.name)}</h2>
     <p>${esc(d.desc)}</p>

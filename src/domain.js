@@ -1,22 +1,2540 @@
 import { normaliseLanguage, replyText, dishName, uiText } from './languages.js';
 
-// Illustrative menu retained from the earlier Ah Hua prototype, expanded with traditional accompaniments & house drinks. Not verified restaurant data.
+// Authentic Nan Hwa Chong (南华昌) Fish Head Steamboat & Traditional Zi Char Menu
 export const menu = [
-  { id: 'grouper', name: 'Grouper Fish Head Steamboat', cn: '石斑鱼头炉', price: 4800, category: 'Steamboat', icon: '🍲', desc: 'A bubbling charcoal pot of rich milky fish broth, tender grouper, yam and greens.', tag: 'Ah Hua’s favourite', popularity: 98, spicyLevel: 0, allergens: 'Fish', modifiers: ['Charcoal milky broth', 'Clear ginger broth', 'Extra sour plum', 'Less salt'], aliases: ['grouper', '石斑', 'fish head', '鱼头炉', 'steamboat'] },
-  { id: 'pomfret', name: 'Pomfret Steamboat', cn: '鲳鱼鱼头炉', price: 5800, category: 'Steamboat', icon: '🥘', desc: 'Delicate wild-style pomfret simmered in a comforting, savoury teochew broth.', tag: 'For sharing', popularity: 92, spicyLevel: 0, allergens: 'Fish', modifiers: ['Charcoal milky broth', 'Clear teochew broth', 'Extra tang o greens', 'Soup on side'], aliases: ['pomfret', '鲳鱼'] },
-  { id: 'snapper', name: 'Snapper Steamboat', cn: '红哥里鱼头炉', price: 4200, category: 'Steamboat', icon: '🍲', desc: 'The familiar warmth of a traditional red snapper fish head broth.', tag: 'Classic', popularity: 86, spicyLevel: 0, allergens: 'Fish', modifiers: ['Charcoal milky broth', 'Clear ginger broth', 'Extra yam cubes', 'Mild'], aliases: ['snapper', '红哥里'] },
-  { id: 'yam', name: 'Crispy Yam & Fish Maw Add-on', cn: '炸芋头鱼鳔', price: 800, category: 'Steamboat', icon: '🍠', desc: 'Golden fried taro pieces and spongy fish maw to soak up the steamboat broth.', tag: 'Steamboat add-on', popularity: 89, spicyLevel: 0, allergens: 'Fish, soy; oil unverified', modifiers: ['Serve on side', 'Add directly to pot', 'Extra crispy'], aliases: ['crispy yam', 'fish maw', 'taro', '芋头', '鱼鳔'] },
-  { id: 'chicken', name: 'Prawn Paste Chicken', cn: '虾酱鸡', price: 1500, category: 'Favourites', icon: '🍗', desc: 'Golden, crisp and aromatic har cheong gai wings. Best enjoyed together.', tag: 'Crowd pleaser', popularity: 99, spicyLevel: 0, allergens: 'Shellfish, wheat', modifiers: ['Extra crispy', 'Sauce on side', 'Less oil'], aliases: ['prawn paste chicken', 'prawn paste', 'chicken', 'har cheong', '虾酱鸡'] },
-  { id: 'pork', name: 'Signature Pork Belly', cn: '南乳花肉', price: 1800, category: 'Favourites', icon: '🥓', desc: 'Crisp pork belly marinated with fragrant fermented red beancurd.', tag: 'Signature', popularity: 91, spicyLevel: 0, allergens: 'Soy, wheat', modifiers: ['Extra crispy', 'Leaner cut if available', 'Chilli dip on side'], aliases: ['pork belly', '南乳花肉'] },
-  { id: 'ribs', name: 'Sweet & Sour Pork Ribs', cn: '排骨大王', price: 1700, category: 'Favourites', icon: '🍖', desc: 'Wok-glazed pork ribs with a sticky, tangy-sweet heritage sauce.', popularity: 84, spicyLevel: 0, allergens: 'Soy, wheat', modifiers: ['Less sweet', 'Sauce on side', 'No onion'], aliases: ['pork ribs', 'ribs', '排骨'] },
-  { id: 'tofu', name: 'Homemade Beancurd', cn: '自制豆腐', price: 1400, category: 'Greens & sides', icon: '🥢', desc: 'Silky house-steamed egg beancurd topped with savoury minced sauce.', popularity: 88, spicyLevel: 0, allergens: 'Soy, egg; sauce unverified', modifiers: ['Mild / kid-friendly', 'Less gravy', 'No garnish'], aliases: ['beancurd', 'tofu', '豆腐'] },
-  { id: 'kang', name: 'Sambal Kang Kong', cn: '马来风光', price: 1300, category: 'Greens & sides', icon: '🥬', desc: 'Wok-tossed water spinach with dried shrimp and a lively house sambal kick.', tag: 'Spicy', popularity: 95, spicyLevel: 2, allergens: 'Shellfish', modifiers: ['Less spicy', 'Extra spicy', 'Stir-fry with garlic instead'], aliases: ['kang kong', 'kangkong', 'sambal', '马来风光', '空心菜'] },
-  { id: 'egg', name: 'Oyster Omelette', cn: '蚝煎', price: 1500, category: 'Greens & sides', icon: '🍳', desc: 'Crisp golden edges, plump oysters, starch batter and a soft egg centre.', popularity: 87, spicyLevel: 0, allergens: 'Shellfish, egg', modifiers: ['Extra crispy edges', 'Chilli on side', 'No coriander'], aliases: ['oyster', 'omelette', '蚝煎'] },
-  { id: 'mushroom', name: 'Golden Enoki & Tofu Puff Set', cn: '金针菇豆卜拼盘', price: 600, category: 'Greens & sides', icon: '🍄', desc: 'Fresh enoki mushrooms and golden tofu puffs for the steamboat or table.', tag: 'Sharing side', popularity: 82, spicyLevel: 0, allergens: 'Soy', modifiers: ['For steamboat pot', 'Serve on side'], aliases: ['enoki', 'mushroom', 'tofu puff', '金针菇', '豆卜'] },
-  { id: 'rice', name: 'Steamed Rice', cn: '白饭', price: 150, category: 'Greens & sides', icon: '🍚', desc: 'One fluffy bowl of fragrant jasmine rice, ready for a little of everything.', allergens: 'Recipe unverified', popularity: 96, spicyLevel: 0, singleSize: true, modifiers: ['Serve first', 'Serve with dishes'], aliases: ['rice', '白饭', '米饭'] },
-  { id: 'tea', name: 'Aged Pu’er Tea (Pot)', cn: '陈年普洱茶（壶）', price: 400, category: 'Drinks & Tea', icon: '🍵', desc: 'A warm, earthy pot of traditional Chinese tea for the table, with hot water refills.', tag: 'Refillable', popularity: 94, spicyLevel: 0, allergens: 'None listed; unverified', singleSize: true, modifiers: ['Hot pot for sharing', 'Extra teacups', 'Warm'], aliases: ['pu er', 'puer', 'chinese tea', 'tea pot', '普洱', '茶'] },
-  { id: 'calamansi', name: 'Sour Plum Calamansi Juice', cn: '冰镇酸梅金桔', price: 350, category: 'Drinks & Tea', icon: '🍊', desc: 'Zesty freshly squeezed calamansi lime with a savoury-sweet sour plum.', tag: 'Refreshing', popularity: 90, spicyLevel: 0, allergens: 'None listed; unverified', singleSize: true, modifiers: ['Less ice', 'No ice', 'Warm', 'Less sweet'], aliases: ['calamansi', 'sour plum', 'lime juice', '金桔', '酸梅'] },
-  { id: 'barley', name: 'Home-boiled Pandan Barley', cn: '自煲香兰薏米水', price: 300, category: 'Drinks & Tea', icon: '🌾', desc: 'Slow-boiled pearl barley infused with fragrant pandan leaves.', tag: 'Homemade', popularity: 85, spicyLevel: 0, allergens: 'Barley (gluten)', singleSize: true, modifiers: ['Warm', 'Chilled with less ice', 'No ice', 'Less sweet'], aliases: ['barley', 'pandan barley', '薏米', '薏米水'] }
+  {
+    "id": "pomfret",
+    "name": "Pomfret Steamboat",
+    "cn": "鲳鱼鱼头炉",
+    "price": 5800,
+    "category": "Steamboat",
+    "icon": "🥘",
+    "image": "https://ucarecdn.com/86808079-6b10-4abb-b036-e14ea8305639/",
+    "desc": "All time favourite for Teochew for generations. Best known for its soft delicate texture and naturally sweet broth simmered over charcoal.",
+    "tag": "For sharing",
+    "popularity": 92,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Charcoal milky broth",
+      "Clear teochew broth",
+      "Extra tang o greens",
+      "Soup on side"
+    ],
+    "aliases": [
+      "pomfret",
+      "鲳鱼",
+      "昌鱼",
+      "pomfret steamboat",
+      "pomfret fishboat"
+    ]
+  },
+  {
+    "id": "grouper",
+    "name": "Grouper Fish Head Steamboat",
+    "cn": "红石斑鱼头炉",
+    "price": 4800,
+    "category": "Steamboat",
+    "icon": "🍲",
+    "image": "https://ucarecdn.com/aa0c09b5-7d3a-4414-a16b-6d121aab84cb/",
+    "desc": "Low in fat and cholesterol with firm texture and mild sweet flavour, bubbling in our signature charcoal broth with yam and vegetables.",
+    "tag": "Ah Hua’s favourite",
+    "popularity": 98,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Charcoal milky broth",
+      "Clear ginger broth",
+      "Extra sour plum",
+      "Less salt"
+    ],
+    "aliases": [
+      "grouper",
+      "石斑",
+      "fish head",
+      "鱼头炉",
+      "steamboat",
+      "红石斑",
+      "grouper fishboat"
+    ]
+  },
+  {
+    "id": "snapper",
+    "name": "Snapper Steamboat",
+    "cn": "红哥里鱼头炉",
+    "price": 4200,
+    "category": "Steamboat",
+    "icon": "🍲",
+    "image": "https://ucarecdn.com/c02d1ed8-3908-4ed4-bc79-87e8498e4298/",
+    "desc": "More commonly known as Ang Go Li. Firm fish meat with clean sweet flavour, cooked in heritage charcoal soup.",
+    "tag": "Classic",
+    "popularity": 86,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Charcoal milky broth",
+      "Clear ginger broth",
+      "Extra yam cubes",
+      "Mild"
+    ],
+    "aliases": [
+      "snapper",
+      "红哥里",
+      "ang go li",
+      "snapper fishboat"
+    ]
+  },
+  {
+    "id": "chicken",
+    "name": "Prawn Paste Chicken",
+    "cn": "虾酱鸡",
+    "price": 1500,
+    "category": "Chicken & Pork",
+    "icon": "🍗",
+    "image": "https://ucarecdn.com/6ebbd458-935b-469d-8448-9b3b3a21766e/",
+    "desc": "Crisp, golden-brown har cheong gai wings marinated in fragrant fermented prawn paste.",
+    "tag": "Crowd pleaser",
+    "popularity": 99,
+    "spicyLevel": 0,
+    "allergens": "Shellfish, wheat",
+    "modifiers": [
+      "Extra crispy",
+      "Sauce on side",
+      "Less oil"
+    ],
+    "aliases": [
+      "prawn paste chicken",
+      "prawn paste",
+      "chicken",
+      "har cheong",
+      "虾酱鸡",
+      "chicken wings"
+    ]
+  },
+  {
+    "id": "pork",
+    "name": "Signature Pork Belly",
+    "cn": "南乳花肉",
+    "price": 1800,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "https://ucarecdn.com/495be89c-5db9-4f7f-8be5-faec2d6a78d0/",
+    "desc": "Deep-fried pork belly slices marinated with traditional fermented red beancurd (nam yu) for crisp skin and tender meat.",
+    "tag": "Signature",
+    "popularity": 91,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Extra crispy",
+      "Leaner cut if available",
+      "Chilli dip on side"
+    ],
+    "aliases": [
+      "pork belly",
+      "南乳花肉",
+      "nam yu pork"
+    ]
+  },
+  {
+    "id": "ribs",
+    "name": "Sweet & Sour Pork Ribs",
+    "cn": "排骨大王",
+    "price": 1700,
+    "category": "Chicken & Pork",
+    "icon": "🍖",
+    "image": "https://ucarecdn.com/f04c7eb3-bf80-4966-a3ec-8207908b8e05/",
+    "desc": "Tender pork ribs glazed with a sticky, tangy-sweet heritage sauce and wok-tossed to perfection.",
+    "tag": "Signature",
+    "popularity": 84,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less sweet",
+      "Sauce on side",
+      "No onion"
+    ],
+    "aliases": [
+      "pork ribs",
+      "ribs",
+      "排骨",
+      "排骨大王",
+      "sweet and sour ribs"
+    ]
+  },
+  {
+    "id": "tofu",
+    "name": "Signature Homemade Beancurd (Tofu)",
+    "cn": "金块豆腐",
+    "price": 1400,
+    "category": "Egg & Tofu",
+    "icon": "🥢",
+    "image": "https://ucarecdn.com/0dd4d881-7a61-456e-af48-949a7c6d3876/",
+    "desc": "Silky golden handmade tofu bricks topped with savoury minced sauce and crisp shallots.",
+    "tag": "Signature",
+    "popularity": 88,
+    "spicyLevel": 0,
+    "allergens": "Soy, egg; sauce unverified",
+    "modifiers": [
+      "Mild / kid-friendly",
+      "Less gravy",
+      "No garnish"
+    ],
+    "aliases": [
+      "beancurd",
+      "tofu",
+      "豆腐",
+      "homemade beancurd",
+      "金块豆腐",
+      "homemade tofu"
+    ]
+  },
+  {
+    "id": "kang",
+    "name": "Sambal Kang Kong",
+    "cn": "马来风光",
+    "price": 1300,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/538129d1-b339-4efd-81d0-21deefb4dc88/",
+    "desc": "Wok-tossed water spinach with spicy dried shrimp sambal belacan and garlic.",
+    "tag": "Spicy",
+    "popularity": 95,
+    "spicyLevel": 2,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Less spicy",
+      "Extra spicy",
+      "Stir-fry with garlic instead"
+    ],
+    "aliases": [
+      "kang kong",
+      "kangkong",
+      "sambal",
+      "马来风光",
+      "空心菜",
+      "water spinach"
+    ]
+  },
+  {
+    "id": "egg",
+    "name": "Oyster Omelette",
+    "cn": "招牌蚝蛋",
+    "price": 1500,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/6ec4ec1b-325b-402a-9642-1e967a356360/",
+    "desc": "Crispy pan-fried egg omelette studded with plump, juicy oysters and fresh coriander.",
+    "tag": "Signature",
+    "popularity": 87,
+    "spicyLevel": 0,
+    "allergens": "Shellfish, egg",
+    "modifiers": [
+      "Extra crispy edges",
+      "Chilli on side",
+      "No coriander"
+    ],
+    "aliases": [
+      "oyster",
+      "omelette",
+      "蚝煎",
+      "招牌蚝蛋",
+      "蚝蛋",
+      "oyster egg"
+    ]
+  },
+  {
+    "id": "rice",
+    "name": "Steamed Rice",
+    "cn": "白饭",
+    "price": 150,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/ccf843c0-1bed-4d5d-954f-c65f57359f65/",
+    "desc": "One fluffy bowl of fragrant jasmine rice, perfect companion for fish broth and gravies.",
+    "allergens": "None",
+    "popularity": 96,
+    "spicyLevel": 0,
+    "singleSize": true,
+    "modifiers": [
+      "Serve first",
+      "Serve with dishes"
+    ],
+    "aliases": [
+      "rice",
+      "白饭",
+      "米饭",
+      "steamed rice",
+      "plain rice",
+      "white rice"
+    ]
+  },
+  {
+    "id": "yam",
+    "name": "Crispy Yam & Fish Maw Add-on",
+    "cn": "炸芋头鱼鳔",
+    "price": 800,
+    "category": "Steamboat",
+    "icon": "🍠",
+    "image": "https://ucarecdn.com/dfb5c0b5-4ac3-45fc-9e38-350ef48dbab3/",
+    "desc": "Golden fried taro pieces and spongy fish maw to soak up the rich steamboat broth.",
+    "tag": "Steamboat add-on",
+    "popularity": 89,
+    "spicyLevel": 0,
+    "allergens": "Fish, soy; oil unverified",
+    "modifiers": [
+      "Serve on side",
+      "Add directly to pot",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "crispy yam",
+      "fish maw",
+      "taro",
+      "芋头",
+      "鱼鳔",
+      "yam"
+    ]
+  },
+  {
+    "id": "mushroom",
+    "name": "Golden Enoki & Tofu Puff Set",
+    "cn": "金针菇豆卜拼盘",
+    "price": 600,
+    "category": "Steamboat",
+    "icon": "🍄",
+    "image": "https://ucarecdn.com/22f8ed39-ad47-420e-b9a0-7683c94d5f0c/",
+    "desc": "Fresh enoki mushrooms and golden tofu puffs for the steamboat or table.",
+    "tag": "Sharing side",
+    "popularity": 82,
+    "spicyLevel": 0,
+    "allergens": "Soy",
+    "modifiers": [
+      "For steamboat pot",
+      "Serve on side"
+    ],
+    "aliases": [
+      "enoki",
+      "mushroom",
+      "tofu puff",
+      "金针菇",
+      "豆卜"
+    ]
+  },
+  {
+    "id": "tea",
+    "name": "Aged Pu’er Tea (Pot)",
+    "cn": "陈年普洱茶（壶）",
+    "price": 400,
+    "category": "Drinks & Tea",
+    "icon": "🍵",
+    "image": "https://ucarecdn.com/86808079-6b10-4abb-b036-e14ea8305639/",
+    "desc": "A warm, earthy pot of traditional Chinese tea for the table, with hot water refills.",
+    "tag": "Refillable",
+    "popularity": 94,
+    "spicyLevel": 0,
+    "allergens": "None",
+    "singleSize": true,
+    "modifiers": [
+      "Hot pot for sharing",
+      "Extra teacups",
+      "Warm"
+    ],
+    "aliases": [
+      "pu er",
+      "puer",
+      "chinese tea",
+      "tea pot",
+      "普洱",
+      "茶"
+    ]
+  },
+  {
+    "id": "calamansi",
+    "name": "Sour Plum Calamansi Juice",
+    "cn": "冰镇酸梅金桔",
+    "price": 350,
+    "category": "Drinks & Tea",
+    "icon": "🍊",
+    "image": "https://ucarecdn.com/1babb7fc-af40-4e49-9b01-a0248166ddac/",
+    "desc": "Zesty freshly squeezed calamansi lime with a savoury-sweet sour plum.",
+    "tag": "Refreshing",
+    "popularity": 90,
+    "spicyLevel": 0,
+    "allergens": "None",
+    "singleSize": true,
+    "modifiers": [
+      "Less ice",
+      "No ice",
+      "Warm",
+      "Less sweet"
+    ],
+    "aliases": [
+      "calamansi",
+      "sour plum",
+      "lime juice",
+      "金桔",
+      "酸梅"
+    ]
+  },
+  {
+    "id": "barley",
+    "name": "Home-boiled Pandan Barley",
+    "cn": "自煲香兰薏米水",
+    "price": 300,
+    "category": "Drinks & Tea",
+    "icon": "🌾",
+    "image": "https://ucarecdn.com/0dd4d881-7a61-456e-af48-949a7c6d3876/",
+    "desc": "Slow-boiled pearl barley infused with fragrant pandan leaves.",
+    "tag": "Homemade",
+    "popularity": 85,
+    "spicyLevel": 0,
+    "allergens": "Barley (gluten)",
+    "singleSize": true,
+    "modifiers": [
+      "Warm",
+      "Chilled with less ice",
+      "No ice",
+      "Less sweet"
+    ],
+    "aliases": [
+      "barley",
+      "pandan barley",
+      "薏米",
+      "薏米水"
+    ]
+  },
+  {
+    "id": "song-fish-head-fishboat",
+    "name": "Song Fish Head Fishboat",
+    "cn": "松鱼鱼头炉",
+    "price": 2580,
+    "category": "Steamboat",
+    "icon": "🍲",
+    "image": "https://ucarecdn.com/1dcdd770-9750-4e39-8312-e8ab07950b1c/",
+    "desc": "Song Fish also known as Big Head Carp. It is a freshwater fish and popular among the Teochews for generations",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Charcoal milky broth",
+      "Clear broth",
+      "Extra yam cubes"
+    ],
+    "aliases": [
+      "song fish head fishboat",
+      "song fish head fishboat",
+      "松鱼鱼头炉"
+    ]
+  },
+  {
+    "id": "sambal-fish-head",
+    "name": "Sambal Fish Head",
+    "cn": "叁巴鱼头",
+    "price": 2480,
+    "category": "Specialty",
+    "icon": "✨",
+    "image": "",
+    "desc": "叁巴鱼头 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Fish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "sambal fish head",
+      "sambal fish head",
+      "叁巴鱼头"
+    ]
+  },
+  {
+    "id": "bittergourd-fish-head",
+    "name": "Bittergourd Fish Head",
+    "cn": "苦瓜鱼头",
+    "price": 2480,
+    "category": "Specialty",
+    "icon": "✨",
+    "image": "https://ucarecdn.com/05ad07c9-a834-41c9-adcd-4a99da8cde3c/",
+    "desc": "苦瓜鱼头 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "bittergourd fish head",
+      "bittergourd fish head",
+      "苦瓜鱼头"
+    ]
+  },
+  {
+    "id": "imperial-pot",
+    "name": "Imperial Pot",
+    "cn": "一品锅",
+    "price": 7480,
+    "category": "Specialty",
+    "icon": "✨",
+    "image": "https://ucarecdn.com/4ecf30b9-9888-43c6-a3b1-d733bc85d3c2/",
+    "desc": "一品锅 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "imperial pot",
+      "imperial pot",
+      "一品锅"
+    ]
+  },
+  {
+    "id": "fried-shrimp-roll",
+    "name": "Fried Shrimp Roll",
+    "cn": "虾枣",
+    "price": 1180,
+    "category": "Specialty",
+    "icon": "✨",
+    "image": "https://ucarecdn.com/481ae670-2f05-410e-88c1-3ec653a2f4b7/",
+    "desc": "虾枣 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "fried shrimp roll",
+      "fried shrimp roll",
+      "虾枣"
+    ]
+  },
+  {
+    "id": "fresh-prawn-paste-for-steamboat",
+    "name": "Fresh Prawn Paste (for Steamboat)",
+    "cn": "虾滑",
+    "price": 1380,
+    "category": "Specialty",
+    "icon": "✨",
+    "image": "https://ucarecdn.com/810a37a2-f111-41f0-ac80-cdbeaed0f854/",
+    "desc": "虾滑 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "fresh prawn paste (for steamboat)",
+      "fresh prawn paste for steamboat",
+      "虾滑"
+    ]
+  },
+  {
+    "id": "butter-crayfish",
+    "name": "Butter Crayfish",
+    "cn": "牛油虾婆",
+    "price": 3280,
+    "category": "Crayfish & Seafood",
+    "icon": "🦞",
+    "image": "https://ucarecdn.com/1babb7fc-af40-4e49-9b01-a0248166ddac/",
+    "desc": "牛油虾婆 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "butter crayfish",
+      "butter crayfish",
+      "牛油虾婆"
+    ]
+  },
+  {
+    "id": "cereal-crayfish",
+    "name": "Cereal Crayfish",
+    "cn": "麦片虾婆",
+    "price": 5580,
+    "category": "Crayfish & Seafood",
+    "icon": "🦞",
+    "image": "https://ucarecdn.com/edc12af1-76d9-44ec-9683-e74766957934/",
+    "desc": "麦片虾婆 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "cereal crayfish",
+      "cereal crayfish",
+      "麦片虾婆"
+    ]
+  },
+  {
+    "id": "chilli-crayfish",
+    "name": "Chilli Crayfish",
+    "cn": "辣椒虾婆",
+    "price": 5580,
+    "category": "Crayfish & Seafood",
+    "icon": "🦞",
+    "image": "https://ucarecdn.com/52ab1efa-61bd-46ad-bb32-fd771ccc407c/",
+    "desc": "辣椒虾婆 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "chilli crayfish",
+      "chilli crayfish",
+      "辣椒虾婆"
+    ]
+  },
+  {
+    "id": "salted-egg-prawns",
+    "name": "Salted Egg Prawns",
+    "cn": "咸蛋虾球",
+    "price": 4580,
+    "category": "Crayfish & Seafood",
+    "icon": "🦐",
+    "image": "https://ucarecdn.com/9e213032-3c8c-4642-a0a7-1eb2bbc7e922/",
+    "desc": "咸蛋虾球 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "salted egg prawns",
+      "salted egg prawns",
+      "咸蛋虾球"
+    ]
+  },
+  {
+    "id": "butter-prawns",
+    "name": "Butter Prawns",
+    "cn": "牛油虾",
+    "price": 3480,
+    "category": "Crayfish & Seafood",
+    "icon": "🦐",
+    "image": "https://ucarecdn.com/17242588-82ab-4605-bed0-38d0e875fb48/",
+    "desc": "牛油虾 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "butter prawns",
+      "butter prawns",
+      "牛油虾"
+    ]
+  },
+  {
+    "id": "cereal-prawns",
+    "name": "Cereal Prawns",
+    "cn": "麦片虾",
+    "price": 2280,
+    "category": "Crayfish & Seafood",
+    "icon": "🦐",
+    "image": "https://ucarecdn.com/5384c23d-7ddd-4de6-a62a-63a6da53bc52/",
+    "desc": "麦片虾 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "cereal prawns",
+      "cereal prawns",
+      "麦片虾"
+    ]
+  },
+  {
+    "id": "salted-egg-squid",
+    "name": "Salted Egg Squid",
+    "cn": "咸蛋苏东",
+    "price": 2080,
+    "category": "Crayfish & Seafood",
+    "icon": "🦑",
+    "image": "https://ucarecdn.com/e887ffb7-0e6a-4798-abdc-cbeacd962b7f/",
+    "desc": "咸蛋苏东 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "salted egg squid",
+      "salted egg squid",
+      "咸蛋苏东"
+    ]
+  },
+  {
+    "id": "butter-squid",
+    "name": "Butter Squid",
+    "cn": "牛油苏东",
+    "price": 1380,
+    "category": "Crayfish & Seafood",
+    "icon": "🦑",
+    "image": "https://ucarecdn.com/41f2e46a-0090-4290-b718-73c027c645b4/",
+    "desc": "牛油苏东 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "butter squid",
+      "butter squid",
+      "牛油苏东"
+    ]
+  },
+  {
+    "id": "cereal-squid",
+    "name": "Cereal Squid",
+    "cn": "麦片苏东",
+    "price": 1380,
+    "category": "Crayfish & Seafood",
+    "icon": "🦑",
+    "image": "https://ucarecdn.com/746f7ea0-38b2-4872-a5db-c2a4f248feab/",
+    "desc": "麦片苏东 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "cereal squid",
+      "cereal squid",
+      "麦片苏东"
+    ]
+  },
+  {
+    "id": "sambal-squid",
+    "name": "Sambal Squid",
+    "cn": "叁巴苏东",
+    "price": 2080,
+    "category": "Crayfish & Seafood",
+    "icon": "🦑",
+    "image": "https://ucarecdn.com/c9e2f77b-c967-4f4c-8693-971a23ebf7ea/",
+    "desc": "叁巴苏东 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "sambal squid",
+      "sambal squid",
+      "叁巴苏东"
+    ]
+  },
+  {
+    "id": "sambal-lala",
+    "name": "Sambal Lala",
+    "cn": "叁巴啦啦",
+    "price": 1380,
+    "category": "Crayfish & Seafood",
+    "icon": "🦪",
+    "image": "https://ucarecdn.com/b8b0518d-d5a2-44c3-93a9-43f4e22f54f6/",
+    "desc": "叁巴啦啦 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "sambal lala",
+      "sambal lala",
+      "叁巴啦啦"
+    ]
+  },
+  {
+    "id": "ginger-onion-lala",
+    "name": "Ginger & Onion Lala",
+    "cn": "姜葱啦啦",
+    "price": 2080,
+    "category": "Crayfish & Seafood",
+    "icon": "🦪",
+    "image": "https://ucarecdn.com/a26e2bc2-db0d-4ac0-b15f-16a874c8c89e/",
+    "desc": "姜葱啦啦 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "ginger & onion lala",
+      "ginger onion lala",
+      "姜葱啦啦"
+    ]
+  },
+  {
+    "id": "marmite-chicken-chop",
+    "name": "Marmite Chicken Chop",
+    "cn": "妈蜜鸡扒",
+    "price": 1380,
+    "category": "Chicken & Pork",
+    "icon": "🍗",
+    "image": "https://ucarecdn.com/ca49cee0-4c6d-4e72-a198-b636c6e5025b/",
+    "desc": "妈蜜鸡扒 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "marmite chicken chop",
+      "marmite chicken chop",
+      "妈蜜鸡扒"
+    ]
+  },
+  {
+    "id": "spicy-diced-chicken",
+    "name": "Spicy Diced Chicken",
+    "cn": "宫保鸡丁",
+    "price": 2880,
+    "category": "Chicken & Pork",
+    "icon": "🍗",
+    "image": "https://ucarecdn.com/44061a12-9ef1-4556-9b04-76714c8f628d/",
+    "desc": "宫保鸡丁 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "spicy diced chicken",
+      "spicy diced chicken",
+      "宫保鸡丁"
+    ]
+  },
+  {
+    "id": "sesame-oil-chicken",
+    "name": "Sesame Oil Chicken",
+    "cn": "麻油鸡",
+    "price": 1380,
+    "category": "Chicken & Pork",
+    "icon": "🍗",
+    "image": "https://ucarecdn.com/3e584908-8694-4c46-8d7b-91aea55c62c9/",
+    "desc": "麻油鸡 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "sesame oil chicken",
+      "sesame oil chicken",
+      "麻油鸡"
+    ]
+  },
+  {
+    "id": "salted-egg-chicken",
+    "name": "Salted Egg Chicken",
+    "cn": "咸蛋鸡丁",
+    "price": 1380,
+    "category": "Chicken & Pork",
+    "icon": "🍗",
+    "image": "https://ucarecdn.com/b9afc21f-910d-466f-817d-8e533e884d42/",
+    "desc": "咸蛋鸡丁 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "salted egg chicken",
+      "salted egg chicken",
+      "咸蛋鸡丁"
+    ]
+  },
+  {
+    "id": "braised-pig-intestine",
+    "name": "Braised Pig Intestine",
+    "cn": "卤大肠",
+    "price": 1180,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "https://ucarecdn.com/596d4ae3-59f3-4519-b840-9c4f9cfa03a0/",
+    "desc": "卤大肠 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "braised pig intestine",
+      "braised pig intestine",
+      "卤大肠"
+    ]
+  },
+  {
+    "id": "braised-pig-trotters",
+    "name": "Braised Pig Trotters",
+    "cn": "卤猪脚",
+    "price": 1180,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "https://ucarecdn.com/d70c8dd7-6b60-49ed-91d7-c58423026ac8/",
+    "desc": "卤猪脚 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "braised pig trotters",
+      "braised pig trotters",
+      "卤猪脚"
+    ]
+  },
+  {
+    "id": "sweet-and-sour-pork",
+    "name": "Sweet and Sour Pork",
+    "cn": "咕噜肉",
+    "price": 2080,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "https://ucarecdn.com/dd37a2dd-f13c-4e42-8aea-60ef1bb00570/",
+    "desc": "咕噜肉 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "sweet and sour pork",
+      "sweet and sour pork",
+      "咕噜肉"
+    ]
+  },
+  {
+    "id": "marmite-pork-ribs",
+    "name": "Marmite Pork Ribs",
+    "cn": "妈蜜排骨",
+    "price": 1380,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "https://ucarecdn.com/ca49cee0-4c6d-4e72-a198-b636c6e5025b/",
+    "desc": "妈蜜排骨 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "marmite pork ribs",
+      "marmite pork ribs",
+      "妈蜜排骨"
+    ]
+  },
+  {
+    "id": "salted-egg-pork-ribs",
+    "name": "Salted Egg Pork Ribs",
+    "cn": "咸蛋排骨",
+    "price": 1380,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "https://ucarecdn.com/65d1b75a-a4fc-4f32-85a8-eef8c1904c6a/",
+    "desc": "咸蛋排骨 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "salted egg pork ribs",
+      "salted egg pork ribs",
+      "咸蛋排骨"
+    ]
+  },
+  {
+    "id": "bittergourd-pork-ribs",
+    "name": "Bittergourd Pork Ribs",
+    "cn": "苦瓜排骨",
+    "price": 1380,
+    "category": "Chicken & Pork",
+    "icon": "🥓",
+    "image": "",
+    "desc": "苦瓜排骨 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "bittergourd pork ribs",
+      "bittergourd pork ribs",
+      "苦瓜排骨"
+    ]
+  },
+  {
+    "id": "onion-omelette",
+    "name": "Onion Omelette",
+    "cn": "大葱蛋",
+    "price": 1380,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/2455ccde-056e-45d7-bbf5-fb35544dbc5c/",
+    "desc": "大葱蛋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "onion omelette",
+      "onion omelette",
+      "大葱蛋"
+    ]
+  },
+  {
+    "id": "salted-turnip-omelette",
+    "name": "Salted Turnip Omelette",
+    "cn": "菜浦蛋",
+    "price": 980,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/a0196df6-5d86-481e-a81e-1fe6e923e4b2/",
+    "desc": "菜浦蛋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "salted turnip omelette",
+      "salted turnip omelette",
+      "菜浦蛋"
+    ]
+  },
+  {
+    "id": "fu-rong-omelette",
+    "name": "Fu-Rong Omelette",
+    "cn": "芙蓉蛋",
+    "price": 1380,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/c2543fe5-7051-40b8-aead-f53d8a3e3a74/",
+    "desc": "芙蓉蛋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "fu-rong omelette",
+      "fu rong omelette",
+      "芙蓉蛋"
+    ]
+  },
+  {
+    "id": "minced-pork-omelette",
+    "name": "Minced Pork Omelette",
+    "cn": "肉碎煎蛋",
+    "price": 2080,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/84919412-cc38-4172-be2e-8c45e3349424/",
+    "desc": "肉碎煎蛋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "minced pork omelette",
+      "minced pork omelette",
+      "肉碎煎蛋"
+    ]
+  },
+  {
+    "id": "bittergourd-omelette",
+    "name": "Bittergourd Omelette",
+    "cn": "苦瓜煎蛋",
+    "price": 1180,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/c9ab4cc7-d292-468d-ac58-4b01b56af14f/",
+    "desc": "苦瓜煎蛋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "bittergourd omelette",
+      "bittergourd omelette",
+      "苦瓜煎蛋"
+    ]
+  },
+  {
+    "id": "prawn-omelette",
+    "name": "Prawn Omelette",
+    "cn": "虾仁煎蛋",
+    "price": 1380,
+    "category": "Egg & Tofu",
+    "icon": "🍳",
+    "image": "https://ucarecdn.com/19d11d64-ec54-42cd-8737-10bb2c25b612/",
+    "desc": "虾仁煎蛋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "prawn omelette",
+      "prawn omelette",
+      "虾仁煎蛋"
+    ]
+  },
+  {
+    "id": "braised-beancurd",
+    "name": "Braised Beancurd",
+    "cn": "红烧豆腐",
+    "price": 1780,
+    "category": "Egg & Tofu",
+    "icon": "🥢",
+    "image": "https://ucarecdn.com/7e533afe-7fd4-4f71-96e0-71a12bb8ba75/",
+    "desc": "红烧豆腐 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "braised beancurd",
+      "braised beancurd",
+      "红烧豆腐"
+    ]
+  },
+  {
+    "id": "minced-pork-fried-beancurd",
+    "name": "Minced Pork Fried Beancurd",
+    "cn": "肉碎炸豆腐",
+    "price": 1780,
+    "category": "Egg & Tofu",
+    "icon": "🥢",
+    "image": "https://ucarecdn.com/d3952f39-25ea-467b-bd00-02d5d829d6ea/",
+    "desc": "肉碎炸豆腐 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "minced pork fried beancurd",
+      "minced pork fried beancurd",
+      "肉碎炸豆腐"
+    ]
+  },
+  {
+    "id": "chilli-prawns-witih-beancurd",
+    "name": "Chilli Prawns witih Beancurd",
+    "cn": "虾球豆腐",
+    "price": 3480,
+    "category": "Egg & Tofu",
+    "icon": "🥢",
+    "image": "https://ucarecdn.com/28c982a1-8cca-4521-84f6-21b7f7b930fe/",
+    "desc": "虾球豆腐 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Soy",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "chilli prawns witih beancurd",
+      "chilli prawns witih beancurd",
+      "虾球豆腐"
+    ]
+  },
+  {
+    "id": "kai-lan",
+    "name": "Kai Lan",
+    "cn": "芥兰苗",
+    "price": 1180,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/36bb4dbe-2d8d-4bb8-a0db-32bc83346a8c/",
+    "desc": "芥兰苗 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "kai lan",
+      "kai lan",
+      "芥兰苗"
+    ]
+  },
+  {
+    "id": "nai-bai",
+    "name": "Nai Bai",
+    "cn": "奶白菜",
+    "price": 2280,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/1d4377d1-8bee-4a21-bb93-cfd8714d30ba/",
+    "desc": "奶白菜 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "nai bai",
+      "nai bai",
+      "奶白菜"
+    ]
+  },
+  {
+    "id": "four-heavenly-king",
+    "name": "Four Heavenly King",
+    "cn": "四大天王",
+    "price": 1880,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/2f94a543-474f-4632-a171-af22563bfaa9/",
+    "desc": "四大天王 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "four heavenly king",
+      "four heavenly king",
+      "四大天王"
+    ]
+  },
+  {
+    "id": "sambal-sweet-potato-leaves",
+    "name": "Sambal Sweet Potato Leaves",
+    "cn": "叁巴番薯叶",
+    "price": 1180,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/8329fa72-4313-4371-bf19-f30198556fd5/",
+    "desc": "叁巴番薯叶 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "sambal sweet potato leaves",
+      "sambal sweet potato leaves",
+      "叁巴番薯叶"
+    ]
+  },
+  {
+    "id": "salted-fish-beansprout",
+    "name": "Salted Fish Beansprout",
+    "cn": "咸鱼豆芽",
+    "price": 1180,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/7fccee9d-632e-4818-a09b-1cf6c687e0dd/",
+    "desc": "咸鱼豆芽 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "salted fish beansprout",
+      "salted fish beansprout",
+      "咸鱼豆芽"
+    ]
+  },
+  {
+    "id": "spinach",
+    "name": "Spinach",
+    "cn": "菠菜",
+    "price": 1180,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/c0658c73-467c-4361-b97c-f4d8e9fed3c4/",
+    "desc": "菠菜 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "spinach",
+      "spinach",
+      "菠菜"
+    ]
+  },
+  {
+    "id": "vegetarian-mixed-vegetables",
+    "name": "Vegetarian Mixed Vegetables",
+    "cn": "罗汉斋",
+    "price": 1180,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/e7b46965-1b46-4e69-88c6-b4cef9c71fad/",
+    "desc": "罗汉斋 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "vegetarian mixed vegetables",
+      "vegetarian mixed vegetables",
+      "罗汉斋"
+    ]
+  },
+  {
+    "id": "salted-turnip-french-bean",
+    "name": "Salted Turnip French Bean",
+    "cn": "菜脯四季豆",
+    "price": 1880,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/b6625a32-8f7e-444c-9d43-42c4ac4d8ae3/",
+    "desc": "菜脯四季豆 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "salted turnip french bean",
+      "salted turnip french bean",
+      "菜脯四季豆"
+    ]
+  },
+  {
+    "id": "minced-meat-with-eggplant",
+    "name": "Minced Meat with Eggplant",
+    "cn": "香肉茄子",
+    "price": 1380,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/c3d7f29f-24ee-41e4-adb2-46635abf4427/",
+    "desc": "香肉茄子 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "minced meat with eggplant",
+      "minced meat with eggplant",
+      "香肉茄子"
+    ]
+  },
+  {
+    "id": "salted-egg-with-bittergourd",
+    "name": "Salted Egg with Bittergourd",
+    "cn": "咸蛋苦瓜",
+    "price": 2080,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/2d153e6b-4a74-4fa3-90c9-34e8bd84ef8a/",
+    "desc": "咸蛋苦瓜 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "Popular",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Egg",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "salted egg with bittergourd",
+      "salted egg with bittergourd",
+      "咸蛋苦瓜"
+    ]
+  },
+  {
+    "id": "stir-fried-broccoli",
+    "name": "Stir Fried Broccoli",
+    "cn": "西兰花",
+    "price": 2080,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/0ec82ebe-81ad-4f96-b3bc-9e089ea2c8f5/",
+    "desc": "西兰花 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "stir fried broccoli",
+      "stir fried broccoli",
+      "西兰花"
+    ]
+  },
+  {
+    "id": "cuttlefish-kang-kong",
+    "name": "Cuttlefish Kang Kong",
+    "cn": "鱿鱼蕹菜",
+    "price": 2780,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/312ebe55-c896-4932-a584-062f56ce5830/",
+    "desc": "鱿鱼蕹菜 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "cuttlefish kang kong",
+      "cuttlefish kang kong",
+      "鱿鱼蕹菜"
+    ]
+  },
+  {
+    "id": "broccoli-with-scallops",
+    "name": "Broccoli with Scallops",
+    "cn": "西兰带子",
+    "price": 4380,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/2689e11c-c993-4077-8b66-3c5f8fc2cece/",
+    "desc": "西兰带子 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "broccoli with scallops",
+      "broccoli with scallops",
+      "西兰带子"
+    ]
+  },
+  {
+    "id": "braised-sea-cucumber",
+    "name": "Braised Sea Cucumber",
+    "cn": "红烧海参",
+    "price": 3280,
+    "category": "Vegetables",
+    "icon": "🥬",
+    "image": "",
+    "desc": "红烧海参 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Stir-fry with garlic",
+      "Less spicy",
+      "Less oil"
+    ],
+    "aliases": [
+      "braised sea cucumber",
+      "braised sea cucumber",
+      "红烧海参"
+    ]
+  },
+  {
+    "id": "mui-fan",
+    "name": "Mui Fan",
+    "cn": "烩饭",
+    "price": 720,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/67fc5705-76b3-43ed-9410-7c1398b84129/",
+    "desc": "烩饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "mui fan",
+      "mui fan",
+      "烩饭"
+    ]
+  },
+  {
+    "id": "fried-rice",
+    "name": "Fried Rice",
+    "cn": "星洲炒饭",
+    "price": 720,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/6f5dc8ef-e754-4d73-beb0-e7f327c475c8/",
+    "desc": "星洲炒饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "fried rice",
+      "fried rice",
+      "星洲炒饭"
+    ]
+  },
+  {
+    "id": "sambal-fried-rice",
+    "name": "Sambal Fried Rice",
+    "cn": "叁巴炒饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/b1c561e1-0023-43f4-b432-e7701078a5c4/",
+    "desc": "叁巴炒饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "sambal fried rice",
+      "sambal fried rice",
+      "叁巴炒饭"
+    ]
+  },
+  {
+    "id": "salted-fish-fried-rice",
+    "name": "Salted Fish Fried Rice",
+    "cn": "咸鱼炒饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/fb3fafce-35c9-45cb-95ea-423b9a402de4/",
+    "desc": "咸鱼炒饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "salted fish fried rice",
+      "salted fish fried rice",
+      "咸鱼炒饭"
+    ]
+  },
+  {
+    "id": "seafood-fried-rice",
+    "name": "Seafood Fried Rice",
+    "cn": "海鲜炒饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/92eacf01-b4ae-4f90-8447-2278cc4c0177/",
+    "desc": "海鲜炒饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "seafood fried rice",
+      "seafood fried rice",
+      "海鲜炒饭"
+    ]
+  },
+  {
+    "id": "spicy-diced-chicken-rice",
+    "name": "Spicy Diced Chicken Rice",
+    "cn": "宫保鸡丁饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/d0e2698f-4f6b-4a35-92a1-29b8ea81d5ef/",
+    "desc": "宫保鸡丁饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 2,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "spicy diced chicken rice",
+      "spicy diced chicken rice",
+      "宫保鸡丁饭"
+    ]
+  },
+  {
+    "id": "sweet-sour-pork-rib-rice",
+    "name": "Sweet & Sour Pork Rib Rice",
+    "cn": "排骨王饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "",
+    "desc": "排骨王饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "sweet & sour pork rib rice",
+      "sweet sour pork rib rice",
+      "排骨王饭"
+    ]
+  },
+  {
+    "id": "black-pepper-pork-meat-rice",
+    "name": "Black Pepper Pork Meat Rice",
+    "cn": "黑胡椒猪肉饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "",
+    "desc": "黑胡椒猪肉饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "black pepper pork meat rice",
+      "black pepper pork meat rice",
+      "黑胡椒猪肉饭"
+    ]
+  },
+  {
+    "id": "ginger-pork-meat-rice",
+    "name": "Ginger Pork Meat Rice",
+    "cn": "姜葱猪肉饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/729b4673-cd08-4dae-9ff5-724a2b52ac7c/",
+    "desc": "姜葱猪肉饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "ginger pork meat rice",
+      "ginger pork meat rice",
+      "姜葱猪肉饭"
+    ]
+  },
+  {
+    "id": "ginger-sliced-fish-with-rice",
+    "name": "Ginger Sliced Fish with Rice",
+    "cn": "姜葱鱼片饭",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "",
+    "desc": "姜葱鱼片饭 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "ginger sliced fish with rice",
+      "ginger sliced fish with rice",
+      "姜葱鱼片饭"
+    ]
+  },
+  {
+    "id": "pomfret-porridge",
+    "name": "Pomfret Porridge",
+    "cn": "鲳鱼粥",
+    "price": 1500,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "https://ucarecdn.com/ffb1e5ca-0ecd-4fcf-80a6-5be5ee68b14b/",
+    "desc": "鲳鱼粥 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "pomfret porridge",
+      "pomfret porridge",
+      "鲳鱼粥"
+    ]
+  },
+  {
+    "id": "snapper-porridge",
+    "name": "Snapper Porridge",
+    "cn": "红哥里粥",
+    "price": 1500,
+    "category": "Rice & Noodles",
+    "icon": "🍚",
+    "image": "",
+    "desc": "红哥里粥 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "snapper porridge",
+      "snapper porridge",
+      "红哥里粥"
+    ]
+  },
+  {
+    "id": "hor-fun",
+    "name": "Hor Fun",
+    "cn": "什锦河",
+    "price": 720,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/07b33d51-36f0-44d6-97bd-b252215086de/",
+    "desc": "什锦河 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "hor fun",
+      "hor fun",
+      "什锦河"
+    ]
+  },
+  {
+    "id": "hokkien-noodles",
+    "name": "Hokkien Noodles",
+    "cn": "福建面",
+    "price": 1180,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/cd1c497f-ebb6-476b-9fb5-5c27236c6c0b/",
+    "desc": "福建面 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "hokkien noodles",
+      "hokkien noodles",
+      "福建面"
+    ]
+  },
+  {
+    "id": "ee-mian",
+    "name": "Ee Mian",
+    "cn": "伊面",
+    "price": 1780,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/81c1d8d7-e796-4d7f-a184-3d1df3a549a6/",
+    "desc": "伊面 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "ee mian",
+      "ee mian",
+      "伊面"
+    ]
+  },
+  {
+    "id": "bee-hoon",
+    "name": "Bee Hoon",
+    "cn": "什锦米粉",
+    "price": 1180,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/cd26f1e8-6bef-470b-828d-99202d35b136/",
+    "desc": "什锦米粉 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "bee hoon",
+      "bee hoon",
+      "什锦米粉"
+    ]
+  },
+  {
+    "id": "fried-ee-fu-noodles",
+    "name": "Fried Ee-Fu Noodles",
+    "cn": "干炒伊面",
+    "price": 1880,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/a5ffe7d5-a6bc-42ed-b469-ce48dd9bb7ac/",
+    "desc": "干炒伊面 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "fried ee-fu noodles",
+      "fried ee fu noodles",
+      "干炒伊面"
+    ]
+  },
+  {
+    "id": "fried-bee-hoon",
+    "name": "Fried Bee Hoon",
+    "cn": "干炒米粉",
+    "price": 1880,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/e1b383a9-a3c0-49cc-9d4d-52f43a8256d6/",
+    "desc": "干炒米粉 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "fried bee hoon",
+      "fried bee hoon",
+      "干炒米粉"
+    ]
+  },
+  {
+    "id": "seafood-bee-hoon",
+    "name": "Seafood Bee Hoon",
+    "cn": "海鲜米粉",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "",
+    "desc": "海鲜米粉 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "seafood bee hoon",
+      "seafood bee hoon",
+      "海鲜米粉"
+    ]
+  },
+  {
+    "id": "crispy-bee-hoon",
+    "name": "Crispy Bee Hoon",
+    "cn": "香底米粉",
+    "price": 1880,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "",
+    "desc": "香底米粉 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "crispy bee hoon",
+      "crispy bee hoon",
+      "香底米粉"
+    ]
+  },
+  {
+    "id": "hong-kong-fried-noodles",
+    "name": "Hong Kong Fried Noodles",
+    "cn": "港式炒面",
+    "price": 1380,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/a3f57a4e-b2bd-4742-8cdf-43f53896d4f8/",
+    "desc": "港式炒面 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "hong kong fried noodles",
+      "hong kong fried noodles",
+      "港式炒面"
+    ]
+  },
+  {
+    "id": "mee-goreng",
+    "name": "Mee Goreng",
+    "cn": "马来面",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/37e09555-5a26-4b15-88b0-e869269591ea/",
+    "desc": "马来面 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "mee goreng",
+      "mee goreng",
+      "马来面"
+    ]
+  },
+  {
+    "id": "shan-lao-hor-fun",
+    "name": "Shan Lao Hor Fun",
+    "cn": "三捞河",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/7087b4d1-3042-40d3-b58b-0e76299e1ff7/",
+    "desc": "三捞河 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "shan lao hor fun",
+      "shan lao hor fun",
+      "三捞河"
+    ]
+  },
+  {
+    "id": "fried-hor-fun",
+    "name": "Fried Hor Fun",
+    "cn": "干炒河",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "https://ucarecdn.com/915885df-b778-4f64-91da-bf63ad6f3ffd/",
+    "desc": "干炒河 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "fried hor fun",
+      "fried hor fun",
+      "干炒河"
+    ]
+  },
+  {
+    "id": "seafood-hor-fun",
+    "name": "Seafood Hor Fun",
+    "cn": "海鲜河",
+    "price": 950,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "",
+    "desc": "海鲜河 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "3 portion sizes",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "seafood hor fun",
+      "seafood hor fun",
+      "海鲜河"
+    ]
+  },
+  {
+    "id": "pomfret-bee-hoon-soup",
+    "name": "Pomfret Bee Hoon Soup",
+    "cn": "鲳鱼米粉汤",
+    "price": 1500,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "",
+    "desc": "鲳鱼米粉汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "pomfret bee hoon soup",
+      "pomfret bee hoon soup",
+      "鲳鱼米粉汤"
+    ]
+  },
+  {
+    "id": "snapper-bee-hoon-soup",
+    "name": "Snapper Bee Hoon Soup",
+    "cn": "红哥里米粉汤",
+    "price": 1500,
+    "category": "Rice & Noodles",
+    "icon": "🍜",
+    "image": "",
+    "desc": "红哥里米粉汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Less oil",
+      "Add chilli padi",
+      "No bean sprouts"
+    ],
+    "aliases": [
+      "snapper bee hoon soup",
+      "snapper bee hoon soup",
+      "红哥里米粉汤"
+    ]
+  },
+  {
+    "id": "seafood-soup",
+    "name": "Seafood Soup",
+    "cn": "海鲜汤",
+    "price": 1180,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/92762c72-3824-47a0-8bb5-350c3539920d/",
+    "desc": "海鲜汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Shellfish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "seafood soup",
+      "seafood soup",
+      "海鲜汤"
+    ]
+  },
+  {
+    "id": "seaweed-soup",
+    "name": "Seaweed Soup",
+    "cn": "紫菜汤",
+    "price": 1080,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/07db0462-aedb-40c4-9ca4-c55a7987259f/",
+    "desc": "紫菜汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "seaweed soup",
+      "seaweed soup",
+      "紫菜汤"
+    ]
+  },
+  {
+    "id": "bittergourd-soup",
+    "name": "Bittergourd Soup",
+    "cn": "苦瓜汤",
+    "price": 1080,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/27a9e48f-7491-48db-bfc4-ca00f0f563a5/",
+    "desc": "苦瓜汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy, wheat",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "bittergourd soup",
+      "bittergourd soup",
+      "苦瓜汤"
+    ]
+  },
+  {
+    "id": "tofu-soup",
+    "name": "Tofu Soup",
+    "cn": "豆腐汤",
+    "price": 1080,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/db367c38-8d35-4b36-8da9-d956edec9be6/",
+    "desc": "豆腐汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Soy",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "tofu soup",
+      "tofu soup",
+      "豆腐汤"
+    ]
+  },
+  {
+    "id": "pomfret-soup",
+    "name": "Pomfret Soup",
+    "cn": "鲳鱼汤",
+    "price": 1780,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/ffb1e5ca-0ecd-4fcf-80a6-5be5ee68b14b/",
+    "desc": "鲳鱼汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "pomfret soup",
+      "pomfret soup",
+      "鲳鱼汤"
+    ]
+  },
+  {
+    "id": "snapper-soup",
+    "name": "Snapper Soup",
+    "cn": "红哥里汤",
+    "price": 1380,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/9a462863-dd80-43f3-b4ce-888ddc5684ec/",
+    "desc": "红哥里汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "snapper soup",
+      "snapper soup",
+      "红哥里汤"
+    ]
+  },
+  {
+    "id": "grouper-soup",
+    "name": "Grouper Soup",
+    "cn": "红石斑汤",
+    "price": 1780,
+    "category": "Soup",
+    "icon": "🥣",
+    "image": "https://ucarecdn.com/1d98663a-473a-4f79-a1e2-ba5a2607ea13/",
+    "desc": "红石斑汤 · Traditional Nan Hwa Chong dish freshly cooked to order.",
+    "tag": "",
+    "popularity": 80,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Sauce on side",
+      "Less salt",
+      "Extra crispy"
+    ],
+    "aliases": [
+      "grouper soup",
+      "grouper soup",
+      "红石斑汤"
+    ]
+  },
+  {
+    "id": "tang-o",
+    "name": "Tang-O Greens",
+    "cn": "茼蒿",
+    "price": 580,
+    "category": "Steamboat",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/2a205514-5b05-4acd-997a-2f5415194015/",
+    "desc": "Crisp, aromatic garland chrysanthemum greens. Traditional essential pairing for fish head steamboat.",
+    "tag": "Steamboat top-up",
+    "popularity": 88,
+    "spicyLevel": 0,
+    "allergens": "None",
+    "modifiers": [
+      "Serve fresh for pot"
+    ],
+    "aliases": [
+      "tang o",
+      "tango",
+      "茼蒿",
+      "garland chrysanthemum"
+    ]
+  },
+  {
+    "id": "cabbage",
+    "name": "Chinese Cabbage",
+    "cn": "白菜",
+    "price": 580,
+    "category": "Steamboat",
+    "icon": "🥬",
+    "image": "https://ucarecdn.com/b928aebe-3327-4b7f-8114-e68b57779a5d/",
+    "desc": "Sweet Chinese cabbage leaves that sweeten the steamboat soup as it simmers.",
+    "tag": "Steamboat top-up",
+    "popularity": 85,
+    "spicyLevel": 0,
+    "allergens": "None",
+    "modifiers": [
+      "Add to pot"
+    ],
+    "aliases": [
+      "cabbage",
+      "白菜",
+      "chinese cabbage"
+    ]
+  },
+  {
+    "id": "crispy-sole-fish",
+    "name": "Crispy Sole Fish",
+    "cn": "扁鱼",
+    "price": 580,
+    "category": "Steamboat",
+    "icon": "🐟",
+    "image": "https://ucarecdn.com/2533ec32-51be-4937-b54a-1aa46d0c9a4e/",
+    "desc": "Deep fried crispy dried sole fish (ti-po), the secret umami foundation of traditional Teochew broth.",
+    "tag": "Secret umami",
+    "popularity": 89,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Serve on side",
+      "Simmer in broth"
+    ],
+    "aliases": [
+      "sole fish",
+      "crispy sole fish",
+      "扁鱼",
+      "ti po"
+    ]
+  },
+  {
+    "id": "pomfret-fish-roe",
+    "name": "Pomfret Fish Roe",
+    "cn": "鲳鱼鱼卵",
+    "price": 600,
+    "category": "Steamboat",
+    "icon": "🐟",
+    "image": "",
+    "desc": "Fresh pomfret roe to enrich your simmering steamboat soup.",
+    "tag": "Seasonal",
+    "popularity": 84,
+    "spicyLevel": 0,
+    "allergens": "Fish",
+    "modifiers": [
+      "Serve fresh on ice"
+    ],
+    "aliases": [
+      "fish roe",
+      "pomfret fish roe",
+      "鲳鱼鱼卵",
+      "鱼卵"
+    ]
+  }
 ];
 export const serviceTypes = {
   soup: { id: 'soup', icon: '🍲', label: 'Refill steamboat broth' },
@@ -238,9 +2756,23 @@ export function chat(text, state, selectedLanguage = state.replyLanguage) {
   if (/vegetarian|vegan|素食|清真|halal/.test(t)) return answer('dietary');
   if (/recommend|suggest|pax|people|推荐|几个人|人吃|人餐|what.*good|another|different|换一|预算|budget|under\s*\$?\d/.test(t) || state.recommendationContext&&/no pork|no fish|no seafood|no rice|spicy|chilli|辣|不吃|不要鱼/.test(t)) return recommend(t,state,language);
   if (/no spicy|not spicy|non.spicy|mild|不辣|kids|children/.test(t)) state.preference = 'No chilli requested; staff must confirm';
-  const found = menu.map(d => ({ d, at: Math.min(...d.aliases.map(a=>aliasIndex(t,a)).filter(i=>i>=0), Infinity) })).filter(x=>Number.isFinite(x.at));
-  // Specific steamboat names take precedence over the generic word “steamboat”.
-  const matches = found.filter(x=>x.d.id !== 'grouper' || !found.some(y=>['pomfret','snapper'].includes(y.d.id)) || /grouper|石斑/.test(t)).sort((a,b)=>a.at-b.at);
+  const found = [];
+  for (const d of menu) {
+    let bestAt = Infinity;
+    let bestLen = 0;
+    for (const a of d.aliases) {
+      const idx = aliasIndex(t, a);
+      if (idx >= 0 && (idx < bestAt || (idx === bestAt && a.length > bestLen))) {
+        bestAt = idx;
+        bestLen = a.length;
+      }
+    }
+    if (Number.isFinite(bestAt)) {
+      found.push({ d, at: bestAt, end: bestAt + bestLen });
+    }
+  }
+  const nonSubsumed = found.filter(m => !found.some(o => o.d.id !== m.d.id && o.at <= m.at && o.end >= m.end && (o.end - o.at > m.end - m.at)));
+  const matches = nonSubsumed.filter(x => x.d.id !== 'grouper' || !nonSubsumed.some(y => ['pomfret', 'snapper'].includes(y.d.id)) || /grouper|石斑/.test(t)).sort((a, b) => a.at - b.at);
   if (matches.length) {
     if (/\b(no|without|don.t|remove|cancel)\b|不要|取消|去掉/.test(t) && !/no chilli|no spicy|without chilli/.test(t)) return answer('excluded');
     if (/price|how much|多少钱|价格|what is|what.s in/.test(t)) {
