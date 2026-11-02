@@ -325,9 +325,12 @@ function render() {
   const staffBadgeCount = pending + openCalls;
 
   $('#app').innerHTML = `
-  <div class="demo-bar"><span class="dot"></span> DEMO EXPERIENCE <span class="demo-detail">Sample menu · No real orders or charges</span></div>
+  <div class="demo-bar"><span class="dot"></span> NAN HWA CHONG (南华昌) · EST. 1927 <span class="demo-detail">Interactive table ordering · Authentic fish head steamboat</span></div>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Ah Hua home"><span class="seal">華</span><span>Ah Hua<small>南华昌 · TRADITIONAL FISH HEAD STEAMBOAT</small></span></a>
+    <a class="brand" href="/" aria-label="Nan Hwa Chong home">
+      <span class="seal"><img class="seal-img" src="https://ucarecdn.com/3fcbba39-c037-4087-9aa9-c018c3ec8d87/-/crop/330x330/144,0/-/preview/" alt="南华昌" onerror="this.style.display='none';this.parentElement.textContent='南';" /></span>
+      <span>Nan Hwa Chong<small>南华昌 (亚秋) 鱼头炉 · EST. 1927</small></span>
+    </a>
     <div class="top-actions">
       <div class="top-lang-dropdown" aria-label="Language selection · 选择语言">
         <span class="lang-globe-icon" aria-hidden="true">🌐</span>
@@ -360,7 +363,7 @@ function render() {
     </aside>
     <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(state.cart))} →</strong></a>
   ` : ''}
-  <footer><span class="footer-mark">華</span> A little warmth. A good meal. <span>Independent concept demo · Not an official restaurant ordering service</span></footer>
+  <footer><span class="footer-mark">南</span> Nan Hwa Chong (南华昌) Fish Head Steamboat Corner · Traditional Teochew Taste Since 1927 <span>North Bridge Road &amp; Jalan Sultan · Singapore</span></footer>
   <dialog id="dish-dialog" closedby="any" aria-labelledby="dish-dialog-title"></dialog>
   <dialog id="bill-dialog" closedby="any" aria-labelledby="bill-dialog-title"></dialog>
   <dialog id="service-dialog" closedby="any" aria-labelledby="service-dialog-title"></dialog>
@@ -463,23 +466,10 @@ function customer() {
   const activeTableCalls = state.calls.filter(c => c.table === table && !c.done);
   const summary = tableSummary(state, table, splitPax);
 
-  return `<section class="quick-lang-banner" aria-label="Language selection · 选择语言">
-    <div class="quick-lang-inner">
-      <span class="quick-lang-title">🌐 ${esc(T('chooseLang'))}:</span>
-      <div class="quick-lang-pills">
-        ${Object.entries(languages).map(([id, l]) => `
-          <button type="button" class="quick-lang-pill ${state.replyLanguage === id ? 'active' : ''}" data-lang-pill="${id}" aria-pressed="${state.replyLanguage === id}">
-            ${l.label}
-          </button>
-        `).join('')}
-      </div>
-    </div>
-  </section>
-
-  <section class="welcome">
+  return `<section class="welcome">
     <div>
       <div class="eyebrow-row">
-        <span class="eyebrow">NAN HWA CHONG HERITAGE · 南华昌百年老字号</span>
+        <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
         <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''}</span>
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
@@ -540,7 +530,7 @@ function customer() {
           ${avatarMarkup()}
           <div>
             <h2>Have a chat with Ah Hua <span class="online-dot"></span></h2>
-            <p>English · 中文 · Singlish · Bahasa Melayu · Français</p>
+            <p>Nan Hwa Chong Digital Host · English · 中文 · Singlish · Melayu · Français</p>
           </div>
           <div class="reply-controls">
             <button type="button" id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice replies: on' : 'Turn on voice replies'}</button>
@@ -548,9 +538,10 @@ function customer() {
           </div>
         </div>
         <div class="avatar-caption">
-          <label class="reply-language-label">Ah Hua’s language · 回复语言
-            <select id="reply-language" aria-label="Ah Hua reply language">${Object.entries(languages).map(([id, l]) => `<option value="${id}" ${state.replyLanguage === id ? 'selected' : ''}>${l.label}</option>`).join('')}</select>
-          </label>
+          <div class="host-caption-row">
+            <span class="host-role-badge">Ah Hua · Nan Hwa Chong Host</span>
+            <span class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></span>
+          </div>
           <div class="language-voice-note">${esc(T('voiceNote'))}</div>
           <span id="avatar-status" role="status"></span>
           <p id="voice-reply-help"></p>
@@ -945,8 +936,6 @@ function bindCustomer() {
     state.messages = state.messages.slice(-80);
   });
   $('#top-language-select')?.addEventListener('change', e => switchLanguage(e.target.value));
-  document.querySelectorAll('[data-lang-pill]').forEach(b => b.onclick = () => switchLanguage(b.dataset.langPill));
-  $('#reply-language')?.addEventListener('change', e => switchLanguage(e.target.value));
   $('#speaker').onclick = () => {
     speaking = !speaking;
     updateSpeaker();
@@ -1458,7 +1447,7 @@ function openQrDialog(targetTable) {
         <text x="60" y="65" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">${targetTable}</text>
         <path d="M50 16h6v6h-6zM62 16h8v6h-8zM50 28h12v6H50zM16 50h10v6H16zM32 54h8v8h-8zM80 50h12v6H80zM96 58h10v10H96zM50 82h8v10h-8zM66 86h10v8H66zM82 82h14v14H82zM90 100h16v8H90z" fill="#173f35"/>
       </svg>
-      <strong>Ah Hua 阿华 · Table ${targetTable}</strong>
+      <strong>Nan Hwa Chong 南华昌 · Table ${targetTable}</strong>
       <code>${esc(tableUrl)}</code>
     </div>
     <div class="dialog-actions">
