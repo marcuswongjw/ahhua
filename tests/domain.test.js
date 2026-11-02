@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   initialState, makeLine, addLines, chat, total, submit, transition,
   requestService, tableSummary, settleTable, toggleOrderItem,
-  getTableSession, applyOp
+  getTableSession, applyOp, STATIONS, getDishStation, SET_MENUS,
+  fireHeldItem, hurryItem, voidItem, guestBreakdown, closeTableSession,
+  getEReceipt, dish
 } from '../src/domain.js';
 import { computeDishBadge } from '../src/lore.js';
 import { handleRequest } from '../server.mjs';
@@ -224,4 +226,158 @@ test('server /api/op endpoint processes atomic operations with state versioning'
   assert.ok(sess15);
   assert.equal(sess15.cart[0].id, 'rice');
   assert.equal(sess15.cart[0].qty, 3);
+});
+
+test('station routing assigns proper kitchen station to each dish and line', () => {
+  assert.equal(getDishStation(dish('pomfret')), 'steamboat');
+  assert.equal(getDishStation(dish('chicken')), 'wok');
+  assert.equal(getDishStation(dish('tea')), 'bar');
+  assert.equal(getDishStation({ id: 'orh-nee', category: 'Dessert' }), 'dessert');
+
+  const line = makeLine('grouper', 1);
+  assert.equal(line.station, 'steamboat');
+  assert.equal(line.timing, 'fire');
+
+  const heldLine = makeLine('tea', 2, 'Regular', 'Post-meal tea', 'hold');
+  assert.equal(heldLine.station, 'bar');
+  assert.equal(heldLine.timing, 'hold');
+});
+
+test('auto-fire routes normal orders directly to approved while flagging high-risk orders', () => {
+  const s = initialState();
+  
+  // Normal order with autoFire: true -> auto-approved
+  addLines(s, [makeLine('chicken', 1), makeLine('rice', 2)], '08');
+  const normalOrder = submit(s, '08', { autoFire: true });
+  assert.equal(normalOrder.status, 'approved');
+  assert.equal(normalOrder.flaggedReason, null);
+
+  // High total order (> $250) -> stays pending
+  addLines(s, [
+    makeLine('pomfret', 2, 'Large'),
+    makeLine('grouper', 3, 'Large'),
+    makeLine('pork', 4)
+  ], '09');
+  const highValOrder = submit(s, '09', { autoFire: true });
+  assert.equal(highValOrder.status, 'pending');
+  assert.ok(highValOrder.flaggedReason.includes('>S$250'));
+
+  // High single item quantity (>= 5) -> stays pending
+  addLines(s, [makeLine('chicken', 6)], '10');
+  const highQtyOrder = submit(s, '10', { autoFire: true });
+  assert.equal(highQtyOrder.status, 'pending');
+  assert.ok(highQtyOrder.flaggedReason.includes('≥5'));
+});
+
+test('hold and fire mechanism controls serving timing and updates atomically', () => {
+  const s = initialState();
+  const heldTea = makeLine('tea', 2, 'Regular', 'Serve after hotpot', 'hold');
+  addLines(s, [makeLine('chicken', 1), heldTea], '04');
+  
+  const order = submit(s, '04', { autoFire: true });
+  assert.equal(order.items[0].timing, 'fire');
+  assert.equal(order.items[1].timing, 'hold');
+
+  // Fire held item
+  fireHeldItem(s, order.id, 1);
+  assert.equal(order.items[1].timing, 'fire');
+
+  // Verify applyOp supports FIRE_HELD_ITEM
+  order.items[1].timing = 'hold';
+  applyOp(s, { type: 'FIRE_HELD_ITEM', orderId: order.id, itemIndex: 1 });
+  assert.equal(order.items[1].timing, 'fire');
+});
+
+test('hurry and void items update kitchen state and bill computation accurately', () => {
+  const s = initialState();
+  addLines(s, [makeLine('chicken', 1), makeLine('rice', 2)], '05');
+  const order = submit(s, '05', { autoFire: true });
+
+  // Hurry chicken
+  hurryItem(s, '05', order.id, 0, 'Har Cheong Gai');
+  assert.equal(order.items[0].hurried, true);
+  assert.ok(s.calls.some(c => c.table === '05' && c.type === 'hurry'));
+
+  // Initial bill before void (chicken 1500 + 2*rice 300 = 1800)
+  const initialSummary = tableSummary(s, '05');
+  assert.equal(initialSummary.subtotal, 1800);
+
+  // Void rice
+  voidItem(s, '05', order.id, 1, 'Sold out in kitchen');
+  assert.equal(order.items[1].voided, true);
+  assert.equal(order.items[1].voidReason, 'Sold out in kitchen');
+
+  // Bill after void should exclude voided item
+  const postVoidSummary = tableSummary(s, '05');
+  assert.equal(postVoidSummary.subtotal, 1500); // Only chicken charges
+});
+
+test('guest breakdown attributes items and computes itemized split', () => {
+  const s = initialState();
+  const aliceChicken = makeLine('chicken', 1);
+  aliceChicken.addedBy = 'Alice';
+  aliceChicken.guestEmoji = '🦐';
+
+  const bobRice = makeLine('rice', 2);
+  bobRice.addedBy = 'Bob';
+  bobRice.guestEmoji = '☕';
+
+  addLines(s, [aliceChicken, bobRice], '06');
+  submit(s, '06', { autoFire: true });
+
+  const breakdown = guestBreakdown(s, '06');
+  assert.equal(breakdown.length, 2);
+
+  const alice = breakdown.find(g => g.guestName === 'Alice');
+  assert.ok(alice);
+  assert.equal(alice.subtotal, 1500);
+  assert.equal(alice.items.length, 1);
+
+  const bob = breakdown.find(g => g.guestName === 'Bob');
+  assert.ok(bob);
+  assert.equal(bob.subtotal, 300);
+  assert.equal(bob.items.length, 1);
+});
+
+test('set menus provide curated banquet configurations with slot choices', () => {
+  assert.ok(SET_MENUS.length >= 3);
+  const couple = SET_MENUS.find(m => m.id === 'set-2pax');
+  assert.ok(couple);
+  assert.equal(couple.pax, 2);
+  assert.equal(couple.slots.length, 3);
+  assert.ok(couple.fixedItems.length > 0);
+
+  const prosperity = SET_MENUS.find(m => m.id === 'set-8pax');
+  assert.ok(prosperity);
+  assert.equal(prosperity.pax, 8);
+  assert.ok(prosperity.slots.some(sl => sl.options.some(o => o.id === 'pomfret')));
+});
+
+test('close table session clears cart and resets table lifecycle', () => {
+  const s = initialState();
+  addLines(s, [makeLine('chicken', 1)], '07');
+  const order = submit(s, '07', { autoFire: true });
+
+  const sessBefore = getTableSession(s, '07');
+  assert.equal(sessBefore.status, 'dining');
+
+  closeTableSession(s, '07');
+  const sessAfter = getTableSession(s, '07');
+  assert.equal(sessAfter.cart.length, 0);
+  assert.equal(sessAfter.status, 'closed');
+});
+
+test('getEReceipt formats formal Singapore tax invoice with GST Reg No', () => {
+  const s = initialState();
+  addLines(s, [makeLine('chicken', 1), makeLine('rice', 2)], '11');
+  submit(s, '11', { autoFire: true });
+
+  const receipt = getEReceipt(s, '11', 2);
+  assert.equal(receipt.merchant.gstReg, 'M9-0012345-X');
+  assert.equal(receipt.table, '11');
+  assert.equal(receipt.subtotal, 1800);
+  assert.equal(receipt.serviceCharge, 180); // 10%
+  assert.equal(receipt.gst, 178); // 9% of (1800 + 180) = 178.2 -> 178
+  assert.equal(receipt.grandTotal, 2158);
+  assert.equal(receipt.items.length, 2);
 });

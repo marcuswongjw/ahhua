@@ -177,6 +177,7 @@ export const dishName = (language, dish) => language==='zh' ? dish.cn : dishName
 export const categoryNames = {
   zh: {
     'All dishes': '全部菜品',
+    'Set Menus': '精选套餐',
     'Steamboat': '鱼头炉',
     'Specialty': '特质佳肴',
     'Crayfish & Seafood': '虾婆与海鲜',
@@ -189,6 +190,7 @@ export const categoryNames = {
   },
   ms: {
     'All dishes': 'Semua Hidangan',
+    'Set Menus': 'Set Hidangan',
     'Steamboat': 'Steamboat Ikan',
     'Specialty': 'Istimewa',
     'Crayfish & Seafood': 'Udang & Makanan Laut',
@@ -201,6 +203,7 @@ export const categoryNames = {
   },
   fr: {
     'All dishes': 'Tous les plats',
+    'Set Menus': 'Menus Découverte',
     'Steamboat': 'Fondue de poisson',
     'Specialty': 'Spécialités',
     'Crayfish & Seafood': 'Écrevisses & Fruits de mer',

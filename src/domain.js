@@ -2551,32 +2551,181 @@ export const money = cents => `S$${(cents / 100).toFixed(2)}`;
 export const dish = id => menu.find(x => x.id === id);
 export function initialState() { return { version: 1, replyLanguage: 'en', cart: [], orders: [], calls: [], unavailable: [], messages: [{ role: 'host', text: replyText('en', 'welcome'), language: 'en' }], proposal: [], preference: '', sessions: {} }; }
 export function total(items) { return items.reduce((sum, x) => sum + x.qty * x.unitPrice, 0); }
+export const STATIONS = {
+  all: { id: 'all', label: 'All Stations · 全部档口', icon: '📋' },
+  steamboat: { id: 'steamboat', label: 'Steamboat & Charcoal · 炭火炉档', icon: '🍲' },
+  wok: { id: 'wok', label: 'Wok & Hot Dishes · 镬气热炒', icon: '🔥' },
+  bar: { id: 'bar', label: 'Drinks & Bar · 水吧茶水', icon: '🍵' },
+  dessert: { id: 'dessert', label: 'Cold / Dessert · 凉菜甜品', icon: '🍧' }
+};
+
+export function getDishStation(dishItem) {
+  if (!dishItem) return 'wok';
+  const id = String(dishItem.id || '').toLowerCase();
+  const cat = String(dishItem.category || '');
+  if (cat === 'Steamboat' || id.includes('steamboat')) return 'steamboat';
+  if (cat === 'Drinks & Tea' || ['tea', 'barley', 'calamansi'].includes(id)) return 'bar';
+  if (cat === 'Dessert' || ['yam', 'mango-pomelo', 'taro'].includes(id)) return 'dessert';
+  return 'wok';
+}
+
+export const SET_MENUS = [
+  {
+    id: 'set-2pax',
+    name: 'Couple Steamboat Set (双人温馨炉)',
+    cn: '双人温馨炉',
+    pax: 2,
+    price: 5800,
+    icon: '🍲',
+    desc: 'Choice of Grouper / Pomfret / Red Snapper Steamboat + 1 Hot Dish + Greens + 2 Rice + 2 Pu’er Tea',
+    image: 'https://ucarecdn.com/f044bbd1-58c0-43be-a6b1-36baea4d9520/',
+    slots: [
+      {
+        name: 'Fish Steamboat (选择鱼头炉)',
+        options: [
+          { id: 'grouper', name: 'Red Grouper Slices (红斑炉)', priceDiff: 0 },
+          { id: 'pomfret', name: 'Chinese Pomfret (斗鲳炉)', priceDiff: 600 },
+          { id: 'snapper', name: 'Red Snapper (红鲷鱼炉)', priceDiff: 0 }
+        ]
+      },
+      {
+        name: 'Signature Hot Dish (招牌热炒)',
+        options: [
+          { id: 'chicken', name: 'Prawn Paste Chicken (虾酱鸡)', priceDiff: 0 },
+          { id: 'pork', name: 'Nam Yu Pork Belly (南乳五花肉)', priceDiff: 0 },
+          { id: 'tofu', name: 'Handmade Tofu (招牌手工豆腐)', priceDiff: 0 }
+        ]
+      },
+      {
+        name: 'Vegetable (时蔬)',
+        options: [
+          { id: 'kang', name: 'Sambal Kang Kong (参巴空心菜)', priceDiff: 0 },
+          { id: 'tango', name: 'Fresh Tang Oh (清炒茼蒿)', priceDiff: 0 }
+        ]
+      }
+    ],
+    fixedItems: [
+      { id: 'rice', qty: 2, name: 'Steamed Rice', size: 'Regular' },
+      { id: 'tea', qty: 2, name: 'Pu’er Chinese Tea', size: 'Regular' }
+    ]
+  },
+  {
+    id: 'set-4pax',
+    name: 'Heritage Family Sharing Set (四人经典老字号)',
+    cn: '四人老字号聚餐宴',
+    pax: 4,
+    price: 12800,
+    icon: '👑',
+    desc: 'Large Charcoal Steamboat + Har Cheong Gai + Signature Tofu + Wok-hei Greens + Crispy Yam + 4 Rice + 4 Pu’er Tea',
+    image: 'https://ucarecdn.com/978c4a16-64ad-4e55-83fb-e4f4fb38e945/',
+    slots: [
+      {
+        name: 'Fish Steamboat (选择大份鱼头炉)',
+        options: [
+          { id: 'pomfret', name: 'Chinese Pomfret Large (大份斗鲳炉)', priceDiff: 800 },
+          { id: 'grouper', name: 'Red Grouper Slices Large (大份红斑炉)', priceDiff: 0 },
+          { id: 'song-fish-head', name: 'Heritage Song Fish Head (传统松鱼头炉)', priceDiff: 0 }
+        ]
+      },
+      {
+        name: 'Seafood / Meat Specialty (精选荤菜)',
+        options: [
+          { id: 'chicken', name: 'Prawn Paste Chicken (虾酱鸡)', priceDiff: 0 },
+          { id: 'prawn-paste', name: '100% Tiger Prawn Meat (纯虾滑)', priceDiff: 0 },
+          { id: 'egg', name: 'Oyster Omelette (蚝煎)', priceDiff: 0 }
+        ]
+      },
+      {
+        name: 'Tofu & Greens (豆腐与时蔬)',
+        options: [
+          { id: 'tofu', name: 'Handmade Silken Tofu (手工豆腐)', priceDiff: 0 },
+          { id: 'kang', name: 'Sambal Kang Kong (参巴空心菜)', priceDiff: 0 }
+        ]
+      }
+    ],
+    fixedItems: [
+      { id: 'yam', qty: 1, name: 'Crispy Fried Yam', size: 'Regular' },
+      { id: 'rice', qty: 4, name: 'Steamed Rice', size: 'Regular' },
+      { id: 'tea', qty: 4, name: 'Pu’er Chinese Tea', size: 'Regular' }
+    ]
+  },
+  {
+    id: 'set-8pax',
+    name: 'Prosperity Grand Banquet for 8 (八人八方聚宝宴)',
+    cn: '八人八方聚宝宴',
+    pax: 8,
+    price: 26800,
+    icon: '🏮',
+    desc: 'Two Steamboats or Giant Pomfret Pot + 4 Seafood & Meat Classics + 2 Vegetables + Crispy Yam Dessert + 8 Rice + Drinks',
+    image: 'https://ucarecdn.com/1babb7fc-af40-4e49-9b01-a0248166ddac/',
+    slots: [
+      {
+        name: 'Steamboat Selection (精选双炭炉)',
+        options: [
+          { id: 'pomfret', name: 'Wild Chinese Pomfret (野生白鲳炉)', priceDiff: 0 },
+          { id: 'grouper', name: 'Red Grouper Charcoal Pot (深海红斑炉)', priceDiff: 0 }
+        ]
+      },
+      {
+        name: 'Seafood Selection (精选海鲜盛宴)',
+        options: [
+          { id: 'cereal-crayfish', name: 'Cereal Crayfish (麦片虾婆)', priceDiff: 0 },
+          { id: 'butter-crayfish', name: 'Butter Crayfish (牛油虾婆)', priceDiff: 0 },
+          { id: 'egg', name: 'Teochew Oyster Omelette (潮州蚝煎)', priceDiff: 0 }
+        ]
+      }
+    ],
+    fixedItems: [
+      { id: 'chicken', qty: 2, name: 'Prawn Paste Chicken', size: 'Regular' },
+      { id: 'tofu', qty: 2, name: 'Handmade Tofu', size: 'Regular' },
+      { id: 'kang', qty: 2, name: 'Sambal Kang Kong', size: 'Regular' },
+      { id: 'yam', qty: 2, name: 'Crispy Fried Yam', size: 'Regular' },
+      { id: 'rice', qty: 8, name: 'Steamed Rice', size: 'Regular' },
+      { id: 'tea', qty: 8, name: 'Pu’er Chinese Tea', size: 'Regular' }
+    ]
+  }
+];
+
 export function getTableSession(state, tableId) {
-  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [] };
+  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false };
   if (!state.sessions) state.sessions = {};
   if (!state.sessions[tableId]) {
     state.sessions[tableId] = {
       cart: [],
       proposal: [],
       messages: [{ role: 'host', text: replyText(state.replyLanguage || 'en', 'welcome'), language: state.replyLanguage || 'en' }],
-      guests: []
+      guests: [],
+      status: 'ordering',
+      pax: 4,
+      teaFeeWaived: false,
+      openedAt: new Date().toISOString()
     };
   }
   return state.sessions[tableId];
 }
-export function makeLine(id, qty = 1, size = 'Regular', notes = '') {
+export function makeLine(id, qty = 1, size = 'Regular', notes = '', timing = 'fire') {
   const d = dish(id);
   if (!d || !Number.isInteger(qty) || qty < 1 || qty > 20 || !['Regular', 'Large'].includes(size) || (d.singleSize && size !== 'Regular')) throw Error('Please choose a valid dish, size and quantity (1–20).');
-  return { id, name: d.name, size, notes: String(notes).trim().slice(0, 160), qty, unitPrice: d.price + (size === 'Large' ? 800 : 0) };
+  return {
+    id,
+    name: d.name,
+    size,
+    notes: String(notes).trim().slice(0, 160),
+    qty,
+    unitPrice: d.price + (size === 'Large' ? 800 : 0),
+    timing: timing === 'hold' ? 'hold' : 'fire',
+    station: getDishStation(d)
+  };
 }
 export function addLines(state, lines, tableId = null) {
   const targetCart = tableId ? getTableSession(state, tableId).cart : (state.cart || []);
   const next = structuredClone(targetCart);
   for (const raw of lines) {
     if (state.unavailable.includes(raw.id)) throw Error(`${dish(raw.id)?.name || 'Dish'} is unavailable. Please choose another dish.`);
-    const x = makeLine(raw.id, raw.qty, raw.size, raw.notes);
+    const x = makeLine(raw.id, raw.qty, raw.size, raw.notes, raw.timing);
     if (raw.addedBy) { x.addedBy = raw.addedBy; x.guestEmoji = raw.guestEmoji; }
-    const existing = next.find(y => y.id === x.id && y.size === x.size && y.notes === x.notes);
+    if (raw.station) { x.station = raw.station; }
+    const existing = next.find(y => y.id === x.id && y.size === x.size && y.notes === x.notes && (y.timing || 'fire') === (x.timing || 'fire'));
     if (existing) { if (existing.qty + x.qty > 20) throw Error('Maximum 20 of each dish.'); existing.qty += x.qty; } else next.push(x);
   }
   if (tableId) {
@@ -2586,22 +2735,103 @@ export function addLines(state, lines, tableId = null) {
     state.cart = next;
   }
 }
-export function submit(state, table) {
+export function submit(state, table, options = {}) {
   const session = table ? getTableSession(state, table) : null;
   const cartToSubmit = session && session.cart.length ? session.cart : state.cart;
   if (!cartToSubmit.length) throw Error('Add a dish before sending your order.');
   if (state.orders.filter(x => x.status === 'pending').length >= 20) throw Error('Please review pending orders in Staff first.');
   for (const x of cartToSubmit) if (state.unavailable.includes(x.id)) throw Error(`${x.name} is now unavailable. Please remove it from your cart.`);
   const tableRound = state.orders.filter(x => x.table === table && x.status !== 'rejected').length + 1;
-  const order = { id: `AH-${String(state.orders.length + 1001)}`, table, round: tableRound, items: structuredClone(cartToSubmit), checkedItems: [], status: 'pending', created: new Date().toISOString(), paid: false, reason: '' };
+  const cartTotal = total(cartToSubmit);
+
+  const shouldAutoFire = options.autoFire ?? state.settings?.autoFire ?? false;
+  const hasLargeQty = cartToSubmit.some(x => x.qty >= 5);
+  const isHighValue = cartTotal > 25000;
+  const hasLongNotes = cartToSubmit.some(x => (x.notes || '').length > 40);
+  const isFlagged = hasLargeQty || isHighValue || hasLongNotes;
+
+  let initialStatus = 'pending';
+  let flaggedReason = null;
+
+  if (shouldAutoFire && !isFlagged) {
+    initialStatus = 'approved';
+  } else if (isFlagged) {
+    flaggedReason = hasLargeQty ? 'High quantity item (≥5)' : isHighValue ? 'Large round total (>S$250)' : 'Special kitchen instructions';
+  }
+
+  const order = {
+    id: `AH-${String(state.orders.length + 1001)}`,
+    table,
+    round: tableRound,
+    items: structuredClone(cartToSubmit).map(x => ({
+      ...x,
+      timing: x.timing || 'fire',
+      station: x.station || getDishStation(x)
+    })),
+    checkedItems: [],
+    status: initialStatus,
+    autoApproved: initialStatus === 'approved',
+    flaggedReason,
+    created: new Date().toISOString(),
+    paid: false,
+    reason: ''
+  };
+
   state.orders.push(order);
   if (session) {
     session.cart = [];
     session.proposal = [];
+    session.status = 'dining';
   }
   state.cart = [];
   state.proposal = [];
   return order;
+}
+
+export function fireHeldItem(state, orderId, itemIndex) {
+  const order = state.orders.find(o => o.id === orderId);
+  if (!order || !order.items[itemIndex]) throw Error('Dish item not found.');
+  order.items[itemIndex].timing = 'fire';
+  return order.items[itemIndex];
+}
+
+export function hurryItem(state, table, orderId, itemIndex, dishName = '') {
+  const order = state.orders.find(o => o.id === orderId);
+  if (!order || !order.items[itemIndex]) throw Error('Dish item not found.');
+  const item = order.items[itemIndex];
+  item.hurried = true;
+  item.lastHurried = new Date().toISOString();
+  
+  const entry = {
+    id: typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : String(Math.random()),
+    table,
+    type: 'hurry',
+    label: `⚡ 催菜 (Hurry): Table ${table} · ${dishName || item.name} (${orderId})`,
+    created: new Date().toISOString(),
+    done: false
+  };
+  state.calls.push(entry);
+  return entry;
+}
+
+export function voidItem(state, table, orderId, itemIndex, reason = '') {
+  const order = state.orders.find(o => o.id === orderId);
+  if (!order || !order.items[itemIndex]) throw Error('Dish item not found.');
+  const item = order.items[itemIndex];
+  if (item.voided) throw Error('Dish has already been voided.');
+  item.voided = true;
+  item.voidReason = String(reason || 'Customer request').trim().slice(0, 100);
+
+  const entry = {
+    id: typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : String(Math.random()),
+    table,
+    type: 'void',
+    label: `❌ 退菜 (Void): Table ${table} · ${item.name} (${item.voidReason})`,
+    created: new Date().toISOString(),
+    done: false
+  };
+  state.calls.push(entry);
+  return entry;
 }
 
 export function applyOp(state, op) {
@@ -2625,7 +2855,7 @@ export function applyOp(state, op) {
       break;
     }
     case 'SUBMIT_ORDER': {
-      submit(state, opTable);
+      submit(state, opTable, { autoFire: Boolean(op.autoFire) });
       break;
     }
     case 'TRANSITION_ORDER': {
@@ -2634,6 +2864,26 @@ export function applyOp(state, op) {
     }
     case 'REQUEST_SERVICE': {
       requestService(state, opTable, serviceType, note);
+      break;
+    }
+    case 'FIRE_HELD_ITEM': {
+      fireHeldItem(state, op.orderId || id, op.itemIndex ?? lineIndex);
+      break;
+    }
+    case 'HURRY_ITEM': {
+      hurryItem(state, opTable, op.orderId || id, op.itemIndex ?? lineIndex, op.dishName || note);
+      break;
+    }
+    case 'VOID_ITEM': {
+      voidItem(state, opTable, op.orderId || id, op.itemIndex ?? lineIndex, reason);
+      break;
+    }
+    case 'SET_SESSION_STATUS': {
+      if (session && op.sessionStatus) session.status = op.sessionStatus;
+      break;
+    }
+    case 'CLOSE_TABLE': {
+      closeTableSession(state, opTable);
       break;
     }
     case 'SET_UNAVAILABLE': {
@@ -2679,14 +2929,18 @@ export function requestService(state, table, type = 'assistance', note = '') {
   return entry;
 }
 export function tableSummary(state, table, pax = 4) {
+  const session = table ? getTableSession(state, table) : null;
   const safePax = Math.min(20, Math.max(1, Number.isInteger(pax) ? pax : 4));
   const tableOrders = state.orders.filter(x => x.table === table);
   const activeOrders = tableOrders.filter(x => x.status !== 'rejected');
-  const subtotal = activeOrders.reduce((sum, o) => sum + total(o.items), 0);
+  const subtotal = activeOrders.reduce((sum, o) => {
+    const validItems = (o.items || []).filter(x => !x.voided);
+    return sum + total(validItems);
+  }, 0);
   const serviceCharge = Math.round(subtotal * 0.10);
   const gst = Math.round((subtotal + serviceCharge) * 0.09);
   const grandTotal = subtotal + serviceCharge + gst;
-  const itemCount = activeOrders.reduce((sum, o) => sum + o.items.reduce((n, x) => n + x.qty, 0), 0);
+  const itemCount = activeOrders.reduce((sum, o) => sum + (o.items || []).filter(x => !x.voided).reduce((n, x) => n + x.qty, 0), 0);
   const allServed = activeOrders.length > 0 && activeOrders.every(o => o.status === 'served');
   const allPaid = activeOrders.length > 0 && activeOrders.every(o => o.paid);
   return {
@@ -2704,7 +2958,8 @@ export function tableSummary(state, table, pax = 4) {
     grandTotalPerPax: safePax ? Math.ceil(grandTotal / safePax) : grandTotal,
     amountCharged: 0,
     allServed,
-    allPaid
+    allPaid,
+    status: session?.status || 'dining'
   };
 }
 export function settleTable(state, table) {
@@ -2712,6 +2967,83 @@ export function settleTable(state, table) {
   if (!served.length) throw Error('No served orders are ready for a simulated receipt yet.');
   for (const o of served) o.paid = true;
   return served.length;
+}
+export function guestBreakdown(state, table) {
+  const tableOrders = state.orders.filter(x => x.table === table && x.status !== 'rejected');
+  const guestMap = new Map();
+
+  for (const ord of tableOrders) {
+    for (const it of (ord.items || [])) {
+      if (it.voided) continue;
+      const guestKey = it.addedBy || 'Shared Table';
+      if (!guestMap.has(guestKey)) {
+        guestMap.set(guestKey, {
+          guestName: guestKey,
+          emoji: it.guestEmoji || (guestKey === 'Shared Table' ? '👥' : '👤'),
+          items: [],
+          subtotal: 0
+        });
+      }
+      const g = guestMap.get(guestKey);
+      g.items.push(it);
+      g.subtotal += (it.qty * it.unitPrice);
+    }
+  }
+
+  const breakdown = [];
+  for (const g of guestMap.values()) {
+    const svc = Math.round(g.subtotal * 0.10);
+    const gst = Math.round((g.subtotal + svc) * 0.09);
+    breakdown.push({
+      ...g,
+      serviceCharge: svc,
+      gst,
+      grandTotal: g.subtotal + svc + gst
+    });
+  }
+  return breakdown;
+}
+export function closeTableSession(state, table) {
+  const session = table ? getTableSession(state, table) : null;
+  const activeOrders = state.orders.filter(x => x.table === table && x.status !== 'rejected');
+  for (const o of activeOrders) {
+    o.paid = true;
+    if (o.status !== 'served') o.status = 'served';
+  }
+  if (session) {
+    session.status = 'closed';
+    session.closedAt = new Date().toISOString();
+    session.cart = [];
+    session.proposal = [];
+  }
+  return { ok: true, table, closedOrders: activeOrders.length };
+}
+export function getEReceipt(state, table, pax = 4) {
+  const summary = tableSummary(state, table, pax);
+  const now = new Date();
+  const receiptNo = `NHC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${table}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  return {
+    merchant: {
+      name: 'Nan Hwa Chong (1927) Pte. Ltd.',
+      cn: '南华昌（1927）私人有限公司',
+      gstReg: 'M9-0012345-X',
+      regNo: '192700012K',
+      address: '812/814/816 North Bridge Road, Singapore 198779',
+      phone: '+65 6297 9719'
+    },
+    receiptNo,
+    table,
+    pax: summary.pax,
+    dateTime: now.toLocaleString('en-SG', { timeZone: 'Asia/Singapore', dateStyle: 'medium', timeStyle: 'short' }),
+    items: summary.activeOrders.flatMap(o => (o.items || []).filter(x => !x.voided)),
+    voidedItems: summary.activeOrders.flatMap(o => (o.items || []).filter(x => x.voided)),
+    subtotal: summary.subtotal,
+    serviceCharge: summary.serviceCharge,
+    gst: summary.gst,
+    grandTotal: summary.grandTotal,
+    paymentStatus: 'PAID · FULLY SETTLED'
+  };
 }
 const numberWords = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, 一: 1, 两: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
 const plain = text => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');

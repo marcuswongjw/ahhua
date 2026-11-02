@@ -1199,4 +1199,331 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
   40%, 80% { transform: translateX(8px); }
 }
 
+/* ====================================================================
+   TIER 1 RESTAURANT OPERATIONS STYLING
+   ==================================================================== */
+
+/* KDS Station Routing */
+.kds-station-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 0 16px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+.station-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f4eb;
+  border: 1px solid #dce2d4;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--green);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.station-tab-btn.active {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+/* Timing & Line Item Controls */
+.timing-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.timing-badge.hold {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+.timing-badge.hurried {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  animation: pulse-dot 1.5s infinite;
+}
+.timing-badge.voided {
+  background: #e2e3e5;
+  color: #6c757d;
+  text-decoration: line-through;
+}
+
+.item-action-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.mini-btn {
+  border: 1px solid #ced6c5;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 9px;
+  font-weight: 600;
+  background: #fff;
+  cursor: pointer;
+  color: var(--green);
+}
+.mini-btn.hurry {
+  border-color: #e6a817;
+  color: #a05a00;
+  background: #fff9e6;
+}
+.mini-btn.fire {
+  border-color: var(--brand-red);
+  color: #fff;
+  background: var(--brand-red);
+}
+.mini-btn.void {
+  border-color: #d6b3b0;
+  color: #8f342c;
+  background: #fdf5f5;
+}
+
+/* Set Menus */
+.set-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.set-menu-card {
+  border: 1px solid #d9e1d4;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 12px #223b3208;
+  position: relative;
+}
+.set-menu-photo {
+  height: 150px;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+.set-menu-content {
+  padding: 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.set-menu-pax {
+  display: inline-block;
+  background: var(--brand-gold);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  width: fit-content;
+}
+.set-menu-title {
+  font-size: 15px;
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+.set-menu-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  flex: 1;
+}
+.set-menu-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #eef2ea;
+  padding-top: 10px;
+}
+.set-menu-price {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--brand-red);
+}
+
+/* Set Menu Dialog & Customiser */
+.set-slot-group {
+  margin-bottom: 16px;
+  border: 1px solid #dce2d4;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafbf8;
+}
+.set-slot-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--brand-red);
+  margin-bottom: 8px;
+  display: block;
+}
+.set-slot-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.set-option-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid #e1e7db;
+}
+.set-option-label:has(input:checked) {
+  border-color: var(--brand-red);
+  background: #fff5f2;
+}
+
+/* Bill Tabs: Split Evenly vs Pay For My Items */
+.bill-tabs-nav {
+  display: flex;
+  border-bottom: 2px solid #e2e8dc;
+  margin-bottom: 16px;
+}
+.bill-tab-btn {
+  flex: 1;
+  background: none;
+  border: 0;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+.bill-tab-btn.active {
+  color: var(--brand-red);
+  border-bottom-color: var(--brand-red);
+}
+
+.guest-bill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.guest-bill-card {
+  border: 1px solid #dce2d4;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafcf8;
+}
+.guest-bill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.guest-bill-head strong {
+  font-size: 14px;
+}
+.guest-bill-items {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* E-Receipt Invoice Styling */
+.e-receipt-wrap {
+  background: #fff;
+  padding: 18px;
+  border-radius: 10px;
+  border: 1px dashed #ced6c5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+}
+.e-receipt-header {
+  text-align: center;
+  border-bottom: 1px dashed #ced6c5;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+.e-receipt-header h3 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+.e-receipt-header p {
+  font-size: 9px;
+  color: #666;
+  margin: 2px 0;
+  line-height: 1.4;
+}
+.e-receipt-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #555;
+  margin-bottom: 12px;
+}
+.e-receipt-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.e-receipt-lines th {
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  padding: 4px 0;
+  font-size: 9px;
+  color: #777;
+}
+.e-receipt-lines td {
+  padding: 6px 0;
+  border-bottom: 1px dotted #f0f0f0;
+}
+.e-receipt-totals {
+  border-top: 1px dashed #ced6c5;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.e-receipt-totals div {
+  display: flex;
+  justify-content: space-between;
+}
+.e-receipt-totals div.grand-total {
+  font-size: 14px;
+  font-weight: 700;
+  border-top: 1px solid #111;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+.e-receipt-stamp {
+  margin: 16px auto 4px;
+  width: fit-content;
+  border: 2px solid #2e7d32;
+  color: #2e7d32;
+  padding: 4px 16px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+
 

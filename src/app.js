@@ -1,7 +1,8 @@
 import {
   menu, money, dish, initialState, total, makeLine, addLines, submit, transition,
   chat, configureRecommendation, serviceTypes, requestService, tableSummary, settleTable, toggleOrderItem,
-  getTableSession, applyOp
+  getTableSession, applyOp, STATIONS, getDishStation, SET_MENUS, fireHeldItem, hurryItem, voidItem,
+  guestBreakdown, closeTableSession, getEReceipt
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
@@ -31,6 +32,8 @@ let lastVoiceError = '';
 let search = '';
 let splitPax = 4;
 let staffTableFilter = 'all';
+let kitchenStation = 'all';
+let billTab = 'split'; // 'split' | 'items'
 let syncMode = 'local';
 let connectedPeers = 1;
 
@@ -357,14 +360,55 @@ function relativeTime(iso) {
   return mins < 1 ? 'Just now' : `${mins}m ago`;
 }
 
-function orderLines(order, interactiveKitchen = false) {
+function orderLines(order, interactiveKitchen = false, allowCustomerActions = false) {
   const checked = new Set(Array.isArray(order.checkedItems) ? order.checkedItems : []);
   return order.items.map((x, i) => {
     const isChecked = checked.has(i);
+    const isVoided = Boolean(x.voided);
+    const isHeld = x.timing === 'hold';
+    const isHurried = Boolean(x.hurried);
+
+    const timingBadge = isVoided
+      ? `<span class="timing-badge voided">❌ 退菜 (${esc(x.voidReason || '')})</span>`
+      : isHurried
+        ? `<span class="timing-badge hurried">⚡ 催菜 Hurried</span>`
+        : isHeld
+          ? `<span class="timing-badge hold">⏸️ 叫起 Held</span>`
+          : '';
+
     if (interactiveKitchen) {
-      return `<li class="checkable-line ${isChecked ? 'checked' : ''}"><button type="button" class="line-check-btn" data-check-order="${order.id}" data-check-item="${i}" aria-pressed="${isChecked}"><span class="check-box">${isChecked ? '✓' : ''}</span><div><b>${x.qty} × ${esc(x.name)}</b><span>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</span></div></button><strong>${money(x.qty * x.unitPrice)}</strong></li>`;
+      if (kitchenStation !== 'all' && x.station && x.station !== kitchenStation) {
+        return '';
+      }
+      return `<li class="checkable-line ${isChecked ? 'checked' : ''} ${isVoided ? 'voided-item' : ''}">
+        <button type="button" class="line-check-btn" data-check-order="${order.id}" data-check-item="${i}" aria-pressed="${isChecked}" ${isVoided ? 'disabled' : ''}>
+          <span class="check-box">${isChecked ? '✓' : ''}</span>
+          <div>
+            <b>${x.qty} × ${esc(x.name)} ${timingBadge}</b>
+            <span>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''} · <small>${esc(x.station || 'wok')}</small></span>
+          </div>
+        </button>
+        <div class="line-end-actions">
+          <strong>${money(x.qty * x.unitPrice)}</strong>
+          ${isHeld ? `<button type="button" class="mini-btn fire" data-fire-held="${order.id}" data-item-idx="${i}">🔥 起菜</button>` : ''}
+        </div>
+      </li>`;
     }
-    return `<li class="${isChecked ? 'plated-line' : ''}"><b>${x.qty} × ${esc(x.name)} ${isChecked ? '<em class="plated-tag">✓ Plated</em>' : ''}</b><span>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</span><strong>${money(x.qty * x.unitPrice)}</strong></li>`;
+
+    return `<li class="${isChecked ? 'plated-line' : ''} ${isVoided ? 'voided-item' : ''}">
+      <div>
+        <b>${x.qty} × ${esc(x.name)} ${isChecked ? '<em class="plated-tag">✓ Plated</em>' : ''} ${timingBadge}</b>
+        <span>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</span>
+        ${allowCustomerActions && !isChecked && !isVoided && order.status !== 'served' ? `
+          <div class="item-action-btns">
+            ${isHeld ? `<button type="button" class="mini-btn fire" data-fire-held="${order.id}" data-item-idx="${i}">🔥 起菜 (Fire Now)</button>` : ''}
+            <button type="button" class="mini-btn hurry" data-hurry-dish="${order.id}" data-item-idx="${i}" data-dish-name="${esc(x.name)}" ${isHurried ? 'disabled' : ''}>${isHurried ? '⚡ 已催 (Hurried)' : '⚡ 催菜 (Hurry)'}</button>
+            <button type="button" class="mini-btn void" data-void-dish="${order.id}" data-item-idx="${i}" data-dish-name="${esc(x.name)}">✕ 退菜</button>
+          </div>
+        ` : ''}
+      </div>
+      <strong>${isVoided ? `<del>${money(x.qty * x.unitPrice)}</del>` : money(x.qty * x.unitPrice)}</strong>
+    </li>`;
   }).join('');
 }
 
@@ -494,6 +538,9 @@ function render() {
   <dialog id="ah-hua-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="ah-hua-dialog-title"></dialog>
   <dialog id="cart-check-dialog" closedby="any" aria-labelledby="cart-check-dialog-title"></dialog>
   <dialog id="staff-pin-dialog" closedby="any" aria-labelledby="staff-pin-title"></dialog>
+  <dialog id="set-menu-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="set-menu-title"></dialog>
+  <dialog id="void-dialog" closedby="any" aria-labelledby="void-dialog-title"></dialog>
+  <dialog id="e-receipt-dialog" closedby="any" aria-labelledby="e-receipt-title"></dialog>
   <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
     <form method="dialog">
       <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -505,7 +552,7 @@ function render() {
     </form>
   </dialog>`;
 
-  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#staff-pin-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog', '#e-receipt-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     const targetRole = b.dataset.role;
@@ -687,9 +734,9 @@ function executeOrderSubmission() {
   }
   let order;
   try {
-    order = submit(state, table);
+    order = submit(state, table, { autoFire: true });
     reply(localReply('submitted', { id: order.id }));
-    dispatchOp({ type: 'SUBMIT_ORDER', table });
+    dispatchOp({ type: 'SUBMIT_ORDER', table, autoFire: true });
   } catch (err) {
     toast(err.message);
     return;
@@ -700,7 +747,9 @@ function executeOrderSubmission() {
     triggerOrderAnimation();
     hapticPulse();
     render();
-    toast(`🎉 Order ${order.id} sent to kitchen! Ah Hua is now on Center Stage.`);
+    toast(order.status === 'approved'
+      ? `🔥 Order ${order.id} auto-fired directly to kitchen tickets!`
+      : `🎉 Order ${order.id} submitted! Pending staff review (${order.flaggedReason || 'Flagged'}).`);
   }
 }
 
@@ -1223,6 +1272,7 @@ function customer() {
           <div class="categories" aria-label="Menu category">
             ${[
               'All dishes',
+              'Set Menus',
               'Steamboat',
               'Specialty',
               'Crayfish & Seafood',
@@ -1249,6 +1299,24 @@ function customer() {
             </div>
           </div>
         </search>
+        ${category === 'Set Menus' ? `
+          <div class="set-menu-grid">
+            ${SET_MENUS.map(sm => `
+              <article class="set-menu-card">
+                <img class="set-menu-photo" src="${esc(sm.image)}" alt="${esc(sm.name)}" loading="lazy">
+                <div class="set-menu-content">
+                  <span class="set-menu-pax">👥 ${sm.pax} PAX · ${esc(sm.cn)}</span>
+                  <h3 class="set-menu-title">${esc(sm.name)}</h3>
+                  <p class="set-menu-desc">${esc(sm.desc)}</p>
+                  <div class="set-menu-footer">
+                    <span class="set-menu-price">${money(sm.price)}</span>
+                    <button type="button" class="primary small" data-open-set="${sm.id}">Customise Set →</button>
+                  </div>
+                </div>
+              </article>
+            `).join('')}
+          </div>
+        ` : `
         <div class="menu-grid">
           ${shown.map(d => {
             const soldOut = state.unavailable.includes(d.id);
@@ -1297,6 +1365,7 @@ function customer() {
             </article>`;
           }).join('') || '<p class="empty">No dishes match. Try another search or filter.</p>'}
         </div>
+        `}
         <p class="menu-footnote">All prices, portions, recipes and allergen notes are illustrative and unverified. No real GST or service charge is billed in this demo.</p>
       </section>
     </div>
@@ -1399,7 +1468,7 @@ function cart(summary) {
           ${badge(o.status)}
         </div>
         <p>${o.items.reduce((n, x) => n + x.qty, 0)} items · ${money(total(o.items))} · <small>${relativeTime(o.created)}</small></p>
-        <ul class="tracking-items-mini">${orderLines(o, false)}</ul>
+        <ul class="tracking-items-mini">${orderLines(o, false, true)}</ul>
         ${o.status === 'rejected'
           ? `<p class="reason">${esc(o.reason)}</p>`
           : `<div class="progress-track">${['pending', 'approved', 'preparing', 'ready', 'served'].map((s, i) => `<span class="${['pending', 'approved', 'preparing', 'ready', 'served'].indexOf(o.status) >= i ? 'done' : ''}" title="${statusLabel[s]}"></span>`).join('')}</div>`}
@@ -1443,7 +1512,10 @@ function staff() {
         <span><i class="legend-dot pending"></i> Needs approval</span>
         <span><i class="legend-dot call"></i> Calling server</span>
         <span><i class="legend-dot dining"></i> Dining</span>
-        ${staffTableFilter !== 'all' ? `<button type="button" class="secondary small" data-floor-table="all">Show all tables</button>` : ''}
+        ${staffTableFilter !== 'all' ? `
+          <button type="button" class="secondary small" data-floor-table="all">Show all tables</button>
+          <button type="button" class="secondary small" data-close-table="${staffTableFilter}" style="color:var(--brand-red);border-color:var(--brand-red)">🧹 Close Table ${staffTableFilter} (清台)</button>
+        ` : ''}
       </div>
     </div>
     <div class="floor-grid">
@@ -1542,6 +1614,20 @@ function kitchen() {
     <div class="kds-stat"><span>🍵 Tea & drinks</span><strong>${drinkCount}</strong></div>
   </section>
 
+  <div class="kds-station-tabs" role="tablist" aria-label="Kitchen station filtering">
+    ${[
+      { id: 'all', label: 'All Stations (全部)' },
+      { id: 'steamboat', label: '🍲 Steamboat (炭火炉档)' },
+      { id: 'wok', label: '🔥 Wok (镬气热炒)' },
+      { id: 'bar', label: '🍵 Bar & Drinks (水吧)' },
+      { id: 'dessert', label: '🍨 Dessert & Cold (甜品凉菜)' }
+    ].map(st => `
+      <button type="button" class="station-tab-btn ${kitchenStation === st.id ? 'active' : ''}" data-station="${st.id}">
+        ${st.label}
+      </button>
+    `).join('')}
+  </div>
+
   <div class="kitchen-board">
     ${['approved', 'preparing', 'ready'].map(s => `<section class="kitchen-lane">
       <h2>
@@ -1623,6 +1709,34 @@ function bindCustomer() {
   document.querySelectorAll('[data-open-bill]').forEach(b => b.onclick = () => openBillDialog());
   $('#open-steamboat-guide')?.addEventListener('click', () => openSteamboatGuide());
   $('#open-mobile-cart')?.addEventListener('click', () => openMobileCart());
+
+  document.querySelectorAll('[data-open-set]').forEach(b => {
+    b.onclick = () => openSetMenuDialog(b.dataset.openSet);
+  });
+  document.querySelectorAll('[data-hurry-dish]').forEach(b => {
+    b.onclick = () => act(() => {
+      const orderId = b.dataset.hurryDish;
+      const itemIdx = +b.dataset.itemIdx;
+      const dishName = b.dataset.dishName;
+      hurryItem(state, table, orderId, itemIdx, dishName);
+      dispatchOp({ type: 'HURRY_ITEM', table, orderId, itemIndex: itemIdx, dishName });
+      toast(`⚡ 催菜提醒已发送厨房：Table ${table} 催促「${dishName}」！`);
+    });
+  });
+  document.querySelectorAll('[data-void-dish]').forEach(b => {
+    b.onclick = () => {
+      openVoidDialog(b.dataset.voidDish, +b.dataset.itemIdx, b.dataset.dishName);
+    };
+  });
+  document.querySelectorAll('[data-fire-held]').forEach(b => {
+    b.onclick = () => act(() => {
+      const orderId = b.dataset.fireHeld;
+      const itemIdx = +b.dataset.itemIdx;
+      fireHeldItem(state, orderId, itemIdx);
+      dispatchOp({ type: 'FIRE_HELD_ITEM', orderId, itemIndex: itemIdx });
+      toast(`🔥 起菜指令已发送！厨房档口立即制作。`);
+    });
+  });
 
   document.querySelectorAll('[data-category]').forEach(b => b.onclick = () => {
     draft = $('#message').value;
@@ -1821,6 +1935,17 @@ function openDish(id) {
         ${uniqueMods.map(mod => `<button type="button" class="mod-chip" data-mod="${esc(mod)}" aria-pressed="false">${esc(mod)}</button>`).join('')}
       </div>
     </div>
+    <div class="timing-selector-row" style="margin: 12px 0;">
+      <span class="modifier-label">Serving Timing · 上菜时机:</span>
+      <div class="timing-chips" style="display:flex;gap:8px;margin-top:6px;">
+        <label class="timing-option-label" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;background:#f5f8f2;padding:6px 10px;border-radius:6px;border:1px solid #dce2d4;cursor:pointer;">
+          <input type="radio" name="timing" value="fire" checked> 🔥 Cook &amp; Serve (即起)
+        </label>
+        <label class="timing-option-label" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;background:#fdfcf8;padding:6px 10px;border-radius:6px;border:1px solid #e5ded0;cursor:pointer;">
+          <input type="radio" name="timing" value="hold"> ⏸️ Hold until requested (叫起)
+        </label>
+      </div>
+    </div>
     <details class="custom-note-details">
       <summary>Other special request for kitchen? (optional)</summary>
       <textarea name="notes" maxlength="160" placeholder="e.g. sauce on side, less salty">${esc(state.preference)}</textarea>
@@ -1865,6 +1990,7 @@ function openDish(id) {
     const form = new FormData(e.target);
     const qty = Number(form.get('qty'));
     const size = form.get('size');
+    const timing = form.get('timing') || 'fire';
     const customNote = String(form.get('notes') || '').trim();
     const combinedNotes = [...selectedMods, ...(customNote ? [customNote] : [])].join(', ');
     if (!Number.isInteger(qty) || qty < 1) return;
@@ -1876,7 +2002,7 @@ function openDish(id) {
       toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
     }
 
-    const existingIndex = tableCart.findIndex(y => y.id === id && y.size === size && y.notes === combinedNotes);
+    const existingIndex = tableCart.findIndex(y => y.id === id && y.size === size && y.notes === combinedNotes && (y.timing || 'fire') === timing);
     try {
       if (existingIndex >= 0) {
         if (qty > 20) throw Error('Maximum 20 of each dish.');
@@ -1888,6 +2014,7 @@ function openDish(id) {
         const newLine = makeLine(id, qty, size, combinedNotes);
         newLine.addedBy = currentGuest.name;
         newLine.guestEmoji = currentGuest.emoji;
+        newLine.timing = timing;
         dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
       }
       updateDockSpeech();
@@ -1903,107 +2030,143 @@ function openBillDialog() {
   const dialog = $('#bill-dialog');
   const renderBillContent = () => {
     const summary = tableSummary(state, table, splitPax);
+    const guests = guestBreakdown(state, table);
+
     dialog.innerHTML = `<div class="bill-modal-body">
       <div class="dialog-top">
-        <span class="eyebrow">HERITAGE TABLE CHECK · 模拟账单</span>
+        <span class="eyebrow">HERITAGE TABLE CHECK · 账单与结算</span>
         <button type="button" class="close-dialog" aria-label="Close bill summary">×</button>
       </div>
-      <h2 id="bill-dialog-title">Table ${table} · Running Bill</h2>
+      <h2 id="bill-dialog-title">Table ${table} · Running Tab</h2>
       <p>All active rounds combined for your table. Amount charged in this demo is always <b>S$0.00</b>.</p>
-      ${summary.activeOrders.length ? `
-        <div class="bill-rounds-list">
-          ${summary.activeOrders.map(o => `<div class="bill-round-block">
-            <div class="bill-round-head">
-              <strong>Round ${o.round || 1} (${o.id})</strong>
-              ${badge(o.status)}
-            </div>
-            <ul>
-              ${o.items.map(x => `<li><span>${x.qty} × ${esc(x.name)} <small>(${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''})</small></span><strong>${money(x.qty * x.unitPrice)}</strong></li>`).join('')}
-            </ul>
-          </div>`).join('')}
-        </div>
-        <div class="bill-totals-box">
-          <div><span>Sample dishes subtotal (${summary.itemCount} items)</span><strong>${money(summary.subtotal)}</strong></div>
-          <div class="muted-line"><span>Illustrative 10% service charge (not billed)</span><span>${money(summary.serviceCharge)}</span></div>
-          <div class="muted-line"><span>Illustrative 9% GST (not billed)</span><span>${money(summary.gst)}</span></div>
-          <div class="muted-line"><span>Illustrative grand total</span><span>${money(summary.grandTotal)}</span></div>
-          <div class="charged-line"><span>Actual demo amount charged</span><strong>S$0.00</strong></div>
-        </div>
-        <div class="bill-split-box">
-          <div class="split-controls">
-            <span class="split-label">${esc(T('splitBy'))}</span>
-            <div class="split-stepper">
-              <button type="button" id="split-pax-minus" aria-label="Decrease diners">−</button>
-              <span id="split-pax-count">${splitPax} diners</span>
-              <button type="button" id="split-pax-plus" aria-label="Increase diners" ${splitPax >= 20 ? 'disabled' : ''}>+</button>
-            </div>
-            <label for="modal-split-pax" class="sr-only">${esc(T('splitBy'))}</label>
-            <select id="modal-split-pax" class="sr-only">
-              ${Array.from({ length: 20 }, (_, i) => `<option value="${i + 1}" ${splitPax === i + 1 ? 'selected' : ''}>${i + 1} diners</option>`).join('')}
-            </select>
+
+      <div class="bill-tabs-nav" role="tablist">
+        <button type="button" class="bill-tab-btn ${billTab === 'split' ? 'active' : ''}" id="tab-split-btn">Split Evenly · 均分 (AA制)</button>
+        <button type="button" class="bill-tab-btn ${billTab === 'items' ? 'active' : ''}" id="tab-items-btn">Pay For My Items · 按人付 (${guests.length} diners)</button>
+      </div>
+
+      ${summary.activeOrders.length ? (
+        billTab === 'split' ? `
+          <div class="bill-rounds-list">
+            ${summary.activeOrders.map(o => `<div class="bill-round-block">
+              <div class="bill-round-head">
+                <strong>Round ${o.round || 1} (${o.id})</strong>
+                ${badge(o.status)}
+              </div>
+              <ul>
+                ${o.items.map(x => `<li class="${x.voided ? 'voided-item' : ''}"><span>${x.qty} × ${esc(x.name)} <small>(${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''})</small></span><strong>${x.voided ? `<del>${money(x.qty * x.unitPrice)}</del>` : money(x.qty * x.unitPrice)}</strong></li>`).join('')}
+              </ul>
+            </div>`).join('')}
           </div>
-          <div class="split-result">
-            <span>Sample dish share: <b>${money(summary.subtotalPerPax)}</b> / pax</span>
-            <small>With illustrative SC & GST: ${money(summary.grandTotalPerPax)} / pax</small>
+          <div class="bill-totals-box">
+            <div><span>Dishes subtotal (${summary.itemCount} items)</span><strong>${money(summary.subtotal)}</strong></div>
+            <div class="muted-line"><span>10% Service Charge</span><span>${money(summary.serviceCharge)}</span></div>
+            <div class="muted-line"><span>9% GST (Inclusive)</span><span>${money(summary.gst)}</span></div>
+            <div class="muted-line"><span>Total amount</span><span>${money(summary.grandTotal)}</span></div>
+            <div class="charged-line"><span>Actual demo amount charged</span><strong>S$0.00</strong></div>
           </div>
-        </div>
-        <div class="sgqr-standee-card">
-          <div class="sgqr-header-strip">
-            <span class="sgqr-brand-tag">SGQR · PAYNOW</span>
-            <span class="sgqr-paynow-emblem">PayNow</span>
-          </div>
-          <div class="sgqr-body-view">
-            <div class="sgqr-qr-wrap">
-              <svg viewBox="0 0 140 140" class="qr-svg" width="130" height="130" aria-label="SGQR PayNow Code">
-                <rect width="140" height="140" rx="6" fill="#fff" stroke="#982226" stroke-width="2"/>
-                <rect x="14" y="14" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
-                <rect x="23" y="23" width="14" height="14" fill="#202422"/>
-                <rect x="94" y="14" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
-                <rect x="103" y="23" width="14" height="14" fill="#202422"/>
-                <rect x="14" y="94" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
-                <rect x="23" y="103" width="14" height="14" fill="#202422"/>
-                <rect x="52" y="52" width="36" height="36" rx="6" fill="#7b1828"/>
-                <text x="70" y="75" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">SGQR</text>
-                <path d="M54 18h6v6h-6zM66 18h8v6h-8zM54 30h12v6H54zM18 54h10v6H18zM34 58h8v8h-8zM94 54h12v6H94zM110 62h10v10h-10zM54 94h8v10h-8zM70 98h10v8H70zM94 94h14v14H94zM102 114h16v8h-16z" fill="#202422"/>
-              </svg>
+          <div class="bill-split-box">
+            <div class="split-controls">
+              <span class="split-label">${esc(T('splitBy'))}</span>
+              <div class="split-stepper">
+                <button type="button" id="split-pax-minus" aria-label="Decrease diners">−</button>
+                <span id="split-pax-count">${splitPax} diners</span>
+                <button type="button" id="split-pax-plus" aria-label="Increase diners" ${splitPax >= 20 ? 'disabled' : ''}>+</button>
+              </div>
+              <label for="modal-split-pax" class="sr-only">${esc(T('splitBy'))}</label>
+              <select id="modal-split-pax" class="sr-only">
+                ${Array.from({ length: 20 }, (_, i) => `<option value="${i + 1}" ${splitPax === i + 1 ? 'selected' : ''}>${i + 1} diners</option>`).join('')}
+              </select>
             </div>
-            <div class="sgqr-details">
-              <div class="sgqr-entity-name">NAN HWA CHONG STEAMBOAT PTE. LTD.</div>
-              <div class="sgqr-uen">UEN: 201619270H</div>
-              <div class="sgqr-ref">Ref: T${table}-R${summary.rounds || 1}</div>
-              <div class="sgqr-amount-pill">Total: ${money(summary.subtotal)} · Demo: S$0.00</div>
+            <div class="split-result">
+              <span>Dish share: <b>${money(summary.subtotalPerPax)}</b> / pax</span>
+              <small>With SC &amp; GST: ${money(summary.grandTotalPerPax)} / pax</small>
             </div>
           </div>
-          <div class="sgqr-action-row">
-            <button type="button" class="sgqr-btn-pay" id="apple-pay-btn">
-              <span>Pay / GPay</span>
-              <small>(1-Tap)</small>
+          <div class="sgqr-standee-card">
+            <div class="sgqr-header-strip">
+              <span class="sgqr-brand-tag">SGQR · PAYNOW</span>
+              <span class="sgqr-paynow-emblem">PayNow</span>
+            </div>
+            <div class="sgqr-body-view">
+              <div class="sgqr-qr-wrap">
+                <svg viewBox="0 0 140 140" class="qr-svg" width="130" height="130" aria-label="SGQR PayNow Code">
+                  <rect width="140" height="140" rx="6" fill="#fff" stroke="#982226" stroke-width="2"/>
+                  <rect x="14" y="14" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
+                  <rect x="23" y="23" width="14" height="14" fill="#202422"/>
+                  <rect x="94" y="14" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
+                  <rect x="103" y="23" width="14" height="14" fill="#202422"/>
+                  <rect x="14" y="94" width="32" height="32" fill="none" stroke="#202422" stroke-width="7"/>
+                  <rect x="23" y="103" width="14" height="14" fill="#202422"/>
+                  <rect x="52" y="52" width="36" height="36" rx="6" fill="#7b1828"/>
+                  <text x="70" y="75" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">SGQR</text>
+                  <path d="M54 18h6v6h-6zM66 18h8v6h-8zM54 30h12v6H54zM18 54h10v6H18zM34 58h8v8h-8zM94 54h12v6H94zM110 62h10v10h-10zM54 94h8v10h-8zM70 98h10v8H70zM94 94h14v14H94zM102 114h16v8h-16z" fill="#202422"/>
+                </svg>
+              </div>
+              <div class="sgqr-details">
+                <div class="sgqr-entity-name">NAN HWA CHONG STEAMBOAT PTE. LTD.</div>
+                <div class="sgqr-uen">UEN: 201619270H</div>
+                <div class="sgqr-ref">Ref: T${table}-SPLIT-${splitPax}PAX</div>
+                <div class="sgqr-amount-pill">Exact PayNow: ${money(summary.grandTotalPerPax)} / pax</div>
+              </div>
+            </div>
+            <div class="sgqr-action-row">
+              <button type="button" class="sgqr-btn-pay" id="apple-pay-btn">
+                <span>Pay / GPay</span>
+                <small>(1-Tap)</small>
+              </button>
+              <button type="button" class="sgqr-btn-save" id="save-sgqr-btn">
+                <span>📸 Save SGQR</span>
+              </button>
+            </div>
+          </div>
+          <div class="pay-share-row">
+            <button type="button" class="pay-share-btn" id="pay-my-share-btn">
+              <span>💳 ${esc(T('payShare'))} · ${money(summary.grandTotalPerPax)}</span>
+              <small>Simulated 1-tap checkout</small>
             </button>
-            <button type="button" class="sgqr-btn-save" id="save-sgqr-btn">
-              <span>📸 Save SGQR</span>
+            <button type="button" class="share-bill-btn" id="share-bill-btn">
+              <span>${esc(T('shareBill'))}</span>
             </button>
           </div>
-        </div>
-        <div class="pay-share-row">
-          <button type="button" class="pay-share-btn" id="pay-my-share-btn">
-            <span>💳 ${esc(T('payShare'))} · ${money(summary.grandTotalPerPax)}</span>
-            <small>Simulated 1-tap checkout (Apple Pay / Google Pay style)</small>
-          </button>
-          <button type="button" class="share-bill-btn" id="share-bill-btn">
-            <span>${esc(T('shareBill'))}</span>
-          </button>
-        </div>
-        <div class="dialog-actions">
-          ${summary.activeOrders.some(o => o.status === 'served' && !o.paid)
-            ? `<button type="button" id="settle-table-btn" class="primary wide">Simulate receipt for served rounds · S$0.00</button>`
-            : summary.allPaid
-              ? `<p class="receipt wide">Demo receipt complete · Amount charged S$0.00</p>`
-              : `<p class="muted">Once kitchen marks your rounds as Served, you can generate a simulated S$0.00 receipt here.</p>`}
-        </div>
-      ` : `<div class="cart-empty"><div>🧾</div><h3>No submitted rounds for Table ${table} yet.</h3><p>Add dishes to your cart and send them to staff first.</p></div>`}
+        ` : `
+          <div class="guest-bill-list">
+            ${guests.map(g => `
+              <div class="guest-bill-card">
+                <div class="guest-bill-head">
+                  <strong>${g.emoji} ${esc(g.guestName)}</strong>
+                  <span style="font-weight:700;color:var(--brand-red)">${money(g.grandTotal)}</span>
+                </div>
+                <div class="guest-bill-items">
+                  ${g.items.map(it => `<div>${it.qty} × ${esc(it.name)} (${money(it.qty * it.unitPrice)})</div>`).join('')}
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:10px;border-top:1px dashed #e1e7db;padding-top:6px;">
+                  <span>Incl. 10% SC &amp; 9% GST</span>
+                  <button type="button" class="mini-btn fire" data-pay-guest="${esc(g.guestName)}" data-amount="${g.grandTotal}">PayNow ${money(g.grandTotal)} →</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `
+      ) : `<div class="cart-empty"><div>🧾</div><h3>No submitted rounds for Table ${table} yet.</h3><p>Add dishes to your cart and send them to staff first.</p></div>`}
+
+      <div class="bill-modal-actions" style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+        ${summary.activeOrders.length ? `<button type="button" class="secondary wide" id="open-e-receipt-btn">🧾 View Official GST E-Receipt (查看电子发票) →</button>` : ''}
+      </div>
     </div>`;
 
     dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+    dialog.querySelector('#tab-split-btn')?.addEventListener('click', () => { billTab = 'split'; renderBillContent(); });
+    dialog.querySelector('#tab-items-btn')?.addEventListener('click', () => { billTab = 'items'; renderBillContent(); });
+    dialog.querySelector('#open-e-receipt-btn')?.addEventListener('click', () => {
+      closeTopLayer(dialog);
+      openEReceiptDialog();
+    });
+    dialog.querySelectorAll('[data-pay-guest]').forEach(b => b.onclick = () => {
+      triggerOrderAnimation();
+      hapticPulse();
+      toast(`Simulated PayNow payment of ${money(+b.dataset.amount)} received for ${b.dataset.payGuest}. Thank you!`);
+    });
     dialog.querySelector('#split-pax-minus')?.addEventListener('click', () => {
       if (splitPax > 1) {
         splitPax--;
@@ -2054,6 +2217,212 @@ function openBillDialog() {
   };
   renderBillContent();
   dialog.showModal();
+}
+
+function openEReceiptDialog() {
+  const dialog = $('#e-receipt-dialog');
+  if (!dialog) return;
+  const rc = getEReceipt(state, table, splitPax);
+
+  dialog.innerHTML = `
+    <div class="e-receipt-wrap">
+      <div class="dialog-top">
+        <span class="eyebrow">OFFICIAL TAX INVOICE · 正式结账单</span>
+        <button type="button" class="close-dialog" aria-label="Close receipt">×</button>
+      </div>
+      <div class="e-receipt-header">
+        <h3>${rc.merchant.name}</h3>
+        <p>${rc.merchant.cn}</p>
+        <p>${rc.merchant.address} · Tel: ${rc.merchant.phone}</p>
+        <p>GST Reg No: ${rc.merchant.gstReg} · Co Reg: ${rc.merchant.regNo}</p>
+      </div>
+      <div class="e-receipt-meta">
+        <div>
+          <div><strong>Receipt:</strong> ${rc.receiptNo}</div>
+          <div><strong>Table:</strong> Table ${rc.table} (${rc.pax} Diners)</div>
+        </div>
+        <div style="text-align:right">
+          <div><strong>Date:</strong> ${rc.dateTime}</div>
+          <div><strong>POS / Station:</strong> POS-01 (KDS Auto)</div>
+        </div>
+      </div>
+      <table class="e-receipt-lines">
+        <thead>
+          <tr>
+            <th>Item &amp; Specifications</th>
+            <th style="text-align:center">Qty</th>
+            <th style="text-align:right">Price</th>
+            <th style="text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rc.items.map(it => `
+            <tr>
+              <td><b>${esc(it.name)}</b><br><small>${esc(it.size)}${it.notes ? ' · ' + esc(it.notes) : ''}</small></td>
+              <td style="text-align:center">${it.qty}</td>
+              <td style="text-align:right">${money(it.unitPrice)}</td>
+              <td style="text-align:right">${money(it.qty * it.unitPrice)}</td>
+            </tr>
+          `).join('')}
+          ${rc.voidedItems.length ? rc.voidedItems.map(it => `
+            <tr style="color:#888;text-decoration:line-through">
+              <td>${esc(it.name)} (${esc(it.voidReason || 'Voided')})</td>
+              <td style="text-align:center">${it.qty}</td>
+              <td style="text-align:right">${money(it.unitPrice)}</td>
+              <td style="text-align:right">S$0.00</td>
+            </tr>
+          `).join('') : ''}
+        </tbody>
+      </table>
+      <div class="e-receipt-totals">
+        <div><span>Subtotal:</span><span>${money(rc.subtotal)}</span></div>
+        <div><span>10% Service Charge:</span><span>${money(rc.serviceCharge)}</span></div>
+        <div><span>9% GST (Inclusive):</span><span>${money(rc.gst)}</span></div>
+        <div class="grand-total"><span>Total Amount Paid:</span><span>${money(rc.grandTotal)}</span></div>
+      </div>
+      <div class="e-receipt-stamp">PAID · 结账完成</div>
+      <div class="dialog-actions" style="margin-top:16px">
+        <button type="button" class="secondary" id="print-receipt-btn">🖨️ Save PDF / Print</button>
+        <button type="button" class="primary" id="settle-and-close-btn">🔒 Close &amp; Free Table</button>
+      </div>
+    </div>
+  `;
+
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#print-receipt-btn')?.addEventListener('click', () => {
+    toast('PDF e-receipt generated and saved to device photos.');
+  });
+  dialog.querySelector('#settle-and-close-btn')?.addEventListener('click', () => {
+    dispatchOp({ type: 'CLOSE_TABLE', table });
+    closeTopLayer(dialog);
+    toast(`Table ${table} session closed and table released.`);
+  });
+}
+
+function openVoidDialog(orderId, itemIndex, dishName) {
+  const dialog = $('#void-dialog');
+  if (!dialog) return;
+
+  dialog.innerHTML = `
+    <div class="void-modal-body" style="padding:10px 4px">
+      <div class="dialog-top">
+        <span class="eyebrow">VOID REQUEST · 退菜申请</span>
+        <button type="button" class="close-dialog" aria-label="Close void modal">×</button>
+      </div>
+      <div style="text-align:center;margin:10px 0 16px;">
+        <div style="font-size:36px;margin-bottom:8px">❌</div>
+        <h2>Cancel ${esc(dishName)}?</h2>
+        <p style="font-size:12px;color:var(--muted)">Select reason for voiding this unserved dish. The kitchen ticket will be updated immediately.</p>
+      </div>
+      <form id="void-reason-form">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:8px 10px;background:#f7f9f4;border-radius:6px;border:1px solid #dce2d4;cursor:pointer;">
+            <input type="radio" name="void_reason" value="Wait too long (等候时间过长)" checked> 等候时间过长 (Wait too long)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:8px 10px;background:#f7f9f4;border-radius:6px;border:1px solid #dce2d4;cursor:pointer;">
+            <input type="radio" name="void_reason" value="Ordered by mistake (顾客点错菜品)"> 顾客点错菜品 (Ordered by mistake)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:8px 10px;background:#f7f9f4;border-radius:6px;border:1px solid #dce2d4;cursor:pointer;">
+            <input type="radio" name="void_reason" value="Guest leaving in hurry (赶时间需离开)"> 赶时间需离开 (Guest leaving in hurry)
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" id="cancel-void-btn">Keep Dish</button>
+          <button type="submit" class="primary" style="background:#8f342c;border-color:#8f342c">Confirm Void (确认退菜)</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#cancel-void-btn').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#void-reason-form').onsubmit = e => {
+    e.preventDefault();
+    const reason = new FormData(e.target).get('void_reason');
+    dispatchOp({ type: 'VOID_ITEM', table, id: orderId, lineIndex: itemIndex, reason });
+    closeTopLayer(dialog);
+    toast(`Dish ${dishName} voided and removed from bill.`);
+  };
+}
+
+function openSetMenuDialog(setId) {
+  const dialog = $('#set-menu-dialog');
+  if (!dialog) return;
+  const sm = SET_MENUS.find(s => s.id === setId);
+  if (!sm) return;
+
+  dialog.innerHTML = `
+    <div class="set-modal-body" style="padding:14px">
+      <div class="dialog-top">
+        <span class="eyebrow">TEOCHEW SET BANQUET · 精选套餐</span>
+        <button type="button" class="close-dialog" aria-label="Close set modal">×</button>
+      </div>
+      <div style="margin:10px 0 14px">
+        <span class="set-menu-pax">👥 ${sm.pax} PAX · ${esc(sm.cn)}</span>
+        <h2 style="font-size:18px;margin:4px 0">${esc(sm.name)}</h2>
+        <p style="font-size:11px;color:var(--muted);line-height:1.5">${esc(sm.desc)}</p>
+      </div>
+      <form id="set-menu-form">
+        <div class="set-slots-container">
+          ${sm.slots.map((slot, sIdx) => `
+            <div class="set-slot-group">
+              <span class="set-slot-title">SLOT 0${sIdx + 1} · ${esc(slot.name)}</span>
+              <div class="set-slot-options">
+                ${slot.options.map((opt, oIdx) => `
+                  <label class="set-option-label">
+                    <input type="radio" name="slot_${sIdx}" value="${opt.id}" ${oIdx === 0 ? 'checked' : ''} data-price-diff="${opt.priceDiff}">
+                    <span>${esc(opt.name)}</span>
+                    ${opt.priceDiff ? `<small style="margin-left:auto;color:var(--brand-red)">+${money(opt.priceDiff)}</small>` : ''}
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="background:#f8faf5;border:1px dashed #dce2d4;border-radius:8px;padding:10px;margin-bottom:14px;font-size:11px">
+          <strong>Included Fixed Items (包含主食与茶水):</strong>
+          <ul style="margin:6px 0 0 16px;padding:0;color:var(--muted)">
+            ${sm.fixedItems.map(f => `<li>${f.qty} × ${esc(f.name)} (${esc(f.size)})</li>`).join('')}
+          </ul>
+        </div>
+        <button type="submit" class="primary wide" id="confirm-add-set-btn">
+          Add Entire Set to Table Cart · ${money(sm.price)} →
+        </button>
+      </form>
+    </div>
+  `;
+
+  dialog.showModal();
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#set-menu-form').onsubmit = e => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const chosenLines = [];
+
+    sm.slots.forEach((slot, sIdx) => {
+      const chosenId = form.get(`slot_${sIdx}`);
+      const opt = slot.options.find(o => o.id === chosenId);
+      if (opt) {
+        const line = makeLine(opt.id, 1, 'Regular', `Set Menu: ${sm.name}`);
+        line.addedBy = currentGuest.name;
+        line.guestEmoji = currentGuest.emoji;
+        chosenLines.push(line);
+      }
+    });
+
+    sm.fixedItems.forEach(f => {
+      const line = makeLine(f.id, f.qty, f.size || 'Regular', `Set Menu: ${sm.name}`);
+      line.addedBy = currentGuest.name;
+      line.guestEmoji = currentGuest.emoji;
+      chosenLines.push(line);
+    });
+
+    dispatchOp({ type: 'ADD_LINES', table, lines: chosenLines });
+    closeTopLayer(dialog);
+    toast(`🍱 ${sm.name} added to Table ${table} shared cart!`);
+  };
 }
 
 function triggerOrderAnimation() {
@@ -2474,6 +2843,31 @@ function bindOperations() {
     if (call) call.done = true;
     toast('Simulated server request acknowledged.');
   }));
+  document.querySelectorAll('[data-station]').forEach(b => {
+    b.onclick = () => {
+      kitchenStation = b.dataset.station;
+      render();
+    };
+  });
+  document.querySelectorAll('[data-fire-held]').forEach(b => {
+    b.onclick = () => act(() => {
+      const orderId = b.dataset.fireHeld;
+      const itemIdx = +b.dataset.itemIdx;
+      fireHeldItem(state, orderId, itemIdx);
+      dispatchOp({ type: 'FIRE_HELD_ITEM', orderId, itemIndex: itemIdx });
+      toast('🔥 起菜指令已更新！档口开始制作。');
+    });
+  });
+  document.querySelectorAll('[data-close-table]').forEach(b => {
+    b.onclick = () => {
+      const tbl = b.dataset.closeTable;
+      if (confirm(`Reset and close Table ${tbl}? This clears active table session and marks orders finished.`)) {
+        closeTableSession(state, tbl);
+        dispatchOp({ type: 'CLOSE_TABLE', table: tbl });
+        toast(`Table ${tbl} session closed and cleared.`);
+      }
+    };
+  });
 }
 
 window.addEventListener('storage', event => {
