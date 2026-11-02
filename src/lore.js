@@ -101,22 +101,49 @@ export const STORY_CARDS = [
   }
 ];
 
-export const SCARCITY_BADGES = {
-  pomfret: '🔥 Ordered by 42 tables today',
-  grouper: '⚡ Only 4 fresh portions left!',
-  snapper: '🐟 Morning dock catch',
-  'song-fish-head': '🍲 Teochew classic favorite',
-  chicken: '👑 98% reordered today',
-  pork: '🔥 Wok-hei signature',
-  ribs: '✨ Crispy golden glaze',
-  tofu: '🥢 Hand-crafted daily',
-  kang: '🌶️ Fresh wok-flamed',
-  egg: '🦪 Fresh oyster sizzle',
-  tango: '🥬 Sweet seasonal harvest',
-  yam: '🍠 Traditional crisp-simmer',
-  'prawn-paste': '🦐 100% Tiger prawn meat',
-  rice: '🍚 Fragrant Jasmine rice'
-};
+export function computeDishBadge(dishId, state) {
+  if (!state) return '';
+  const isSoldOut = state.unavailable?.includes(dishId);
+  if (isSoldOut) return '';
+  
+  // Real orders count across all table orders today in state
+  const totalOrderedQty = (state.orders || []).flatMap(o => (o.items || []).filter(x => x.id === dishId)).reduce((sum, x) => sum + x.qty, 0);
+  
+  if (totalOrderedQty >= 5) {
+    return `🔥 Ordered ${totalOrderedQty}× today`;
+  } else if (totalOrderedQty >= 2) {
+    return `✨ Popular pick (${totalOrderedQty} ordered)`;
+  }
+  
+  // Real culinary prep & heritage tags
+  const heritageBadges = {
+    pomfret: '👑 Traditional Choice',
+    'pomfret-steamboat': '👑 Traditional Choice',
+    grouper: '⚡ Low-fat Tender Grouper',
+    'grouper-steamboat': '⚡ Low-fat Tender Grouper',
+    snapper: '🐟 Rich Collagen Broth',
+    'red-snapper-steamboat': '🐟 Rich Collagen Broth',
+    'song-fish-head': '🍲 Century-old Heritage',
+    'fish-head-steamboat': '🍲 Century-old Heritage',
+    chicken: '👑 Fermented Prawn Paste',
+    'prawn-paste-chicken': '👑 Fermented Prawn Paste',
+    pork: '🔥 Nam Yu Red Beancurd',
+    'sweet-and-sour-pork': '🔥 Nam Yu Red Beancurd',
+    ribs: '✨ Crispy Golden Glaze',
+    tofu: '🥢 Handmade Egg Tofu',
+    'signature-tofu': '🥢 Handmade Egg Tofu',
+    kang: '🌶️ Wok-hei Sambal',
+    'sambal-kangkong': '🌶️ Wok-hei Sambal',
+    egg: '🦪 Sizzling Oyster Omelette',
+    'fried-oyster-omelette': '🦪 Sizzling Oyster Omelette',
+    tango: '🥬 Sweet Tang Oh Greens',
+    yam: '🍠 Golden Fried Taro',
+    'prawn-paste': '🦐 100% Tiger Prawn Meat',
+    'fresh-prawn-paste-for-steamboat': '🦐 100% Tiger Prawn Meat',
+    rice: '🍚 Fragrant Jasmine Rice'
+  };
+  return heritageBadges[dishId] || '';
+}
 
 export const GUEST_PERSONAS = [
   { name: 'Kopi Uncle', emoji: '☕' },

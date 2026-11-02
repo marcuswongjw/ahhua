@@ -1,12 +1,13 @@
 import {
   menu, money, dish, initialState, total, makeLine, addLines, submit, transition,
-  chat, configureRecommendation, serviceTypes, requestService, tableSummary, settleTable, toggleOrderItem
+  chat, configureRecommendation, serviceTypes, requestService, tableSummary, settleTable, toggleOrderItem,
+  getTableSession, applyOp
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
 import { languages, normaliseLanguage, replyText, uiText, plannerMessage, dishName, categoryName } from './languages.js';
 import {
-  QUICK_CHIPS, LORE_ANSWERS, STORY_CARDS, SCARCITY_BADGES, GUEST_PERSONAS, POPULAR_MODIFIERS
+  QUICK_CHIPS, LORE_ANSWERS, STORY_CARDS, computeDishBadge, GUEST_PERSONAS, POPULAR_MODIFIERS
 } from './lore.js';
 
 const $ = s => document.querySelector(s);
@@ -82,7 +83,7 @@ function hapticPulse() {
     try { navigator.vibrate(12); } catch {}
   }
 }
-const count = () => state.cart.reduce((n, x) => n + x.qty, 0);
+const count = () => getTableSession(state, table).cart.reduce((n, x) => n + x.qty, 0);
 
 // Modern Web Guidance: Top-layer discrete display transition probe & light-dismiss fallback
 let supportsDisplayTransition;
@@ -148,10 +149,16 @@ function wireDialog(dialog) {
 // Hybrid live sync: BroadcastChannel + localStorage + Server-Sent Events (/api/events)
 const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('ah-hua-demo-sync') : null;
 channel?.addEventListener('message', event => {
-  if (event.data?.senderId !== clientId && event.data?.state?.version === 1) {
-    draft = $('#message')?.value || draft;
-    state = event.data.state;
-    render();
+  if (event.data?.senderId !== clientId) {
+    if (event.data?.op) {
+      applyOp(state, event.data.op);
+      try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+      render();
+    } else if (event.data?.state?.version === 1) {
+      draft = $('#message')?.value || draft;
+      state = event.data.state;
+      render();
+    }
   }
 });
 
@@ -164,6 +171,26 @@ function pushServerState() {
   }).catch(() => {});
 }
 
+function dispatchOp(op) {
+  try {
+    applyOp(state, op);
+    try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+    channel?.postMessage({ senderId: clientId, op, state });
+    if (syncMode === 'live') {
+      fetch('/api/op', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op, senderId: clientId })
+      }).catch(() => {
+        pushServerState();
+      });
+    }
+    render();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 function connectLiveSync() {
   if (typeof EventSource !== 'function') return;
   try {
@@ -174,8 +201,8 @@ function connectLiveSync() {
         syncMode = 'live';
         connectedPeers = packet.clients || 1;
         if (packet.senderId === 'init') {
-          const localHasActivity = state.orders.length || state.cart.length || state.calls.length || state.messages.length > 1;
-          const serverHasActivity = packet.state?.orders?.length || packet.state?.cart?.length || packet.state?.calls?.length;
+          const localHasActivity = state.orders.length || state.cart.length || Object.values(state.sessions || {}).some(s => s.cart?.length) || state.calls.length || state.messages.length > 1;
+          const serverHasActivity = packet.state?.orders?.length || packet.state?.cart?.length || Object.values(packet.state?.sessions || {}).some(s => s.cart?.length) || packet.state?.calls?.length;
           if (serverHasActivity && !localHasActivity) {
             state = packet.state;
             try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
@@ -190,11 +217,17 @@ function connectLiveSync() {
           if (pill) pill.textContent = `● Live sync (${connectedPeers} ${connectedPeers === 1 ? 'screen' : 'screens'})`;
           return;
         }
-        if (packet.senderId !== clientId && packet.state?.version === 1) {
-          draft = $('#message')?.value || draft;
-          state = packet.state;
-          try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
-          render();
+        if (packet.senderId !== clientId) {
+          if (packet.op) {
+            applyOp(state, packet.op);
+            try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+            render();
+          } else if (packet.state?.version === 1) {
+            draft = $('#message')?.value || draft;
+            state = packet.state;
+            try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+            render();
+          }
         }
       } catch {}
     };
@@ -253,6 +286,7 @@ function send(text, displayText = text) {
     state.messages.push({ role: 'customer', text: String(displayText).slice(0, 500) });
     const response = chat(text, state);
     state.proposal = response.lines;
+    getTableSession(state, table).proposal = response.lines;
     reply(response.text);
     state.messages = state.messages.slice(-80);
     draft = '';
@@ -334,6 +368,74 @@ function orderLines(order, interactiveKitchen = false) {
   }).join('');
 }
 
+let pendingRole = null;
+
+function isStaffAuthenticated() {
+  try {
+    return sessionStorage.getItem('ahhua-staff-auth') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function openStaffPinDialog(targetRole) {
+  pendingRole = targetRole;
+  const dialog = $('#staff-pin-dialog');
+  if (!dialog) return;
+
+  dialog.innerHTML = `
+    <div class="pin-modal-body">
+      <div class="dialog-top">
+        <span class="eyebrow">SECURITY ACCESS · 权限验证</span>
+        <button type="button" class="close-dialog" aria-label="Close PIN modal">×</button>
+      </div>
+      <div class="pin-header">
+        <div class="pin-icon">🔒</div>
+        <h2 id="staff-pin-title">Floor Staff &amp; Kitchen PIN</h2>
+        <p>Enter the 4-digit Floor Staff PIN to access order approvals, kitchen tickets, and table management.</p>
+        <div class="pin-hint-tag">Floor PIN: <strong>1927</strong> (Heritage Est. 1927)</div>
+      </div>
+      <form id="staff-pin-form" class="pin-form">
+        <div class="pin-input-wrap">
+          <input type="password" id="staff-pin-input" pattern="[0-9]*" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" autofocus required aria-label="Staff 4-digit PIN">
+        </div>
+        <div id="pin-error" class="pin-error-msg" hidden>Incorrect PIN. Please use 1927.</div>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" id="cancel-pin-btn">Cancel</button>
+          <button type="submit" class="primary" id="submit-pin-btn">Verify PIN →</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  dialog.showModal();
+  const input = dialog.querySelector('#staff-pin-input');
+  setTimeout(() => input?.focus(), 50);
+
+  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+  dialog.querySelector('#cancel-pin-btn').onclick = () => closeTopLayer(dialog);
+
+  dialog.querySelector('#staff-pin-form').onsubmit = e => {
+    e.preventDefault();
+    const entered = input.value.trim();
+    if (entered === '1927') {
+      try { sessionStorage.setItem('ahhua-staff-auth', 'true'); } catch {}
+      closeTopLayer(dialog);
+      role = pendingRole || 'staff';
+      render();
+      toast('Staff credentials verified. Welcome, floor team.');
+    } else {
+      const err = dialog.querySelector('#pin-error');
+      if (err) err.hidden = false;
+      input.value = '';
+      input.focus();
+      input.classList.add('pin-shake');
+      setTimeout(() => input.classList.remove('pin-shake'), 500);
+      toast('Incorrect staff PIN. Please try 1927.');
+    }
+  };
+}
+
 function render() {
   const prevScrollY = window.scrollY;
   state.replyLanguage = normaliseLanguage(state.replyLanguage);
@@ -371,15 +473,15 @@ function render() {
     <button type="button" class="reset" data-action="reset">Reset demo</button>
   </nav>
   <main>${role === 'customer' ? customer() : role === 'staff' ? staff() : kitchen()}</main>
-  ${role === 'customer' && state.cart.length ? `
+  ${role === 'customer' && getTableSession(state, table).cart.length ? `
     <aside class="floating-order-bar" aria-label="Table order summary">
       <button type="button" class="floating-cart-btn" id="open-mobile-cart" aria-label="Review cart with ${count()} items">
         <span class="floating-cart-badge">🛒 ${count()} items</span>
-        <span class="floating-cart-total">${money(total(state.cart))}</span>
+        <span class="floating-cart-total">${money(total(getTableSession(state, table).cart))}</span>
         <span class="floating-cart-label">${esc(T('reviewOrder'))} →</span>
       </button>
     </aside>
-    <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(state.cart))} →</strong></a>
+    <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(getTableSession(state, table).cart))} →</strong></a>
   ` : ''}
   <footer><span class="footer-mark">南</span> Nan Hwa Chong (南华昌) Fish Head Steamboat Corner · Traditional Teochew Taste Since 1927 <span>North Bridge Road &amp; Jalan Sultan · Singapore</span></footer>
   <dialog id="dish-dialog" closedby="any" aria-labelledby="dish-dialog-title"></dialog>
@@ -391,6 +493,7 @@ function render() {
   <dialog id="mobile-cart-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="mobile-cart-dialog-title"></dialog>
   <dialog id="ah-hua-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="ah-hua-dialog-title"></dialog>
   <dialog id="cart-check-dialog" closedby="any" aria-labelledby="cart-check-dialog-title"></dialog>
+  <dialog id="staff-pin-dialog" closedby="any" aria-labelledby="staff-pin-title"></dialog>
   <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
     <form method="dialog">
       <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -402,12 +505,19 @@ function render() {
     </form>
   </dialog>`;
 
-  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#staff-pin-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
+    const targetRole = b.dataset.role;
+    if (targetRole === 'staff' || targetRole === 'kitchen') {
+      if (!isStaffAuthenticated()) {
+        openStaffPinDialog(targetRole);
+        return;
+      }
+    }
     draft = $('#message')?.value || draft;
     stopVoice();
-    role = b.dataset.role;
+    role = targetRole;
     render();
   }));
   document.querySelectorAll('[data-action="call"]').forEach(b => b.addEventListener('click', () => openServiceModal()));
@@ -482,7 +592,7 @@ function updateDockSpeech() {
   if (activeOrders.length) {
     const o = activeOrders[activeOrders.length - 1];
     dockSpeechText = `Round ${o.round || 1} is cooking (~12m)! Tap me for heritage story & service →`;
-  } else if (state.cart.length) {
+  } else if (getTableSession(state, table).cart.length) {
     dockSpeechText = `Table ${table} · ${count()} items in cart! Looking delicious!`;
   } else {
     dockSpeechText = `Table ${table}? Our charcoal steamboat is simmering fresh—1 pot is great to share!`;
@@ -570,11 +680,20 @@ function checkCartRules(cartItems) {
 }
 
 function executeOrderSubmission() {
+  const tableCart = getTableSession(state, table).cart;
+  if (!tableCart.length) {
+    toast('Your cart is empty. Please select dishes first.');
+    return;
+  }
   let order;
-  act(() => {
+  try {
     order = submit(state, table);
     reply(localReply('submitted', { id: order.id }));
-  });
+    dispatchOp({ type: 'SUBMIT_ORDER', table });
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
   if (order) {
     customerGear = 'stage';
     updateDockSpeech();
@@ -586,7 +705,8 @@ function executeOrderSubmission() {
 }
 
 function handleOrderSubmit() {
-  const check = checkCartRules(state.cart);
+  const tableCart = getTableSession(state, table).cart;
+  const check = checkCartRules(tableCart);
   if (check) {
     openCartCheckDialog(check);
   } else {
@@ -621,15 +741,17 @@ function openCartCheckDialog(check) {
   dialog.showModal();
   dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
   dialog.querySelector('#cart-check-accept-btn').onclick = () => {
-    act(() => {
-      addLines(state, [{
+    dispatchOp({
+      type: 'ADD_LINES',
+      table,
+      lines: [{
         id: check.dishId,
         qty: check.suggestQty,
         size: 'Regular',
         notes: 'Added via Ah Hua recommendation',
         addedBy: currentGuest.name,
         guestEmoji: currentGuest.emoji
-      }]);
+      }]
     });
     closeTopLayer(dialog);
     executeOrderSubmission();
@@ -943,7 +1065,9 @@ function openAhHuaDialog() {
       }
     };
     dialog.querySelector('#sheet-accept-proposal')?.addEventListener('click', () => act(() => {
-      addLines(state, state.proposal);
+      const prop = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+      addLines(state, prop, table);
+      getTableSession(state, table).proposal = [];
       state.proposal = [];
       reply(localReply('added'));
       renderContent();
@@ -961,6 +1085,7 @@ function openAhHuaDialog() {
 
 function customer() {
   const summary = tableSummary(state, table, splitPax);
+  const tableCart = getTableSession(state, table).cart;
   if (customerGear === 'stage') {
     return renderCenterStage(summary);
   }
@@ -1020,7 +1145,7 @@ function customer() {
     <div class="spotlight-scroll">
       ${menu.filter(d => (d.popularity || 0) >= 90).map(d => {
         const soldOut = state.unavailable.includes(d.id);
-        const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
+        const inCartQty = tableCart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
         return `<div class="spotlight-card ${inCartQty ? 'in-cart' : ''}">
           ${d.image ? `<img class="spotlight-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span class="spotlight-icon">${d.icon}</span>`}
           <div class="spotlight-info">
@@ -1127,10 +1252,10 @@ function customer() {
         <div class="menu-grid">
           ${shown.map(d => {
             const soldOut = state.unavailable.includes(d.id);
-            const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
+            const inCartQty = tableCart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
             const tableOrders = state.orders.filter(o => o.table === table);
             const tableOrderedQty = tableOrders.flatMap(o => o.items.filter(x => x.id === d.id)).reduce((n, x) => n + x.qty, 0);
-            const scarcityBadge = SCARCITY_BADGES[d.id];
+            const scarcityBadge = computeDishBadge(d.id, state);
             return `<article class="dish-card ${soldOut ? 'sold-out' : ''} ${inCartQty ? 'in-cart' : ''}">
               <div class="dish-art ${d.id} ${d.image ? 'has-photo' : ''}">
                 ${d.image ? `<img class="dish-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
@@ -1193,6 +1318,7 @@ function customer() {
 function cart(summary) {
   const orders = state.orders.filter(x => x.table === table).slice().reverse();
   const nextRound = summary.rounds + 1;
+  const tableCart = getTableSession(state, table).cart;
   return `<aside class="cart-column" id="table-cart">
     <section class="cart-card">
       <div class="cart-title">
@@ -1203,7 +1329,7 @@ function cart(summary) {
         <span class="cart-count">${count()}</span>
       </div>
       <div class="cart-body">
-        ${state.cart.length ? state.cart.map((x, i) => `<div class="cart-line">
+        ${tableCart.length ? tableCart.map((x, i) => `<div class="cart-line">
           <div>
             <h3>${esc(x.name)}</h3>
             <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
@@ -1224,7 +1350,7 @@ function cart(summary) {
           <p>${summary.rounds ? 'Add extra rice, steamboat sides or drinks anytime during your meal.' : 'Add a favourite from the menu,<br>or let Ah Hua help you choose.'}</p>
         </div>`}
       </div>
-      ${state.cart.length ? `<div class="cart-upsell">
+      ${tableCart.length ? `<div class="cart-upsell">
         <span>Complete the table:</span>
         <div class="upsell-chips">
           ${!state.unavailable.includes('rice') ? `<button type="button" data-quick-add="rice">+1 Rice (${money(150)})</button>` : ''}
@@ -1233,9 +1359,9 @@ function cart(summary) {
         </div>
       </div>` : ''}
       <div class="cart-summary">
-        <div><span>Round ${nextRound} subtotal</span><strong>${money(total(state.cart))}</strong></div>
+        <div><span>Round ${nextRound} subtotal</span><strong>${money(total(tableCart))}</strong></div>
         <p>Staff review every round before the kitchen starts.</p>
-        <button type="button" id="submit-order" class="primary wide" ${state.cart.length ? '' : 'disabled'}>Send to staff <span>→</span></button>
+        <button type="button" id="submit-order" class="primary wide" ${tableCart.length ? '' : 'disabled'}>Send to staff <span>→</span></button>
         <small class="safe-note">◇ Demo only. No payment required.</small>
       </div>
     </section>
@@ -1300,7 +1426,10 @@ function staff() {
       <h1>The service desk.</h1>
       <p>Monitor all 20 tables, respond to soup/tea requests, and review each order before it enters the kitchen.</p>
     </div>
-    <span class="ops-badge">STAFF SIMULATION · No sign-in needed</span>
+    <div class="ops-actions-top">
+      <span class="ops-badge">STAFF MODE · Authenticated</span>
+      <button type="button" class="secondary small" id="lock-staff-btn" title="Exit and lock staff access">🔒 Lock & Exit</button>
+    </div>
   </section>
 
   <section class="floor-map-panel" aria-label="Restaurant floor map">
@@ -1400,7 +1529,10 @@ function kitchen() {
       <h1>Behind the pass.</h1>
       <p>Approved orders, a warm charcoal wok, and dish-by-dish plating check-offs.</p>
     </div>
-    <span class="ops-badge">KITCHEN SIMULATION</span>
+    <div class="ops-actions-top">
+      <span class="ops-badge">KITCHEN KDS · Authenticated</span>
+      <button type="button" class="secondary small" id="lock-kitchen-btn" title="Exit and lock kitchen access">🔒 Lock & Exit</button>
+    </div>
   </section>
 
   <section class="kds-summary-bar" aria-label="Active kitchen production totals">
@@ -1515,9 +1647,10 @@ function bindCustomer() {
     render();
     $('#search')?.focus();
   });
-  document.querySelectorAll('[data-quick-add]').forEach(b => b.onclick = () => act(() => {
+  document.querySelectorAll('[data-quick-add]').forEach(b => b.onclick = () => {
     const d = dish(b.dataset.quickAdd);
-    const isDuplicate = state.cart.some(y => y.id === d.id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === d.id));
+    const tableCart = getTableSession(state, table).cart;
+    const isDuplicate = tableCart.some(y => y.id === d.id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === d.id));
     if (isDuplicate) {
       dockSpeechText = `Eh! Someone at Table ${table} already added ${d.name}! Another portion or sharing?`;
       toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
@@ -1525,51 +1658,52 @@ function bindCustomer() {
     const newLine = makeLine(d.id, 1, 'Regular', state.preference);
     newLine.addedBy = currentGuest.name;
     newLine.guestEmoji = currentGuest.emoji;
-    addLines(state, [newLine]);
+    dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
     updateDockSpeech();
     toast(`${currentGuest.emoji} ${currentGuest.name} added ${d.name} to shared cart.`);
-  }));
+  });
   document.querySelectorAll('[data-card-qty]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     const id = b.dataset.cardQty;
     const delta = +b.dataset.delta;
-    act(() => {
-      if (delta > 0) {
-        const newLine = makeLine(id, 1, 'Regular', state.preference);
-        newLine.addedBy = currentGuest.name;
-        newLine.guestEmoji = currentGuest.emoji;
-        addLines(state, [newLine]);
-        toast(`Added 1 ${dish(id).name} to cart.`);
-      } else {
-        const targetIdx = state.cart.map(x => x.id).lastIndexOf(id);
-        if (targetIdx >= 0) {
-          state.cart[targetIdx].qty--;
-          if (state.cart[targetIdx].qty <= 0) state.cart.splice(targetIdx, 1);
-          toast(`Removed 1 ${dish(id).name} from cart.`);
-        }
+    const tableCart = getTableSession(state, table).cart;
+    if (delta > 0) {
+      const newLine = makeLine(id, 1, 'Regular', state.preference);
+      newLine.addedBy = currentGuest.name;
+      newLine.guestEmoji = currentGuest.emoji;
+      dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
+      toast(`Added 1 ${dish(id).name} to cart.`);
+    } else {
+      const targetIdx = tableCart.map(x => x.id).lastIndexOf(id);
+      if (targetIdx >= 0) {
+        dispatchOp({ type: 'UPDATE_QTY', table, lineIndex: targetIdx, delta: -1 });
+        toast(`Removed 1 ${dish(id).name} from cart.`);
       }
-      updateDockSpeech();
-    });
+    }
+    updateDockSpeech();
   });
   document.querySelectorAll('[data-dish]').forEach(b => b.onclick = () => openDish(b.dataset.dish));
-  document.querySelectorAll('[data-qty]').forEach(b => b.onclick = () => act(() => {
-    const line = state.cart[+b.dataset.qty];
-    line.qty += +b.dataset.delta;
-    if (line.qty <= 0) state.cart.splice(+b.dataset.qty, 1);
+  document.querySelectorAll('[data-qty]').forEach(b => b.onclick = () => {
+    dispatchOp({ type: 'UPDATE_QTY', table, lineIndex: +b.dataset.qty, delta: +b.dataset.delta });
     updateDockSpeech();
-  }));
+  });
   $('#accept-proposal')?.addEventListener('click', () => act(() => {
-    addLines(state, state.proposal);
+    const prop = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+    addLines(state, prop, table);
+    getTableSession(state, table).proposal = [];
     state.proposal = [];
     reply(localReply('added'));
     updateDockSpeech();
     toast('Suggestion added to your shared cart.');
   }));
   document.querySelectorAll('[data-remove-proposal]').forEach(b => b.onclick = () => act(() => {
-    state.proposal.splice(+b.dataset.removeProposal, 1);
+    const prop = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+    prop.splice(+b.dataset.removeProposal, 1);
+    state.proposal = prop;
   }));
   $('#cheaper-proposal')?.addEventListener('click', () => {
-    const price = total(state.proposal);
+    const prop = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+    const price = total(prop);
     state.recommendationContext = {
       ...state.recommendationContext,
       budget: Math.max(0, Math.floor(Math.min(price, state.recommendationContext?.budget ?? price) * 0.85 / 100) * 100)
@@ -1581,7 +1715,10 @@ function bindCustomer() {
     $('#meal-planner').open = true;
     $('#planner-pax').focus();
   });
-  $('#dismiss-proposal')?.addEventListener('click', () => act(() => { state.proposal = []; }));
+  $('#dismiss-proposal')?.addEventListener('click', () => act(() => {
+    getTableSession(state, table).proposal = [];
+    state.proposal = [];
+  }));
   if ($('#submit-order')) {
     $('#submit-order').onclick = handleOrderSubmit;
   }
@@ -1606,6 +1743,7 @@ function bindCustomer() {
   document.querySelectorAll('[data-quick-service]').forEach(b => {
     b.onclick = () => act(() => {
       const entry = requestService(state, table, b.dataset.quickService);
+      dispatchOp({ type: 'REQUEST_SERVICE', table, serviceType: b.dataset.quickService });
       toast(`${entry.label} requested for Table ${table}. Floor staff notified!`);
     });
   });
@@ -1731,28 +1869,30 @@ function openDish(id) {
     const combinedNotes = [...selectedMods, ...(customNote ? [customNote] : [])].join(', ');
     if (!Number.isInteger(qty) || qty < 1) return;
 
-    const isDuplicate = state.cart.some(y => y.id === id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === id));
+    const tableCart = getTableSession(state, table).cart;
+    const isDuplicate = tableCart.some(y => y.id === id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === id));
     if (isDuplicate) {
       dockSpeechText = `Eh! Someone at Table ${table} already added ${d.name}! Another portion or sharing?`;
       toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
     }
 
-    const existing = state.cart.find(y => y.id === id && y.size === size && y.notes === combinedNotes);
+    const existingIndex = tableCart.findIndex(y => y.id === id && y.size === size && y.notes === combinedNotes);
     try {
-      if (existing) {
+      if (existingIndex >= 0) {
         if (qty > 20) throw Error('Maximum 20 of each dish.');
-        existing.qty = qty;
+        const delta = qty - tableCart[existingIndex].qty;
+        if (delta !== 0) {
+          dispatchOp({ type: 'UPDATE_QTY', table, lineIndex: existingIndex, delta });
+        }
       } else {
         const newLine = makeLine(id, qty, size, combinedNotes);
         newLine.addedBy = currentGuest.name;
         newLine.guestEmoji = currentGuest.emoji;
-        addLines(state, [newLine]);
+        dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
       }
-      save();
       updateDockSpeech();
       closeTopLayer(dialog);
-      render();
-      toast(existing ? `Updated ${d.name} (${qty}) in cart.` : `${currentGuest.emoji} Added ${d.name} to shared cart.`);
+      toast(existingIndex >= 0 ? `Updated ${d.name} (${qty}) in cart.` : `${currentGuest.emoji} Added ${d.name} to shared cart.`);
     } catch (error) {
       toast(error.message);
     }
@@ -2114,6 +2254,7 @@ function openMobileCart() {
   const summary = tableSummary(state, table, splitPax);
   const nextRound = summary.rounds + 1;
   const renderContent = () => {
+    const tableCart = getTableSession(state, table).cart;
     dialog.innerHTML = `<div class="mobile-cart-body">
       <div class="dialog-top">
         <span class="eyebrow">TABLE ${table} · ROUND ${nextRound}</span>
@@ -2121,7 +2262,7 @@ function openMobileCart() {
       </div>
       <h2 id="mobile-cart-dialog-title">Your Table Order (${count()} items)</h2>
       <div class="cart-body">
-        ${state.cart.length ? state.cart.map((x, i) => `<div class="cart-line">
+        ${tableCart.length ? tableCart.map((x, i) => `<div class="cart-line">
           <div>
             <h3>${esc(x.name)}</h3>
             <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
@@ -2138,7 +2279,7 @@ function openMobileCart() {
           </div>
         </div>`).join('') : `<div class="cart-empty"><div>🥢</div><h3>Your cart is empty</h3><p>Choose your favourite dishes from the menu.</p></div>`}
       </div>
-      ${state.cart.length ? `
+      ${tableCart.length ? `
         <div class="cart-upsell">
           <span>Complete the table:</span>
           <div class="upsell-chips">
@@ -2148,11 +2289,11 @@ function openMobileCart() {
           </div>
         </div>
         <div class="cart-summary">
-          <div><span>Round ${nextRound} subtotal</span><strong>${money(total(state.cart))}</strong></div>
+          <div><span>Round ${nextRound} subtotal</span><strong>${money(total(tableCart))}</strong></div>
           <p>Staff review every round before the kitchen starts cooking.</p>
         </div>
         <div class="cart-actions">
-          <button class="primary wide" id="modal-submit-order" type="button">Send Round ${nextRound} to staff · ${money(total(state.cart))} →</button>
+          <button class="primary wide" id="modal-submit-order" type="button">Send Round ${nextRound} to staff · ${money(total(tableCart))} →</button>
         </div>
       ` : ''}
     </div>`;
@@ -2161,25 +2302,18 @@ function openMobileCart() {
     dialog.querySelectorAll('[data-modal-qty]').forEach(b => b.onclick = () => {
       const idx = +b.dataset.modalQty;
       const delta = +b.dataset.delta;
-      act(() => {
-        state.cart[idx].qty += delta;
-        if (state.cart[idx].qty <= 0) state.cart.splice(idx, 1);
-        updateDockSpeech();
-        renderContent();
-        render();
-      });
+      dispatchOp({ type: 'UPDATE_QTY', table, lineIndex: idx, delta });
+      updateDockSpeech();
+      renderContent();
     });
     dialog.querySelectorAll('[data-modal-quick-add]').forEach(b => b.onclick = () => {
       const d = dish(b.dataset.modalQuickAdd);
-      act(() => {
-        const newLine = makeLine(d.id, 1, 'Regular', state.preference);
-        newLine.addedBy = currentGuest.name;
-        newLine.guestEmoji = currentGuest.emoji;
-        addLines(state, [newLine]);
-        updateDockSpeech();
-        renderContent();
-        render();
-      });
+      const newLine = makeLine(d.id, 1, 'Regular', state.preference);
+      newLine.addedBy = currentGuest.name;
+      newLine.guestEmoji = currentGuest.emoji;
+      dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
+      updateDockSpeech();
+      renderContent();
     });
     dialog.querySelector('#modal-submit-order')?.addEventListener('click', () => {
       closeTopLayer(dialog);
@@ -2299,26 +2433,42 @@ function openSteamboatGuide() {
 }
 
 function bindOperations() {
+  $('#lock-staff-btn')?.addEventListener('click', () => {
+    try { sessionStorage.removeItem('ahhua-staff-auth'); } catch {}
+    role = 'customer';
+    render();
+    toast('Staff mode locked. Switched to customer view.');
+  });
+  $('#lock-kitchen-btn')?.addEventListener('click', () => {
+    try { sessionStorage.removeItem('ahhua-staff-auth'); } catch {}
+    role = 'customer';
+    render();
+    toast('Kitchen mode locked. Switched to customer view.');
+  });
   document.querySelectorAll('[data-floor-table]').forEach(b => b.onclick = () => {
     staffTableFilter = b.dataset.floorTable === staffTableFilter ? 'all' : b.dataset.floorTable;
     render();
   });
-  document.querySelectorAll('[data-status]').forEach(b => b.onclick = () => act(() => {
+  document.querySelectorAll('[data-status]').forEach(b => b.onclick = () => {
     const id = b.dataset.order;
-    if (b.dataset.status === 'approved' && !$(`[data-reviewed="${id}"]`).checked) {
-      throw Error('Review the dishes, notes and prices, then tick the review box.');
+    const status = b.dataset.status;
+    const reason = $(`[data-reason="${id}"]`)?.value || '';
+    if (status === 'approved' && !$(`[data-reviewed="${id}"]`)?.checked) {
+      toast('Review the dishes, notes and prices, then tick the review box.');
+      return;
     }
-    transition(state, id, b.dataset.status, $(`[data-reason="${id}"]`)?.value || '');
-    toast(`${id}: ${statusLabel[b.dataset.status]}`);
-  }));
+    dispatchOp({ type: 'TRANSITION_ORDER', id, status, reason });
+    toast(`${id}: ${statusLabel[status]}`);
+  });
   document.querySelectorAll('[data-check-order]').forEach(b => b.onclick = () => act(() => {
     toggleOrderItem(state, b.dataset.checkOrder, Number(b.dataset.checkItem));
   }));
-  document.querySelectorAll('[data-availability]').forEach(b => b.onchange = () => act(() => {
-    state.unavailable = b.checked
+  document.querySelectorAll('[data-availability]').forEach(b => b.onchange = () => {
+    const next = b.checked
       ? state.unavailable.filter(id => id !== b.dataset.availability)
       : [...new Set([...state.unavailable, b.dataset.availability])];
-  }));
+    dispatchOp({ type: 'SET_UNAVAILABLE', unavailable: next });
+  });
   document.querySelectorAll('[data-resolve]').forEach(b => b.onclick = () => act(() => {
     const call = state.calls.find(c => c.id === b.dataset.resolve);
     if (call) call.done = true;

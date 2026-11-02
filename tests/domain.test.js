@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, makeLine, addLines, chat, total, submit, transition, requestService, tableSummary, settleTable, toggleOrderItem } from '../src/domain.js';
+import {
+  initialState, makeLine, addLines, chat, total, submit, transition,
+  requestService, tableSummary, settleTable, toggleOrderItem,
+  getTableSession, applyOp
+} from '../src/domain.js';
+import { computeDishBadge } from '../src/lore.js';
 import { handleRequest } from '../server.mjs';
 import { EventEmitter } from 'node:events';
 
@@ -117,4 +122,106 @@ test('hybrid live sync server broadcasts state updates across connected clients'
   assert.equal(data.state.cart[0].id, 'calamansi');
   assert.equal(data.state.cart[0].qty, 2);
   sseReq.emit('close');
+});
+
+test('multi-table session isolation separates carts and proposals by tableId', () => {
+  const s = initialState();
+  addLines(s, [makeLine('rice', 2)], '08');
+  addLines(s, [makeLine('chicken', 1)], '12');
+
+  const sess8 = getTableSession(s, '08');
+  const sess12 = getTableSession(s, '12');
+
+  assert.equal(sess8.cart.length, 1);
+  assert.equal(sess8.cart[0].id, 'rice');
+  assert.equal(sess8.cart[0].qty, 2);
+
+  assert.equal(sess12.cart.length, 1);
+  assert.equal(sess12.cart[0].id, 'chicken');
+  assert.equal(sess12.cart[0].qty, 1);
+
+  // Submitting table 08 leaves table 12 intact
+  const order8 = submit(s, '08');
+  assert.equal(order8.table, '08');
+  assert.equal(sess8.cart.length, 0);
+  assert.equal(sess12.cart.length, 1);
+  assert.equal(sess12.cart[0].id, 'chicken');
+});
+
+test('applyOp supports atomic operations without overwriting concurrent sessions', () => {
+  const s = initialState();
+  applyOp(s, { type: 'ADD_LINES', table: '05', lines: [makeLine('tofu', 1)] });
+  const sess5 = getTableSession(s, '05');
+  assert.equal(sess5.cart[0].id, 'tofu');
+  assert.equal(sess5.cart[0].qty, 1);
+
+  // Atomic update qty
+  applyOp(s, { type: 'UPDATE_QTY', table: '05', lineIndex: 0, delta: 2 });
+  assert.equal(sess5.cart[0].qty, 3);
+
+  // Atomic submit order
+  applyOp(s, { type: 'SUBMIT_ORDER', table: '05' });
+  assert.equal(sess5.cart.length, 0);
+  assert.equal(s.orders.length, 1);
+  assert.equal(s.orders[0].table, '05');
+  assert.equal(s.orders[0].items[0].id, 'tofu');
+  assert.equal(s.orders[0].items[0].qty, 3);
+
+  // Atomic transition
+  applyOp(s, { type: 'TRANSITION_ORDER', id: s.orders[0].id, status: 'approved' });
+  assert.equal(s.orders[0].status, 'approved');
+
+  // Atomic service request
+  applyOp(s, { type: 'REQUEST_SERVICE', table: '05', serviceType: 'soup' });
+  assert.equal(s.calls.filter(c => c.table === '05' && c.type === 'soup').length, 1);
+});
+
+test('computeDishBadge dynamically reflects verified order counts or authentic culinary attributes', () => {
+  const s = initialState();
+  // With 0 orders, returns authentic heritage tags
+  const tag = computeDishBadge('grouper-steamboat', s);
+  assert.equal(tag, '⚡ Low-fat Tender Grouper');
+
+  // Add 5 orders of red snapper steamboat
+  s.orders.push({
+    id: 'AH-1001',
+    table: '01',
+    round: 1,
+    status: 'approved',
+    items: [{ id: 'red-snapper-steamboat', qty: 5 }]
+  });
+
+  const liveBadge = computeDishBadge('red-snapper-steamboat', s);
+  assert.equal(liveBadge, '🔥 Ordered 5× today');
+});
+
+test('server /api/op endpoint processes atomic operations with state versioning', async () => {
+  const postReq = Object.assign(new EventEmitter(), { url: '/api/op', method: 'POST', setEncoding() {} });
+  let postStatus = 0;
+  let postBody = '';
+  const postPromise = handleRequest(postReq, {
+    writeHead(code) { postStatus = code; },
+    end(b) { postBody = b; }
+  });
+
+  postReq.emit('data', JSON.stringify({
+    op: { type: 'ADD_LINES', table: '15', lines: [makeLine('rice', 3)] },
+    senderId: 'client-test'
+  }));
+  postReq.emit('end');
+  await postPromise;
+
+  assert.equal(postStatus, 200);
+  const res = JSON.parse(postBody);
+  assert.equal(res.ok, true);
+  assert.ok(res.version >= 1);
+
+  // Check state via GET
+  let getBody = '';
+  await handleRequest({ url: '/api/state', method: 'GET' }, { writeHead() {}, end(b) { getBody = b; } });
+  const data = JSON.parse(getBody);
+  const sess15 = data.state.sessions?.['15'];
+  assert.ok(sess15);
+  assert.equal(sess15.cart[0].id, 'rice');
+  assert.equal(sess15.cart[0].qty, 3);
 });

@@ -1134,3 +1134,69 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
   font-weight: 600;
 }
 
+/* Staff PIN Modal & Lock */
+.pin-modal-body {
+  text-align: center;
+  padding: 10px 4px;
+}
+.pin-header .pin-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+.pin-header h2 {
+  font-size: 20px;
+  margin: 4px 0 8px;
+}
+.pin-header p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 auto 12px;
+  max-width: 320px;
+}
+.pin-hint-tag {
+  display: inline-block;
+  background: #fdf5e6;
+  color: #8b5e1b;
+  border: 1px dashed #e4cda0;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+  margin-bottom: 16px;
+}
+.pin-input-wrap {
+  margin: 12px auto;
+  max-width: 180px;
+}
+.pin-input-wrap input {
+  font-size: 28px;
+  letter-spacing: 12px;
+  text-align: center;
+  padding: 8px 12px;
+  width: 100%;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf5;
+  font-family: monospace;
+}
+.pin-input-wrap input:focus {
+  border-color: var(--brand-red);
+  background: #fff;
+  outline: none;
+}
+.pin-error-msg {
+  color: #c93b2b;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+.pin-shake {
+  animation: shake 0.4s ease-in-out;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+

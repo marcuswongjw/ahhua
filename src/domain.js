@@ -2549,15 +2549,29 @@ export const serviceTypes = {
 };
 export const money = cents => `S$${(cents / 100).toFixed(2)}`;
 export const dish = id => menu.find(x => x.id === id);
-export function initialState() { return { version: 1, replyLanguage: 'en', cart: [], orders: [], calls: [], unavailable: [], messages: [{ role: 'host', text: replyText('en', 'welcome'), language: 'en' }], proposal: [], preference: '' }; }
+export function initialState() { return { version: 1, replyLanguage: 'en', cart: [], orders: [], calls: [], unavailable: [], messages: [{ role: 'host', text: replyText('en', 'welcome'), language: 'en' }], proposal: [], preference: '', sessions: {} }; }
 export function total(items) { return items.reduce((sum, x) => sum + x.qty * x.unitPrice, 0); }
+export function getTableSession(state, tableId) {
+  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [] };
+  if (!state.sessions) state.sessions = {};
+  if (!state.sessions[tableId]) {
+    state.sessions[tableId] = {
+      cart: [],
+      proposal: [],
+      messages: [{ role: 'host', text: replyText(state.replyLanguage || 'en', 'welcome'), language: state.replyLanguage || 'en' }],
+      guests: []
+    };
+  }
+  return state.sessions[tableId];
+}
 export function makeLine(id, qty = 1, size = 'Regular', notes = '') {
   const d = dish(id);
   if (!d || !Number.isInteger(qty) || qty < 1 || qty > 20 || !['Regular', 'Large'].includes(size) || (d.singleSize && size !== 'Regular')) throw Error('Please choose a valid dish, size and quantity (1–20).');
   return { id, name: d.name, size, notes: String(notes).trim().slice(0, 160), qty, unitPrice: d.price + (size === 'Large' ? 800 : 0) };
 }
-export function addLines(state, lines) {
-  const next = structuredClone(state.cart);
+export function addLines(state, lines, tableId = null) {
+  const targetCart = tableId ? getTableSession(state, tableId).cart : (state.cart || []);
+  const next = structuredClone(targetCart);
   for (const raw of lines) {
     if (state.unavailable.includes(raw.id)) throw Error(`${dish(raw.id)?.name || 'Dish'} is unavailable. Please choose another dish.`);
     const x = makeLine(raw.id, raw.qty, raw.size, raw.notes);
@@ -2565,15 +2579,72 @@ export function addLines(state, lines) {
     const existing = next.find(y => y.id === x.id && y.size === x.size && y.notes === x.notes);
     if (existing) { if (existing.qty + x.qty > 20) throw Error('Maximum 20 of each dish.'); existing.qty += x.qty; } else next.push(x);
   }
-  state.cart = next;
+  if (tableId) {
+    getTableSession(state, tableId).cart = next;
+    state.cart = next; // keep root in sync for single-table backwards compat
+  } else {
+    state.cart = next;
+  }
 }
 export function submit(state, table) {
-  if (!state.cart.length) throw Error('Add a dish before sending your order.');
+  const session = table ? getTableSession(state, table) : null;
+  const cartToSubmit = session && session.cart.length ? session.cart : state.cart;
+  if (!cartToSubmit.length) throw Error('Add a dish before sending your order.');
   if (state.orders.filter(x => x.status === 'pending').length >= 20) throw Error('Please review pending orders in Staff first.');
-  for (const x of state.cart) if (state.unavailable.includes(x.id)) throw Error(`${x.name} is now unavailable. Please remove it from your cart.`);
+  for (const x of cartToSubmit) if (state.unavailable.includes(x.id)) throw Error(`${x.name} is now unavailable. Please remove it from your cart.`);
   const tableRound = state.orders.filter(x => x.table === table && x.status !== 'rejected').length + 1;
-  const order = { id: `AH-${String(state.orders.length + 1001)}`, table, round: tableRound, items: structuredClone(state.cart), checkedItems: [], status: 'pending', created: new Date().toISOString(), paid: false, reason: '' };
-  state.orders.push(order); state.cart = []; state.proposal = []; return order;
+  const order = { id: `AH-${String(state.orders.length + 1001)}`, table, round: tableRound, items: structuredClone(cartToSubmit), checkedItems: [], status: 'pending', created: new Date().toISOString(), paid: false, reason: '' };
+  state.orders.push(order);
+  if (session) {
+    session.cart = [];
+    session.proposal = [];
+  }
+  state.cart = [];
+  state.proposal = [];
+  return order;
+}
+
+export function applyOp(state, op) {
+  if (!op || !op.type) return;
+  const { type, table: opTable, lines, lineIndex, delta, id, status, reason, serviceType, note } = op;
+  const session = opTable ? getTableSession(state, opTable) : null;
+  const cart = session ? session.cart : state.cart;
+
+  switch (type) {
+    case 'ADD_LINE':
+    case 'ADD_LINES': {
+      addLines(state, lines || [], opTable);
+      break;
+    }
+    case 'UPDATE_QTY': {
+      if (cart && cart[lineIndex]) {
+        cart[lineIndex].qty += (delta || 0);
+        if (cart[lineIndex].qty <= 0) cart.splice(lineIndex, 1);
+        if (session) state.cart = cart;
+      }
+      break;
+    }
+    case 'SUBMIT_ORDER': {
+      submit(state, opTable);
+      break;
+    }
+    case 'TRANSITION_ORDER': {
+      transition(state, id, status, reason || '');
+      break;
+    }
+    case 'REQUEST_SERVICE': {
+      requestService(state, opTable, serviceType, note);
+      break;
+    }
+    case 'SET_UNAVAILABLE': {
+      if (Array.isArray(op.unavailable)) state.unavailable = op.unavailable;
+      break;
+    }
+    case 'SETTLE_TABLE': {
+      settleTable(state, opTable);
+      break;
+    }
+  }
 }
 const transitions = { pending: ['approved', 'rejected'], approved: ['preparing'], preparing: ['ready'], ready: ['served'] };
 export function transition(state, id, status, reason = '') {
