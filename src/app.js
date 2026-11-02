@@ -4,7 +4,7 @@ import {
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
-import { languages, normaliseLanguage, replyText, uiText, plannerMessage, dishName } from './languages.js';
+import { languages, normaliseLanguage, replyText, uiText, plannerMessage, dishName, categoryName } from './languages.js';
 
 const $ = s => document.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,7 +46,11 @@ const voicePlayer = createVoicePlayer({
 });
 
 const queryTable = new URLSearchParams(location.search).get('table');
+const queryLang = new URLSearchParams(location.search).get('lang');
 let table = /^\d{1,2}$/.test(queryTable || '') && +queryTable > 0 && +queryTable <= 20 ? queryTable.padStart(2, '0') : '08';
+if (queryLang) {
+  state.replyLanguage = normaliseLanguage(queryLang);
+}
 const count = () => state.cart.reduce((n, x) => n + x.qty, 0);
 
 // Modern Web Guidance: Top-layer discrete display transition probe & light-dismiss fallback
@@ -310,8 +314,14 @@ function render() {
   $('#app').innerHTML = `
   <div class="demo-bar"><span class="dot"></span> DEMO EXPERIENCE <span class="demo-detail">Sample menu · No real orders or charges</span></div>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Ah Hua home"><span class="seal">華</span><span>Ah Hua<small>阿华 · TRADITIONAL ZI CHAR & STEAMBOAT</small></span></a>
+    <a class="brand" href="/" aria-label="Ah Hua home"><span class="seal">華</span><span>Ah Hua<small>南华昌 · TRADITIONAL FISH HEAD STEAMBOAT</small></span></a>
     <div class="top-actions">
+      <div class="top-lang-dropdown" aria-label="Language selection · 选择语言">
+        <span class="lang-globe-icon" aria-hidden="true">🌐</span>
+        <select id="top-language-select" aria-label="Select language · 选择语言">
+          ${Object.entries(languages).map(([id, l]) => `<option value="${id}" ${state.replyLanguage === id ? 'selected' : ''}>${l.label}</option>`).join('')}
+        </select>
+      </div>
       <button type="button" class="text-button service-trigger" data-action="call">♧ Call a server</button>
       <button type="button" class="table-pill" data-open-qr="${table}" title="Show Table ${table} QR & details">Table ${table} <span>⊞</span></button>
     </div>
@@ -429,15 +439,28 @@ function customer() {
   const activeTableCalls = state.calls.filter(c => c.table === table && !c.done);
   const summary = tableSummary(state, table, splitPax);
 
-  return `<section class="welcome">
+  return `<section class="quick-lang-banner" aria-label="Language selection · 选择语言">
+    <div class="quick-lang-inner">
+      <span class="quick-lang-title">🌐 ${esc(T('chooseLang'))}:</span>
+      <div class="quick-lang-pills">
+        ${Object.entries(languages).map(([id, l]) => `
+          <button type="button" class="quick-lang-pill ${state.replyLanguage === id ? 'active' : ''}" data-lang-pill="${id}" aria-pressed="${state.replyLanguage === id}">
+            ${l.label}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  </section>
+
+  <section class="welcome">
     <div>
-      <div class="eyebrow">HERITAGE TASTE · MODERN TABLE</div>
-      <h1>Come in. Make yourself at home.</h1>
-      <p>Speak to Ah Hua, plan a sharing feast, or order across multiple rounds with your table.</p>
+      <div class="eyebrow">NAN HWA CHONG HERITAGE · 南华昌百年老字号</div>
+      <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
+      <p>${esc(T('tableSubtitle'))}</p>
     </div>
     <div class="welcome-controls">
       <label class="table-select">TABLE NUMBER
-        <select id="table" aria-label="Table number">${Array.from({ length: 20 }, (_, i) => `<option ${String(i + 1).padStart(2, '0') === table ? 'selected' : ''}>${String(i + 1).padStart(2, '0')}</option>`).join('')}</select>
+        <select id="table" aria-label="Table number">${Array.from({ length: 20 }, (_, i) => `<option value="${String(i + 1).padStart(2, '0')}" ${String(i + 1).padStart(2, '0') === table ? 'selected' : ''}>Table ${String(i + 1).padStart(2, '0')}</option>`).join('')}</select>
       </label>
     </div>
   </section>
@@ -540,7 +563,7 @@ function customer() {
           </div>
           <span class="sample-label">100+ Authentic Dishes & Real Photos</span>
         </div>
-        <search class="menu-tools" aria-label="Filter and search menu">
+        <search class="menu-tools sticky-categories" aria-label="Filter and search menu">
           <div class="categories" aria-label="Menu category">
             ${[
               'All dishes',
@@ -553,19 +576,19 @@ function customer() {
               'Rice & Noodles',
               'Soup',
               'Drinks & Tea'
-            ].map(c => `<button type="button" data-category="${c}" aria-pressed="${category === c}" class="${category === c ? 'active' : ''}">${c}</button>`).join('')}
+            ].map(c => `<button type="button" data-category="${c}" aria-pressed="${category === c}" class="category-pill ${category === c ? 'active' : ''}">${esc(categoryName(state.replyLanguage, c))}</button>`).join('')}
           </div>
           <div class="filter-search-row">
             <div class="dietary-filters" aria-label="Quick menu filters">
               ${[
-                ['all', 'All items'],
-                ['signatures', '👑 ★ Signatures'],
-                ['mild', 'Non-spicy'],
-                ['nopork', 'No pork']
+                ['all', esc(T('filterAll'))],
+                ['signatures', esc(T('filterSignatures'))],
+                ['mild', esc(T('filterMild'))],
+                ['nopork', esc(T('filterNoPork'))]
               ].map(([id, label]) => `<button type="button" class="filter-pill ${menuFilter === id ? 'active' : ''}" data-filter="${id}" aria-pressed="${menuFilter === id}">${label}</button>`).join('')}
             </div>
             <div class="search-wrap">
-              <input id="search" type="search" aria-label="Search dishes" placeholder="Search dishes or 中文…" value="${esc(search)}">
+              <input id="search" type="search" aria-label="Search dishes" placeholder="${state.replyLanguage === 'zh' ? '搜索菜品或拼音…' : 'Search dishes or 中文…'}" value="${esc(search)}">
               ${search ? `<button type="button" id="clear-search" class="clear-search-btn" aria-label="Clear search">×</button>` : ''}
             </div>
           </div>
@@ -880,13 +903,19 @@ function bindCustomer() {
     render();
   };
   $('#mic').onclick = startVoice;
-  $('#reply-language').onchange = e => act(() => {
-    draft = $('#message').value;
+  const switchLanguage = (newLang) => act(() => {
+    draft = $('#message')?.value || '';
     stopVoice();
-    state.replyLanguage = normaliseLanguage(e.target.value);
+    state.replyLanguage = normaliseLanguage(newLang);
+    const url = new URL(location.href);
+    url.searchParams.set('lang', state.replyLanguage);
+    history.replaceState(null, '', url);
     reply(localReply('switched'));
     state.messages = state.messages.slice(-80);
   });
+  $('#top-language-select')?.addEventListener('change', e => switchLanguage(e.target.value));
+  document.querySelectorAll('[data-lang-pill]').forEach(b => b.onclick = () => switchLanguage(b.dataset.langPill));
+  $('#reply-language')?.addEventListener('change', e => switchLanguage(e.target.value));
   $('#speaker').onclick = () => {
     speaking = !speaking;
     updateSpeaker();
@@ -1336,7 +1365,7 @@ function openOrderSuccessDialog(order) {
 
 function openQrDialog(targetTable) {
   const dialog = $('#qr-dialog');
-  const tableUrl = `${location.origin}/?table=${targetTable}`;
+  const tableUrl = `${location.origin}/?table=${targetTable}${state.replyLanguage && state.replyLanguage !== 'en' ? `&lang=${state.replyLanguage}` : ''}`;
   dialog.innerHTML = `<div class="qr-modal-body">
     <div class="dialog-top">
       <span class="eyebrow">TABLE QR & LINK · 桌号二维码</span>
