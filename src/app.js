@@ -51,6 +51,19 @@ let table = /^\d{1,2}$/.test(queryTable || '') && +queryTable > 0 && +queryTable
 if (queryLang) {
   state.replyLanguage = normaliseLanguage(queryLang);
 }
+let largeFont = false;
+try {
+  largeFont = localStorage.getItem('ah-hua-large-font') === 'true';
+} catch {}
+if (largeFont && typeof document !== 'undefined') {
+  document.body?.classList.add('large-text');
+}
+
+function hapticPulse() {
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    try { navigator.vibrate(12); } catch {}
+  }
+}
 const count = () => state.cart.reduce((n, x) => n + x.qty, 0);
 
 // Modern Web Guidance: Top-layer discrete display transition probe & light-dismiss fallback
@@ -322,6 +335,9 @@ function render() {
           ${Object.entries(languages).map(([id, l]) => `<option value="${id}" ${state.replyLanguage === id ? 'selected' : ''}>${l.label}</option>`).join('')}
         </select>
       </div>
+      <button type="button" class="font-toggle-btn ${largeFont ? 'active' : ''}" id="toggle-large-font" aria-label="Toggle large text mode · 大字模式" title="Large text mode for elders · 长辈大字模式">
+        <span class="font-icon" aria-hidden="true">Aa</span><span>${largeFont ? esc(T('standardMode')) : esc(T('elderMode'))}</span>
+      </button>
       <button type="button" class="text-button service-trigger" data-action="call">♧ Call a server</button>
       <button type="button" class="table-pill" data-open-qr="${table}" title="Show Table ${table} QR & details">Table ${table} <span>⊞</span></button>
     </div>
@@ -373,6 +389,14 @@ function render() {
   }));
   document.querySelectorAll('[data-action="call"]').forEach(b => b.addEventListener('click', () => openServiceModal()));
   document.querySelectorAll('[data-open-qr]').forEach(b => b.addEventListener('click', () => openQrDialog(b.dataset.openQr)));
+  $('#toggle-large-font')?.addEventListener('click', () => {
+    hapticPulse();
+    largeFont = !largeFont;
+    try { localStorage.setItem('ah-hua-large-font', String(largeFont)); } catch {}
+    document.body.classList.toggle('large-text', largeFont);
+    render();
+    toast(largeFont ? (state.replyLanguage === 'zh' ? '已开启长辈大字模式' : 'Large text mode enabled for easier reading') : (state.replyLanguage === 'zh' ? '已恢复标准字体' : 'Standard text size restored'));
+  });
   $('[data-action="reset"]').addEventListener('click', () => {
     const d = $('#reset-dialog');
     d.showModal();
@@ -454,7 +478,10 @@ function customer() {
 
   <section class="welcome">
     <div>
-      <div class="eyebrow">NAN HWA CHONG HERITAGE · 南华昌百年老字号</div>
+      <div class="eyebrow-row">
+        <span class="eyebrow">NAN HWA CHONG HERITAGE · 南华昌百年老字号</span>
+        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''}</span>
+      </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>${esc(T('tableSubtitle'))}</p>
     </div>
@@ -597,6 +624,8 @@ function customer() {
           ${shown.map(d => {
             const soldOut = state.unavailable.includes(d.id);
             const inCartQty = state.cart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
+            const tableOrders = state.orders.filter(o => o.table === table);
+            const tableOrderedQty = tableOrders.flatMap(o => o.items.filter(x => x.id === d.id)).reduce((n, x) => n + x.qty, 0);
             return `<article class="dish-card ${soldOut ? 'sold-out' : ''} ${inCartQty ? 'in-cart' : ''}">
               <div class="dish-art ${d.id} ${d.image ? 'has-photo' : ''}">
                 ${d.image ? `<img class="dish-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
@@ -604,6 +633,7 @@ function customer() {
                   ${(d.popularity || 0) >= 95 ? `<span class="dish-badge bestseller" title="Top table favourite">👑 Top Pick</span>` : d.tag ? `<span class="dish-badge tag">${esc(d.tag)}</span>` : ''}
                   ${d.spicyLevel === 1 ? `<span class="dish-badge spice-mild" title="Mild spicy">🌶️ Mild</span>` : d.spicyLevel >= 2 ? `<span class="dish-badge spice-hot" title="Spicy heat">🌶️🌶️ Spicy</span>` : ''}
                   ${d.category === 'Steamboat' && !['grouper', 'pomfret', 'snapper', 'song-fish-head'].includes(d.id) ? `<span class="dish-badge steamboat-side" title="Add to steamboat broth">🍲 Pot Side</span>` : ''}
+                  ${tableOrderedQty ? `<span class="dish-badge prev-ordered" title="Already ordered by Table ${table}">✓ ${tableOrderedQty} ${esc(T('orderedBadge'))}</span>` : ''}
                 </div>
                 ${inCartQty ? `<b class="in-cart-badge">${inCartQty} in cart</b>` : ''}
               </div>
@@ -612,6 +642,7 @@ function customer() {
                   <small>${d.cn}</small>
                   <span class="dish-category-tag">${esc(d.category)}</span>
                 </div>
+                ${tableOrderedQty ? `<div class="ordered-table-indicator" role="status">✓ Table ${table} already ordered ${tableOrderedQty} in earlier round</div>` : ''}
                 <h3>${esc(dishName(state.replyLanguage, d))}</h3>
                 <p>${esc(d.desc)}</p>
                 ${d.modifiers?.length ? `<div class="modifier-preview">${d.modifiers.slice(0, 2).map(m => `<span>${esc(m)}</span>`).join('')}</div>` : ''}
@@ -1198,6 +1229,9 @@ function openBillDialog() {
             <span>💳 ${esc(T('payShare'))} · ${money(summary.grandTotalPerPax)}</span>
             <small>Simulated 1-tap checkout (Apple Pay / Google Pay style)</small>
           </button>
+          <button type="button" class="share-bill-btn" id="share-bill-btn">
+            <span>${esc(T('shareBill'))}</span>
+          </button>
         </div>
         <div class="dialog-actions">
           ${summary.activeOrders.some(o => o.status === 'served' && !o.paid)
@@ -1231,7 +1265,17 @@ function openBillDialog() {
     });
     dialog.querySelector('#pay-my-share-btn')?.addEventListener('click', () => {
       triggerOrderAnimation();
+      hapticPulse();
       toast(`Simulated payment of ${money(summary.grandTotalPerPax)} received for your share. Thank you!`);
+    });
+    dialog.querySelector('#share-bill-btn')?.addEventListener('click', () => {
+      hapticPulse();
+      const text = formatBillShareText(summary, table, splitPax);
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        navigator.share({ title: `Nan Hwa Chong Table ${table} Bill`, text }).catch(() => copyBillText(text));
+      } else {
+        copyBillText(text);
+      }
     });
     dialog.querySelector('#settle-table-btn')?.addEventListener('click', () => {
       act(() => { settleTable(state, table); });
@@ -1260,6 +1304,34 @@ function triggerOrderAnimation() {
   }
   document.body.appendChild(container);
   setTimeout(() => container.remove(), 2600);
+}
+
+function copyBillText(text) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      toast(T('copiedBill'));
+    }).catch(() => {
+      prompt('Copy table bill summary:', text);
+    });
+  } else {
+    prompt('Copy table bill summary:', text);
+  }
+}
+
+function formatBillShareText(summary, tableNum, pax) {
+  const roundsText = summary.activeOrders.map(o => {
+    const items = o.items.map(x => `  • ${x.qty}× ${x.name} (${money(x.qty * x.unitPrice)})`).join('\n');
+    return `Round ${o.round || 1} (${o.id}):\n${items}`;
+  }).join('\n\n');
+  return `🍲 Nan Hwa Chong (南华昌) · Table ${tableNum} Bill
+──────────────────────────
+${roundsText}
+──────────────────────────
+Dishes Subtotal: ${money(summary.subtotal)}
+Illustrative Grand Total: ${money(summary.grandTotal)}
+Split for ${pax} diners: ${money(summary.grandTotalPerPax)} / pax
+(PayNow / PayLah to table host!)
+* Demo Experience: S$0.00 charged`;
 }
 
 function openServiceModal() {

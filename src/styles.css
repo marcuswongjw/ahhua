@@ -4,6 +4,10 @@
 .top-lang-dropdown select{border:0;background:transparent;padding:2px 2px;font-size:11px;font-weight:600;color:var(--green);cursor:pointer}
 .top-lang-dropdown select:focus-visible{outline:none}
 .lang-globe-icon{font-size:13px;line-height:1}
+.font-toggle-btn{display:flex;align-items:center;gap:4px;background:#edf3e6;border:1px solid #d2dec7;border-radius:6px;padding:4px 9px;color:var(--green);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.font-toggle-btn:hover{background:#dfe9d5}
+.font-toggle-btn.active{background:var(--green);color:#fff;border-color:var(--green)}
+.font-icon{font-weight:700;font-size:12px}
 
 /* Top Quick Language Banner (Customer Perspective Priority) */
 .quick-lang-banner{background:#edf3e6;border:1px solid #d4e0cb;border-radius:10px;padding:11px 16px;margin-bottom:20px;display:flex;align-items:center;box-shadow:0 2px 8px #173f350a}
@@ -253,6 +257,31 @@
 .qr-standee{margin:16px 0;padding:20px;border:1px solid #dce2d4;border-radius:12px;background:#fafbf6;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
 .qr-svg{width:140px;height:140px}
 .qr-standee code{font-size:10px;background:#edf1e7;padding:5px 9px;border-radius:5px;word-break:break-all}
+
+.share-bill-btn{width:100%;background:#fff;border:1.5px solid #25d366;color:#128c7e;border-radius:9px;padding:12px 16px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background .15s;margin-top:8px}
+.share-bill-btn:hover{background:#f0faf3}
+
+.dish-badge.prev-ordered{background:#2a5a48;color:#fff}
+.ordered-table-indicator{font-size:10px;font-weight:600;color:#2a5a48;background:#e9f2eb;border:1px solid #c8ded0;border-radius:5px;padding:3px 7px;margin:6px 0 4px;display:inline-block}
+
+.eyebrow-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.eyebrow-row .eyebrow{margin-bottom:0}
+.table-peer-chip{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;color:#3f624e;background:#e7f0e3;border:1px solid #cfded0;border-radius:12px;padding:2px 8px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#4e845f;display:inline-block;animation:pulse-dot 2s infinite ease-in-out}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
+
+/* Senior / Elder Large Text Accessibility Mode */
+body.large-text{font-size:112%}
+body.large-text .brand{font-size:32px}
+body.large-text .welcome h1{font-size:46px}
+body.large-text .dish-info h3{font-size:15px}
+body.large-text .dish-info p{font-size:11px;line-height:1.6}
+body.large-text .dish-bottom strong{font-size:15px}
+body.large-text .card-stepper-btn{width:34px;height:34px;font-size:16px}
+body.large-text .quick-lang-pill{font-size:12px;padding:7px 14px}
+body.large-text .category-pill{font-size:12px;padding:10px 14px}
+body.large-text .service-chip{font-size:12px;padding:9px 14px}
+body.large-text .message{font-size:14px}
 
 /* Top-layer dialog animations per modern-web-guidance */
 dialog{opacity:0;transform:scale(.95);transition-property:opacity,transform,display,overlay;transition-duration:.22s;transition-timing-function:ease-out;transition-behavior:allow-discrete}
