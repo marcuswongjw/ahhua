@@ -1761,6 +1761,225 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
   cursor: pointer;
 }
 
+/* ====================================================================
+   COMPREHENSIVE MOBILE OPTIMIZATIONS (Smartphones <= 768px)
+   ==================================================================== */
+@media (max-width: 768px) {
+  /* Prevent horizontal scroll & viewport shift */
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
+  /* 1. iOS Safari Auto-Zoom Prevention: Ensure 16px font on all inputs */
+  input, select, textarea,
+  #search, #message,
+  .table-select select,
+  .modal-stepper input,
+  .bill-coupon-bar select,
+  #member-signup-form input,
+  #banquet-booking-form input,
+  #banquet-booking-form select,
+  #review-comment-input {
+    font-size: 16px !important;
+  }
+
+  /* 2. Responsive App Top-Bar: Sticky, clean, no overflowing */
+  .topbar {
+    height: auto !important;
+    min-height: 54px;
+    padding: 8px 14px !important;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgba(251, 249, 244, 0.98);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .brand {
+    font-size: 17px !important;
+    gap: 7px !important;
+    flex-shrink: 0;
+  }
+  .brand small {
+    display: none !important;
+  }
+  .seal {
+    width: 32px !important;
+    height: 34px !important;
+    font-size: 20px !important;
+  }
+  .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 65%;
+    padding: 2px 0;
+    flex-shrink: 1;
+  }
+  .top-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .top-lang-dropdown {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+  .member-top-pill, .banquet-top-pill {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+  .font-toggle-btn {
+    padding: 4px 7px !important;
+  }
+  .font-toggle-btn span:not(.font-icon) {
+    display: none !important;
+  }
+  .service-trigger {
+    padding: 4px 7px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+  .table-pill {
+    display: inline-flex !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  /* 3. Sticky Category Navigation Rail */
+  .categories {
+    position: sticky;
+    top: 54px;
+    z-index: 25;
+    background: rgba(251, 249, 244, 0.96);
+    backdrop-filter: blur(10px);
+    padding: 8px 12px 10px;
+    margin: 0 -14px 10px;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-bottom: 1px solid rgba(228, 222, 211, 0.6);
+  }
+  .categories::-webkit-scrollbar {
+    display: none;
+  }
+  .categories button {
+    padding: 7px 12px !important;
+    font-size: 11px !important;
+    border-radius: 20px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* 4. Native Bottom Sheet Dialogs with Drag Bar */
+  dialog.bottom-sheet-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: auto 0 0 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 90vh !important;
+    padding: 0 0 max(16px, env(safe-area-inset-bottom)) 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25) !important;
+  }
+  dialog.bottom-sheet-dialog::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: #d1d5db;
+    margin: 8px auto 4px;
+  }
+
+  /* Sticky Bottom Action Buttons in Sheets */
+  .dialog-actions,
+  .cart-check-actions {
+    position: sticky;
+    bottom: 0;
+    background: rgba(253, 253, 248, 0.96);
+    backdrop-filter: blur(8px);
+    padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+    margin: 14px -14px -10px -14px !important;
+    border-top: 1px solid #e5e9df;
+    z-index: 10;
+  }
+
+  /* 5. Touch Target Enhancements (44px minimum) */
+  .modal-stepper button {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 20px !important;
+    touch-action: manipulation;
+  }
+  .split-stepper button {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 18px !important;
+    touch-action: manipulation;
+  }
+  .quick-add-btn {
+    min-height: 36px !important;
+    min-width: 36px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    touch-action: manipulation;
+  }
+  .set-option-label {
+    min-height: 44px;
+    padding: 10px 12px !important;
+  }
+
+  /* 6. Two-Column Fast-Scan Menu Grid */
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .dish-art {
+    height: 110px !important;
+  }
+  .dish-info {
+    padding: 10px 8px !important;
+  }
+  .dish-info h3 {
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+  }
+  .dish-info p {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 28px !important;
+    font-size: 10px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* 7. Safe Area Inset Support for Floating Cart & Dock */
+  .floating-order-bar {
+    bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    left: 12px !important;
+    right: 12px !important;
+  }
+  body:has(.floating-order-bar) {
+    padding-bottom: calc(75px + env(safe-area-inset-bottom)) !important;
+  }
+  body:has(.floating-order-bar) .ah-hua-floating-dock {
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 65px) !important;
+  }
+}
+
+
 
 
 
