@@ -324,13 +324,24 @@ function render() {
     <button type="button" class="reset" data-action="reset">Reset demo</button>
   </nav>
   <main>${role === 'customer' ? customer() : role === 'staff' ? staff() : kitchen()}</main>
-  ${role === 'customer' && state.cart.length ? `<a class="mobile-cart-link" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(state.cart))} →</strong></a>` : ''}
+  ${role === 'customer' && state.cart.length ? `
+    <aside class="floating-order-bar" aria-label="Table order summary">
+      <button type="button" class="floating-cart-btn" id="open-mobile-cart" aria-label="Review cart with ${count()} items">
+        <span class="floating-cart-badge">🛒 ${count()} items</span>
+        <span class="floating-cart-total">${money(total(state.cart))}</span>
+        <span class="floating-cart-label">${esc(T('reviewOrder'))} →</span>
+      </button>
+    </aside>
+    <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(state.cart))} →</strong></a>
+  ` : ''}
   <footer><span class="footer-mark">華</span> A little warmth. A good meal. <span>Independent concept demo · Not an official restaurant ordering service</span></footer>
   <dialog id="dish-dialog" closedby="any" aria-labelledby="dish-dialog-title"></dialog>
   <dialog id="bill-dialog" closedby="any" aria-labelledby="bill-dialog-title"></dialog>
   <dialog id="service-dialog" closedby="any" aria-labelledby="service-dialog-title"></dialog>
   <dialog id="order-success-dialog" closedby="any" aria-labelledby="order-success-dialog-title"></dialog>
   <dialog id="qr-dialog" closedby="any" aria-labelledby="qr-dialog-title"></dialog>
+  <dialog id="steamboat-guide-dialog" closedby="any" aria-labelledby="steamboat-guide-title"></dialog>
+  <dialog id="mobile-cart-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="mobile-cart-dialog-title"></dialog>
   <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
     <form method="dialog">
       <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -342,7 +353,7 @@ function render() {
     </form>
   </dialog>`;
 
-  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     draft = $('#message')?.value || draft;
@@ -437,6 +448,7 @@ function customer() {
       <strong>Need a top-up or extra bowls?</strong>
     </div>
     <div class="service-buttons">
+      <button type="button" class="service-chip guide-chip" id="open-steamboat-guide">${esc(T('potGuide'))}</button>
       <button type="button" class="service-chip" data-service="soup">${esc(T('soupRefill'))}</button>
       <button type="button" class="service-chip" data-service="tea">${esc(T('teaRefill'))}</button>
       <button type="button" class="service-chip" data-service="bowls">${esc(T('extraBowls'))}</button>
@@ -547,12 +559,15 @@ function customer() {
             <div class="dietary-filters" aria-label="Quick menu filters">
               ${[
                 ['all', 'All items'],
-                ['signatures', '★ Signatures'],
+                ['signatures', '👑 ★ Signatures'],
                 ['mild', 'Non-spicy'],
                 ['nopork', 'No pork']
               ].map(([id, label]) => `<button type="button" class="filter-pill ${menuFilter === id ? 'active' : ''}" data-filter="${id}" aria-pressed="${menuFilter === id}">${label}</button>`).join('')}
             </div>
-            <input id="search" type="search" aria-label="Search dishes" placeholder="Search dishes or 中文…" value="${esc(search)}">
+            <div class="search-wrap">
+              <input id="search" type="search" aria-label="Search dishes" placeholder="Search dishes or 中文…" value="${esc(search)}">
+              ${search ? `<button type="button" id="clear-search" class="clear-search-btn" aria-label="Clear search">×</button>` : ''}
+            </div>
           </div>
         </search>
         <div class="menu-grid">
@@ -562,7 +577,11 @@ function customer() {
             return `<article class="dish-card ${soldOut ? 'sold-out' : ''} ${inCartQty ? 'in-cart' : ''}">
               <div class="dish-art ${d.id} ${d.image ? 'has-photo' : ''}">
                 ${d.image ? `<img class="dish-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
-                ${d.tag ? `<em>${esc(d.tag)}</em>` : ''}
+                <div class="dish-badges-overlay">
+                  ${(d.popularity || 0) >= 95 ? `<span class="dish-badge bestseller" title="Top table favourite">👑 Top Pick</span>` : d.tag ? `<span class="dish-badge tag">${esc(d.tag)}</span>` : ''}
+                  ${d.spicyLevel === 1 ? `<span class="dish-badge spice-mild" title="Mild spicy">🌶️ Mild</span>` : d.spicyLevel >= 2 ? `<span class="dish-badge spice-hot" title="Spicy heat">🌶️🌶️ Spicy</span>` : ''}
+                  ${d.category === 'Steamboat' && !['grouper', 'pomfret', 'snapper', 'song-fish-head'].includes(d.id) ? `<span class="dish-badge steamboat-side" title="Add to steamboat broth">🍲 Pot Side</span>` : ''}
+                </div>
                 ${inCartQty ? `<b class="in-cart-badge">${inCartQty} in cart</b>` : ''}
               </div>
               <div class="dish-info">
@@ -576,8 +595,17 @@ function customer() {
                 <div class="dish-bottom">
                   <strong>${money(d.price)} <small>${d.singleSize ? (d.id === 'rice' ? '/ bowl' : '') : 'from'}</small></strong>
                   <div class="dish-card-actions">
-                    ${!soldOut ? `<button type="button" class="quick-add-btn" data-quick-add="${d.id}" aria-label="Quick add 1 ${esc(d.name)}">${esc(T('quickAdd'))}</button>` : ''}
-                    <button type="button" class="add-dish" data-dish="${d.id}" ${soldOut ? 'disabled' : ''} aria-label="${soldOut ? 'Unavailable' : 'Customise'} ${esc(d.name)}">${soldOut ? 'Sold out' : '+'}</button>
+                    ${!soldOut ? (inCartQty > 0 ? `
+                      <div class="card-stepper" aria-label="Quantity of ${esc(d.name)} in cart">
+                        <button type="button" class="card-stepper-btn minus" data-card-qty="${d.id}" data-delta="-1" aria-label="Decrease ${esc(d.name)}">−</button>
+                        <span class="card-stepper-val" aria-live="polite">${inCartQty}</span>
+                        <button type="button" class="card-stepper-btn plus" data-card-qty="${d.id}" data-delta="1" aria-label="Increase ${esc(d.name)}" ${inCartQty >= 20 ? 'disabled' : ''}>+</button>
+                      </div>
+                      <button type="button" class="card-customise-btn" data-dish="${d.id}" aria-label="Customise flavours or size for ${esc(d.name)}" title="Options">⚙️</button>
+                    ` : `
+                      <button type="button" class="quick-add-btn" data-quick-add="${d.id}" aria-label="Quick add 1 ${esc(d.name)}">+1 Add</button>
+                      <button type="button" class="add-dish" data-dish="${d.id}" aria-label="Customise ${esc(d.name)}">+</button>
+                    `) : `<span class="sold-out-pill">Sold out</span>`}
                   </div>
                 </div>
               </div>
@@ -885,6 +913,8 @@ function bindCustomer() {
   }));
   document.querySelectorAll('[data-service-more]').forEach(b => b.onclick = () => openServiceModal());
   document.querySelectorAll('[data-open-bill]').forEach(b => b.onclick = () => openBillDialog());
+  $('#open-steamboat-guide')?.addEventListener('click', () => openSteamboatGuide());
+  $('#open-mobile-cart')?.addEventListener('click', () => openMobileCart());
 
   document.querySelectorAll('[data-category]').forEach(b => b.onclick = () => {
     draft = $('#message').value;
@@ -904,11 +934,34 @@ function bindCustomer() {
     input?.focus();
     try { input?.setSelectionRange(start, start); } catch {}
   };
+  $('#clear-search')?.addEventListener('click', () => {
+    search = '';
+    render();
+    $('#search')?.focus();
+  });
   document.querySelectorAll('[data-quick-add]').forEach(b => b.onclick = () => act(() => {
     const d = dish(b.dataset.quickAdd);
     addLines(state, [makeLine(d.id, 1, 'Regular', state.preference)]);
     toast(`${d.name} added to your cart.`);
   }));
+  document.querySelectorAll('[data-card-qty]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const id = b.dataset.cardQty;
+    const delta = +b.dataset.delta;
+    act(() => {
+      if (delta > 0) {
+        addLines(state, [makeLine(id, 1, 'Regular', state.preference)]);
+        toast(`Added 1 ${dish(id).name} to cart.`);
+      } else {
+        const targetIdx = state.cart.map(x => x.id).lastIndexOf(id);
+        if (targetIdx >= 0) {
+          state.cart[targetIdx].qty--;
+          if (state.cart[targetIdx].qty <= 0) state.cart.splice(targetIdx, 1);
+          toast(`Removed 1 ${dish(id).name} from cart.`);
+        }
+      }
+    });
+  });
   document.querySelectorAll('[data-dish]').forEach(b => b.onclick = () => openDish(b.dataset.dish));
   document.querySelectorAll('[data-qty]').forEach(b => b.onclick = () => act(() => {
     const line = state.cart[+b.dataset.qty];
@@ -1094,15 +1147,28 @@ function openBillDialog() {
           <div class="charged-line"><span>Actual demo amount charged</span><strong>S$0.00</strong></div>
         </div>
         <div class="bill-split-box">
-          <label for="modal-split-pax">${esc(T('splitBy'))}
-            <select id="modal-split-pax">
-              ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${splitPax === i + 1 ? 'selected' : ''}>${i + 1} diners</option>`).join('')}
+          <div class="split-controls">
+            <span class="split-label">${esc(T('splitBy'))}</span>
+            <div class="split-stepper">
+              <button type="button" id="split-pax-minus" aria-label="Decrease diners">−</button>
+              <span id="split-pax-count">${splitPax} diners</span>
+              <button type="button" id="split-pax-plus" aria-label="Increase diners" ${splitPax >= 20 ? 'disabled' : ''}>+</button>
+            </div>
+            <label for="modal-split-pax" class="sr-only">${esc(T('splitBy'))}</label>
+            <select id="modal-split-pax" class="sr-only">
+              ${Array.from({ length: 20 }, (_, i) => `<option value="${i + 1}" ${splitPax === i + 1 ? 'selected' : ''}>${i + 1} diners</option>`).join('')}
             </select>
-          </label>
+          </div>
           <div class="split-result">
             <span>Sample dish share: <b>${money(summary.subtotalPerPax)}</b> / pax</span>
             <small>With illustrative SC & GST: ${money(summary.grandTotalPerPax)} / pax</small>
           </div>
+        </div>
+        <div class="pay-share-row">
+          <button type="button" class="pay-share-btn" id="pay-my-share-btn">
+            <span>💳 ${esc(T('payShare'))} · ${money(summary.grandTotalPerPax)}</span>
+            <small>Simulated 1-tap checkout (Apple Pay / Google Pay style)</small>
+          </button>
         </div>
         <div class="dialog-actions">
           ${summary.activeOrders.some(o => o.status === 'served' && !o.paid)
@@ -1115,10 +1181,28 @@ function openBillDialog() {
     </div>`;
 
     dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+    dialog.querySelector('#split-pax-minus')?.addEventListener('click', () => {
+      if (splitPax > 1) {
+        splitPax--;
+        renderBillContent();
+        render();
+      }
+    });
+    dialog.querySelector('#split-pax-plus')?.addEventListener('click', () => {
+      if (splitPax < 20) {
+        splitPax++;
+        renderBillContent();
+        render();
+      }
+    });
     dialog.querySelector('#modal-split-pax')?.addEventListener('change', e => {
       splitPax = Number(e.target.value) || 4;
       renderBillContent();
       render();
+    });
+    dialog.querySelector('#pay-my-share-btn')?.addEventListener('click', () => {
+      triggerOrderAnimation();
+      toast(`Simulated payment of ${money(summary.grandTotalPerPax)} received for your share. Thank you!`);
     });
     dialog.querySelector('#settle-table-btn')?.addEventListener('click', () => {
       act(() => { settleTable(state, table); });
@@ -1292,6 +1376,195 @@ function openQrDialog(targetTable) {
     render();
     toast(`Switched to Table ${table}.`);
   };
+}
+
+function openMobileCart() {
+  const dialog = $('#mobile-cart-dialog');
+  if (!dialog) return;
+  const summary = tableSummary(state, table, splitPax);
+  const nextRound = summary.rounds + 1;
+  const renderContent = () => {
+    dialog.innerHTML = `<div class="mobile-cart-body">
+      <div class="dialog-top">
+        <span class="eyebrow">TABLE ${table} · ROUND ${nextRound}</span>
+        <button type="button" class="close-dialog" aria-label="Close cart">×</button>
+      </div>
+      <h2 id="mobile-cart-dialog-title">Your Table Order (${count()} items)</h2>
+      <div class="cart-body">
+        ${state.cart.length ? state.cart.map((x, i) => `<div class="cart-line">
+          <div>
+            <h3>${esc(x.name)}</h3>
+            <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
+            <small>${money(x.unitPrice)} each</small>
+          </div>
+          <div class="cart-line-end">
+            <strong>${money(x.qty * x.unitPrice)}</strong>
+            <div class="quantity">
+              <button type="button" data-modal-qty="${i}" data-delta="-1" aria-label="Decrease ${esc(x.name)}">−</button>
+              <span>${x.qty}</span>
+              <button type="button" data-modal-qty="${i}" data-delta="1" aria-label="Increase ${esc(x.name)}" ${x.qty >= 20 ? 'disabled' : ''}>+</button>
+            </div>
+          </div>
+        </div>`).join('') : `<div class="cart-empty"><div>🥢</div><h3>Your cart is empty</h3><p>Choose your favourite dishes from the menu.</p></div>`}
+      </div>
+      ${state.cart.length ? `
+        <div class="cart-upsell">
+          <span>Complete the table:</span>
+          <div class="upsell-chips">
+            ${!state.unavailable.includes('rice') ? `<button type="button" data-modal-quick-add="rice">+1 Rice (${money(150)})</button>` : ''}
+            ${!state.unavailable.includes('tea') ? `<button type="button" data-modal-quick-add="tea">+Pu’er Tea (${money(400)})</button>` : ''}
+            ${!state.unavailable.includes('yam') ? `<button type="button" data-modal-quick-add="yam">+Crispy Yam (${money(800)})</button>` : ''}
+          </div>
+        </div>
+        <div class="cart-summary">
+          <div><span>Round ${nextRound} subtotal</span><strong>${money(total(state.cart))}</strong></div>
+          <p>Staff review every round before the kitchen starts cooking.</p>
+        </div>
+        <div class="cart-actions">
+          <button class="primary wide" id="modal-submit-order" type="button">Send Round ${nextRound} to staff · ${money(total(state.cart))} →</button>
+        </div>
+      ` : ''}
+    </div>`;
+
+    dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+    dialog.querySelectorAll('[data-modal-qty]').forEach(b => b.onclick = () => {
+      const idx = +b.dataset.modalQty;
+      const delta = +b.dataset.delta;
+      act(() => {
+        state.cart[idx].qty += delta;
+        if (state.cart[idx].qty <= 0) state.cart.splice(idx, 1);
+        renderContent();
+        render();
+      });
+    });
+    dialog.querySelectorAll('[data-modal-quick-add]').forEach(b => b.onclick = () => {
+      const d = dish(b.dataset.modalQuickAdd);
+      act(() => {
+        addLines(state, [makeLine(d.id, 1, 'Regular', state.preference)]);
+        renderContent();
+        render();
+      });
+    });
+    dialog.querySelector('#modal-submit-order')?.addEventListener('click', () => {
+      let order;
+      act(() => {
+        order = submit(state, table);
+        reply(localReply('submitted', { id: order.id }));
+        closeTopLayer(dialog);
+        openSuccessDialog(order);
+      });
+    });
+  };
+
+  renderContent();
+  dialog.showModal();
+}
+
+const steamboatTimers = {};
+
+function playChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  } catch {}
+}
+
+const guideItems = [
+  { id: 'fish', name: 'Pomfret & Grouper (鲳鱼 / 石斑)', cn: '嫩滑鲜鱼肉', targetSec: 180, timeLabel: '3 mins', icon: '🥘', desc: 'Simmer gently over charcoal until fish turns opaque and flaky. Do not overboil to preserve delicate natural sweetness.' },
+  { id: 'tango', name: 'Tang-O Greens (茼蒿)', cn: '菊花菜 / 茼蒿', targetSec: 30, timeLabel: '30 secs', icon: '🥬', desc: 'Swirl in bubbling broth for 30 seconds only. Lifting early keeps the tender leaves aromatic, crisp and sweet.' },
+  { id: 'sole', name: 'Crispy Sole Fish (扁鱼)', cn: '大地鱼 / 扁鱼干', targetSec: 60, timeLabel: '1 min', icon: '🐟', desc: 'Deep fried sole fish releases traditional Teochew umami into the broth. Simmer for 1 minute before scooping.' },
+  { id: 'prawn', name: 'Fresh Prawn Paste (虾滑)', cn: '手打虾滑', targetSec: 150, timeLabel: '2.5 mins', icon: '🦐', desc: 'Scoop bite-sized quenelles into simmering soup. Once they float to the surface, give them 30 seconds more for bouncy snap.' },
+  { id: 'roe', name: 'Fish Roe (鱼卵)', cn: '新鲜鱼卵', targetSec: 120, timeLabel: '2 mins', icon: '🐟', desc: 'Gently poach in broth. Rich and plump when cooked through.' },
+  { id: 'yam', name: 'Golden Taro Yam (炸芋头)', cn: '炸芋头条', targetSec: 300, timeLabel: '5 mins', icon: '🍠', desc: 'Simmer thoroughly in the charcoal pot until velvety and soft. Imparts thick fragrance into the broth.' }
+];
+
+function openSteamboatGuide() {
+  const dialog = $('#steamboat-guide-dialog');
+  if (!dialog) return;
+
+  const renderGuide = () => {
+    dialog.innerHTML = `<div class="steamboat-guide-body">
+      <div class="dialog-top">
+        <span class="eyebrow">TEOCHEW STEAMBOAT SECRETS · 鱼头炉涮煮时间指南</span>
+        <button type="button" class="close-dialog" aria-label="Close guide">×</button>
+      </div>
+      <h2 id="steamboat-guide-title">Optimal Simmer & Cooking Times</h2>
+      <p>Traditional Teochew charcoal steamboat relies on precise timing so fish stays tender, greens stay crisp, and broth deepens in flavour.</p>
+      <div class="steamboat-timer-grid">
+        ${guideItems.map(item => {
+          const timer = steamboatTimers[item.id];
+          const isRunning = timer && timer.remaining > 0 && !timer.done;
+          const isDone = timer && timer.done;
+          const remaining = timer ? timer.remaining : item.targetSec;
+          const mins = Math.floor(remaining / 60);
+          const secs = remaining % 60;
+          const formatted = `${mins}:${String(secs).padStart(2, '0')}`;
+          return `<div class="timer-card ${isRunning ? 'running' : ''} ${isDone ? 'done' : ''}">
+            <div class="timer-card-top">
+              <span class="timer-card-icon">${item.icon}</span>
+              <div>
+                <strong>${esc(item.name)}</strong>
+                <small>${esc(item.cn)}</small>
+              </div>
+              <span class="timer-target-badge">${item.timeLabel}</span>
+            </div>
+            <p>${esc(item.desc)}</p>
+            <div class="timer-action-row">
+              <span class="timer-clock ${isDone ? 'done-pulse' : ''}">${isDone ? '✅ Cooked! 盛出趁热享用' : `⏱️ ${formatted}`}</span>
+              ${isRunning ? `<button type="button" class="timer-btn stop" data-stop-timer="${item.id}">Stop</button>` : isDone ? `<button type="button" class="timer-btn reset" data-start-timer="${item.id}">Restart</button>` : `<button type="button" class="timer-btn start" data-start-timer="${item.id}">Start Timer</button>`}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+    dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+    dialog.querySelectorAll('[data-start-timer]').forEach(b => b.onclick = () => {
+      const id = b.dataset.startTimer;
+      const item = guideItems.find(x => x.id === id);
+      if (!item) return;
+      if (steamboatTimers[id]?.interval) clearInterval(steamboatTimers[id].interval);
+      steamboatTimers[id] = {
+        remaining: item.targetSec,
+        done: false,
+        interval: setInterval(() => {
+          if (steamboatTimers[id] && steamboatTimers[id].remaining > 1) {
+            steamboatTimers[id].remaining--;
+            renderGuide();
+          } else if (steamboatTimers[id]) {
+            clearInterval(steamboatTimers[id].interval);
+            steamboatTimers[id].remaining = 0;
+            steamboatTimers[id].done = true;
+            playChime();
+            toast(`🍲 ${item.name} is ready to eat!`);
+            renderGuide();
+          }
+        }, 1000)
+      };
+      renderGuide();
+    });
+    dialog.querySelectorAll('[data-stop-timer]').forEach(b => b.onclick = () => {
+      const id = b.dataset.stopTimer;
+      if (steamboatTimers[id]?.interval) clearInterval(steamboatTimers[id].interval);
+      delete steamboatTimers[id];
+      renderGuide();
+    });
+  };
+
+  renderGuide();
+  dialog.showModal();
 }
 
 function bindOperations() {

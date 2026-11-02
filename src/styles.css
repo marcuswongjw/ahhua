@@ -95,6 +95,80 @@
 .modifier-preview span{font-size:8px;color:#6d7963;background:#f4f6ef;border:1px solid #e3e8dc;padding:2px 6px;border-radius:4px}
 .dish-card-actions{display:flex;align-items:center;gap:6px}
 .quick-add-btn{border:1px solid #c9d6be;background:#fff;color:var(--green);border-radius:6px;height:29px;padding:0 9px;font-size:10px;font-weight:600}
+.quick-add-btn:hover{background:#f1f5ec}
+
+/* In-Card Quantity Stepper (Meituan / Toast pattern) */
+.card-stepper{display:inline-flex;align-items:center;background:#eef3e9;border:1px solid #cad6bf;border-radius:6px;overflow:hidden;height:29px}
+.card-stepper-btn{border:0;background:transparent;width:28px;height:29px;display:grid;place-items:center;font-size:15px;font-weight:700;color:var(--green);transition:background .15s}
+.card-stepper-btn:hover:not(:disabled){background:#dfe8d8}
+.card-stepper-val{min-width:22px;text-align:center;font-size:11px;font-weight:700;color:var(--green);padding:0 2px}
+.card-customise-btn{width:29px;height:29px;border:1px solid #d2ded0;background:#fff;border-radius:6px;display:grid;place-items:center;font-size:12px;color:var(--green);transition:background .15s}
+.card-customise-btn:hover{background:#f4f6ef}
+.sold-out-pill{font-size:10px;color:#9aa394;padding:4px 8px;background:#f0f2eb;border-radius:4px}
+
+/* Visual Badges (Spice, Top Pick, Steamboat Side) */
+.dish-badges-overlay{position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap;z-index:2;max-width:calc(100% - 65px)}
+.dish-badge{font-size:8px;font-weight:700;padding:3px 6px;border-radius:4px;backdrop-filter:blur(4px);box-shadow:0 1px 4px #00000029}
+.dish-badge.bestseller{background:#fdf2d9;color:#8f6515;border:1px solid #ebd39c}
+.dish-badge.tag{background:#ffffffea;color:#4c5740}
+.dish-badge.spice-mild{background:#fff0eb;color:#b2472d;border:1px solid #f2cfc4}
+.dish-badge.spice-hot{background:#bd3823;color:#fff}
+.dish-badge.steamboat-side{background:#e8f4ed;color:#286345;border:1px solid #c2e2cf}
+
+/* Sticky Category Bar & Search Clear */
+.menu-tools.sticky-categories{position:sticky;top:0;z-index:15;background:rgb(248 246 240 / .95);backdrop-filter:blur(8px);padding-top:10px;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.search-wrap{position:relative;display:flex;align-items:center}
+.clear-search-btn{position:absolute;right:8px;border:0;background:transparent;color:#85907c;font-size:16px;width:24px;height:24px;cursor:pointer;display:grid;place-items:center;border-radius:50%}
+.clear-search-btn:hover{color:var(--green);background:#e7ece0}
+
+/* Teochew Steamboat Cooking Companion & Timers (Haidilao pattern) */
+.service-chip.guide-chip{background:#fdf5e6;border-color:#e6cf9c;color:#8c6218;font-weight:600}
+.service-chip.guide-chip:hover{background:#fbeed3}
+.steamboat-guide-body{max-width:620px;padding:4px}
+.steamboat-timer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+@media(max-width:600px){.steamboat-timer-grid{grid-template-columns:1fr}}
+.timer-card{border:1px solid #dfe5d8;background:#fafbf7;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s,box-shadow .2s}
+.timer-card.running{border-color:#4e845f;background:#f2f8f3;box-shadow:0 4px 14px #4e845f1a}
+.timer-card.done{border-color:#d49b35;background:#fff9ec;box-shadow:0 4px 14px #d49b3524}
+.timer-card-top{display:flex;align-items:center;gap:10px}
+.timer-card-icon{font-size:24px}
+.timer-card-top strong{font-size:12px;display:block;color:var(--green)}
+.timer-card-top small{font-size:10px;color:#78846f}
+.timer-target-badge{margin-left:auto;font-size:10px;font-weight:700;color:#7e6933;background:#f5ecda;padding:2px 7px;border-radius:10px}
+.timer-card p{font-size:11px;color:#6f7c66;line-height:1.5;margin:0}
+.timer-action-row{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:8px;border-top:1px dashed #e1e7dc}
+.timer-clock{font-size:12px;font-weight:700;color:var(--green)}
+.done-pulse{color:#9d6313;animation:pulse .8s infinite alternate}
+@keyframes pulse{from{opacity:.7}to{opacity:1}}
+.timer-btn{border:1px solid #c9d6be;background:#fff;color:var(--green);font-size:10px;font-weight:600;padding:5px 11px;border-radius:6px}
+.timer-btn.start{background:var(--green);color:#fff;border-color:var(--green)}
+.timer-btn.stop{background:#fdf0ec;color:#a84838;border-color:#e6b8ae}
+.timer-btn.reset{background:#eef3e7;color:var(--green);border-color:#c4d3bc}
+
+/* Mobile Floating Order Bar (Deliveroo / Toast pattern) */
+.floating-order-bar{display:none;position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:16px;right:16px;z-index:30}
+.floating-cart-btn{width:100%;border:0;background:var(--green);color:#fff;border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 8px 30px #173f3533;transition:transform .15s,filter .15s}
+.floating-cart-btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
+.floating-cart-badge{background:#2a594b;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700}
+.floating-cart-total{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.floating-cart-label{font-size:12px;font-weight:600}
+@media(max-width:780px){.floating-order-bar{display:block}.mobile-cart-link{display:none!important}}
+
+/* Bottom-Sheet Cart Modal */
+.bottom-sheet-dialog{border:0;border-radius:18px 18px 0 0;padding:0;width:100%;max-width:540px;margin-bottom:0;margin-top:auto;box-shadow:0 -10px 40px #173f352e}
+.mobile-cart-body{max-height:85vh;display:flex;flex-direction:column;padding:24px}
+.mobile-cart-body .cart-body{max-height:45vh;overflow-y:auto}
+
+/* Frictionless Bill Split & Checkout (Sunday App pattern) */
+.split-controls{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.split-stepper{display:inline-flex;align-items:center;background:#fff;border:1px solid #d5decb;border-radius:6px;overflow:hidden}
+.split-stepper button{border:0;background:none;width:28px;height:28px;font-size:14px;font-weight:700;color:var(--green)}
+.split-stepper button:hover{background:#f0f4ea}
+.split-stepper span{padding:0 8px;font-size:11px;font-weight:700;color:var(--green)}
+.pay-share-row{margin-top:12px}
+.pay-share-btn{width:100%;border:1px solid #cfdbaf;background:#f6f9ec;color:var(--green);border-radius:8px;padding:12px 14px;text-align:center;display:flex;flex-direction:column;gap:3px;align-items:center;font-weight:700;font-size:12px;transition:background .15s}
+.pay-share-btn:hover{background:#edf4e0;border-color:#b8cb8c}
+.pay-share-btn small{font-size:9px;font-weight:400;color:#6d795f}
 
 .modifier-group{margin-top:16px}
 .modifier-label{display:block;font-size:11px;color:var(--green);margin-bottom:8px;font-weight:600}
