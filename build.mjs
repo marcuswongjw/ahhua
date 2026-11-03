@@ -4,9 +4,9 @@ import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 
-const GZ_SHA = '71dd2da308ac19d632312c436288f57bfa711cf2e2a60d9ff43093e63440c952';
-const PATCH_SHA = 'b37a0c2a72679b285aa4be3874a9c1f8c3afb30a9f6f7ee6ef393f2b8ef7171f';
-const SOURCE_INCLUDES = ['src/app.js', 'src/domain.js', 'tests/domain.test.js'];
+const GZ_SHA = 'dcc1b642f7d3c0195e5b8f3301a8324ff67cda6fb07e6181b7d70f3c65244bfa';
+const PATCH_SHA = 'c77e734dac26cf8131928e3e0940d58c4e04ba55e835a27195dcde4035518790';
+const SOURCE_INCLUDES = ['src/app.js', 'src/domain.js', 'src/styles.css', 'tests/domain.test.js'];
 
 function gitApply(patchPath, checkOnly, includes) {
   const args = ['apply'];
