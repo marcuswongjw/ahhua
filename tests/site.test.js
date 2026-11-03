@@ -29,14 +29,14 @@ test('brand config is the single place for price, host, and the WhatsApp number'
   assert.equal('person' in contact, false);
 });
 
-test('owner page states the offer, the grant line, and links WhatsApp us to the configured chat', () => {
+test('owner page states the offer and links WhatsApp us to the configured chat', () => {
   const html = marketingDocument();
   assert.match(html, /TableHua 招呼/);
   assert.match(html, new RegExp(brand.tagline));
   assert.match(html, new RegExp(brand.taglineZh));
   assert.ok(html.includes(sgd(pricing.monthlyPerOutlet)));
   assert.ok(html.includes(sgd(pricing.founding.monthlyPerOutlet)));
-  assert.match(html, /You may be eligible for the EDGE Grant\. Ask us\./);
+  assert.doesNotMatch(html, /EDGE Grant|claimed under a grant/i);
   assert.equal([...html.matchAll(/WhatsApp us/g)].length >= 3, true);
   assert.equal([...html.matchAll(/href="https:\/\/wa\.me\/6596304128\?text=Hi%2C%20I&#39;d%20like%20to%20know%20more%20about%20TableHua"/g)].length, 3);
   assert.doesNotMatch(html, /TODO/);

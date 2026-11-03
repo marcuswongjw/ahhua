@@ -181,10 +181,6 @@ export function marketingDocument() {
           <p>No. Diners use their own phones on the table link. Staff and the kitchen use a browser on a phone, tablet, or computer you already have.</p>
         </details>
         <details>
-          <summary>Can this be claimed under a grant?</summary>
-          <p>You may be eligible for the EDGE Grant. Ask us.</p>
-        </details>
-        <details>
           <summary>Do you deliver, run the till, or take the payment?</summary>
           <p>No. ${esc(outOfScope.join(', '))}. PayNow on the bill is a split your guests can pay to you. The concept demo charges S$0.00.</p>
         </details>
