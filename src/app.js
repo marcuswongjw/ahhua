@@ -15,10 +15,11 @@ import { languages, normaliseLanguage, replyText, uiText, plannerMessage, dishNa
 import {
   QUICK_CHIPS, LORE_ANSWERS, STORY_CARDS, computeDishBadge, GUEST_PERSONAS, POPULAR_MODIFIERS
 } from './lore.js';
+import { brand, restaurant, applyHost, demoUrl } from './config.js';
 
 const $ = s => document.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const key = 'ah-hua-demo-v1';
+const key = 'tablehua-demo-v1';
 const clientId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : String(Math.random());
 let state = initialState();
 try {
@@ -54,7 +55,7 @@ if (!currentGuest || !currentGuest.name) {
   currentGuest = GUEST_PERSONAS[Math.abs(hash) % GUEST_PERSONAS.length];
   try { sessionStorage.setItem('ah-hua-guest', JSON.stringify(currentGuest)); } catch {}
 }
-let dockSpeechText = 'Table 08 · Charcoal steamboat simmering fresh—1 pot is great to share!';
+let dockSpeechText = `Ask ${restaurant.hostName} for a dish or a meal suggestion.`;
 let currentMemberPhone = null;
 try { currentMemberPhone = localStorage.getItem('ahhua-member-phone'); } catch {}
 let activeQueueTicket = null;
@@ -69,7 +70,7 @@ let seatingPromptShownForTable = null;
 state.replyLanguage = normaliseLanguage(state.replyLanguage);
 const localReply = (keyName, data) => replyText(state.replyLanguage, keyName, data);
 const T = keyName => uiText(state.replyLanguage, keyName);
-let plannerOpen = true;
+let plannerOpen = false;
 let voicePlaying = false;
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -225,7 +226,7 @@ function pushServerState() {
   if (syncMode !== 'live') return;
   const headers = { 'Content-Type': 'application/json' };
   if (typeof isStaffAuthenticated === 'function' && isStaffAuthenticated()) {
-    headers['X-Staff-Auth'] = '1927';
+    headers['X-Staff-Auth'] = restaurant.staffPin;
   }
   fetch('/api/state', {
     method: 'POST',
@@ -242,7 +243,7 @@ function dispatchOp(op) {
     if (syncMode === 'live') {
       const headers = { 'Content-Type': 'application/json' };
       if (typeof isStaffAuthenticated === 'function' && isStaffAuthenticated()) {
-        headers['X-Staff-Auth'] = '1927';
+        headers['X-Staff-Auth'] = restaurant.staffPin;
       }
       fetch('/api/op', {
         method: 'POST',
@@ -263,8 +264,13 @@ function dispatchOp(op) {
   }
 }
 
+const liveSyncOffered = typeof document !== 'undefined' && document.documentElement?.dataset?.liveSync === 'on';
+
 function connectLiveSync() {
-  if (typeof EventSource !== 'function') return;
+  if (!liveSyncOffered || typeof EventSource !== 'function') {
+    syncMode = 'local';
+    return;
+  }
   try {
     const es = new EventSource('/api/events');
     es.onmessage = event => {
@@ -286,7 +292,7 @@ function connectLiveSync() {
         }
         if (packet.senderId === 'presence') {
           const pill = $('#sync-pill');
-          if (pill) pill.textContent = `● Live sync (${connectedPeers} ${connectedPeers === 1 ? 'screen' : 'screens'})`;
+          if (pill) pill.textContent = `● Live across devices (${connectedPeers})`;
           return;
         }
         if (packet.senderId !== clientId) {
@@ -305,11 +311,8 @@ function connectLiveSync() {
     };
     es.onerror = () => {
       syncMode = 'local';
+      connectedPeers = 1;
       es.close();
-      clearTimeout(connectLiveSync.retryTimer);
-      connectLiveSync.retryTimer = setTimeout(() => {
-        connectLiveSync();
-      }, 4000);
     };
   } catch {}
 }
@@ -510,13 +513,13 @@ function openStaffPinDialog(targetRole) {
         <div class="pin-icon">🔒</div>
         <h2 id="staff-pin-title">Floor Staff &amp; Kitchen PIN</h2>
         <p>Enter the 4-digit Floor Staff PIN to access order approvals, kitchen tickets, and table management.</p>
-        <div class="pin-hint-tag">Floor PIN: <strong>1927</strong> (Heritage Est. 1927)</div>
+        <div class="pin-hint-tag">Floor PIN: <strong>${esc(restaurant.staffPin)}</strong> · ${esc(restaurant.staffPinHint)}</div>
       </div>
       <form id="staff-pin-form" class="pin-form">
         <div class="pin-input-wrap">
           <input type="password" id="staff-pin-input" pattern="[0-9]*" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" autofocus required aria-label="Staff 4-digit PIN">
         </div>
-        <div id="pin-error" class="pin-error-msg" hidden>Incorrect PIN. Please use 1927.</div>
+        <div id="pin-error" class="pin-error-msg" hidden>Incorrect PIN. Please use ${esc(restaurant.staffPin)}.</div>
         <div class="dialog-actions">
           <button type="button" class="secondary" id="cancel-pin-btn">Cancel</button>
           <button type="submit" class="primary" id="submit-pin-btn">Verify PIN →</button>
@@ -535,7 +538,7 @@ function openStaffPinDialog(targetRole) {
   dialog.querySelector('#staff-pin-form').onsubmit = e => {
     e.preventDefault();
     const entered = input.value.trim();
-    if (entered === '1927') {
+    if (entered === restaurant.staffPin) {
       try { sessionStorage.setItem('ahhua-staff-auth', 'true'); } catch {}
       closeTopLayer(dialog);
       role = pendingRole || 'staff';
@@ -548,9 +551,24 @@ function openStaffPinDialog(targetRole) {
       input.focus();
       input.classList.add('pin-shake');
       setTimeout(() => input.classList.remove('pin-shake'), 500);
-      toast('Incorrect staff PIN. Please try 1927.');
+      toast(`Incorrect staff PIN. Please try ${restaurant.staffPin}.`);
     }
   };
+}
+
+function peerChip() {
+  const guest = `${currentGuest.emoji} ${esc(currentGuest.name)}`;
+  if (syncMode === 'live') {
+    return `<span class="table-peer-chip" title="This table is sharing orders through the demo server on this machine."><span class="live-dot"></span> Table ${table} · Live across devices${connectedPeers > 1 ? ` (${connectedPeers})` : ''} · You: <strong class="guest-name-pill">${guest}</strong></span>`;
+  }
+  return `<span class="table-peer-chip is-local" title="Orders stay in this browser. Open Staff and Kitchen here to walk a round through. Another phone will not see this table."><span class="live-dot"></span> Table ${table} · This browser only · You: <strong class="guest-name-pill">${guest}</strong></span>`;
+}
+
+function priceLabel(d) {
+  if (!Number.isInteger(d.price) || d.price <= 0) return 'Price on request';
+  if (d.singleSize && d.id === 'rice') return `${money(d.price)} / bowl`;
+  if (d.singleSize) return money(d.price);
+  return `${money(d.price)} from`;
 }
 
 function render() {
@@ -564,11 +582,11 @@ function render() {
   const currentMember = currentMemberPhone ? getMember(state, currentMemberPhone) : null;
 
   $('#app').innerHTML = `
-  <div class="demo-bar"><span class="dot"></span> NAN HWA CHONG (南华昌) · EST. 1927 <span class="demo-detail">Interactive table ordering · Authentic fish head steamboat</span></div>
+  <div class="demo-bar"><span class="dot"></span> ${esc(brand.productName.toUpperCase())} CONCEPT DEMO <span class="demo-detail">Not a live restaurant · <a href="/">About ${esc(brand.productName)}</a></span></div>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Nan Hwa Chong home">
-      <span class="seal"><img class="seal-img" src="https://ucarecdn.com/3fcbba39-c037-4087-9aa9-c018c3ec8d87/-/crop/330x330/144,0/-/preview/" alt="南华昌" onerror="this.style.display='none';this.parentElement.textContent='南';" /></span>
-      <span>Nan Hwa Chong<small>南华昌 (亚秋) 鱼头炉 · EST. 1927</small></span>
+    <a class="brand" href="${esc(restaurant.demoPath)}" aria-label="${esc(restaurant.name)} demo">
+      <span class="seal"><img class="seal-img" src="/assets/seal.png" alt="" /></span>
+      <span>${esc(restaurant.shortName)}<small>${esc(restaurant.nameZh)} · ${esc(restaurant.hostName)}</small></span>
     </a>
     <div class="top-actions">
       <div class="top-lang-dropdown" aria-label="Language selection · 选择语言">
@@ -577,24 +595,26 @@ function render() {
           ${Object.entries(languages).map(([id, l]) => `<option value="${id}" ${state.replyLanguage === id ? 'selected' : ''}>${l.label}</option>`).join('')}
         </select>
       </div>
-      <button type="button" class="member-top-pill" id="open-member-btn" title="VIP Member Privileges · 会员权益">
-        ${currentMember ? `⭐️ ${esc(currentMember.name.split(' ')[0])} (${money(currentMember.balance)})` : `🎁 VIP Member (免茶位)`}
-      </button>
-      <button type="button" class="banquet-top-pill" id="open-banquet-btn" title="Banquet & CNY Pre-order · 年菜宴席">
-        🏮 Banquet
-      </button>
-      <button type="button" class="font-toggle-btn ${largeFont ? 'active' : ''}" id="toggle-large-font" aria-label="Toggle large text mode · 大字模式" title="Large text mode for elders · 长辈大字模式">
-        <span class="font-icon" aria-hidden="true">Aa</span><span>${largeFont ? esc(T('standardMode')) : esc(T('elderMode'))}</span>
-      </button>
-      <button type="button" class="text-button service-trigger" data-action="call">♧ Call a server</button>
-      <button type="button" class="table-pill" data-open-qr="${table}" title="Show Table ${table} QR & details">Table ${table} <span>⊞</span></button>
+      <button type="button" class="table-pill" data-open-qr="${table}" title="Show Table ${table} QR & details">Table ${table}</button>
+      <details class="house-more">
+        <summary>House</summary>
+        <div class="house-more-panel">
+          <button type="button" class="member-top-pill" id="open-member-btn" title="Sample membership">
+            ${currentMember ? `⭐️ ${esc(currentMember.name.split(' ')[0])} (${money(currentMember.balance)})` : `Membership`}
+          </button>
+          <button type="button" class="banquet-top-pill" id="open-banquet-btn">Banquet booking</button>
+          <button type="button" class="font-toggle-btn ${largeFont ? 'active' : ''}" id="toggle-large-font" aria-label="Toggle large text mode">
+            <span class="font-icon" aria-hidden="true">Aa</span><span>${largeFont ? esc(T('standardMode')) : esc(T('elderMode'))}</span>
+          </button>
+        </div>
+      </details>
     </div>
   </header>
   <nav class="role-nav" aria-label="Demo role">
     <button type="button" data-role="customer" class="${role === 'customer' ? 'active' : ''}">Customer <span>点餐</span></button>
     <button type="button" data-role="staff" class="${role === 'staff' ? 'active' : ''}">Staff ${staffBadgeCount ? `<i>${staffBadgeCount}</i>` : ''}</button>
     <button type="button" data-role="kitchen" class="${role === 'kitchen' ? 'active' : ''}">Kitchen ${activeKitchen ? `<i>${activeKitchen}</i>` : ''}</button>
-    <div class="session-note" id="sync-pill">${syncMode === 'live' ? `● Live sync (${connectedPeers} ${connectedPeers === 1 ? 'screen' : 'screens'})` : '● Local browser sync'}</div>
+    <div class="session-note" id="sync-pill">${syncMode === 'live' ? `● Live across devices (${connectedPeers})` : '● This browser only'}</div>
     <button type="button" class="reset" data-action="reset">Reset demo</button>
   </nav>
   <main>${role === 'customer' ? customer() : role === 'staff' ? staff() : kitchen()}</main>
@@ -608,7 +628,7 @@ function render() {
     </aside>
     <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(getTableSession(state, table).cart))} →</strong></a>
   ` : ''}
-  <footer><span class="footer-mark">南</span> Nan Hwa Chong (南华昌) Fish Head Steamboat Corner · Traditional Teochew Taste Since 1927 <span>North Bridge Road &amp; Jalan Sultan · Singapore</span></footer>`;
+  <footer><img class="footer-seal" src="/assets/seal.png" alt="" /> ${esc(restaurant.name)} (${esc(restaurant.nameZh)}) · concept demo <span>${esc(restaurant.addressNote)}</span></footer>`;
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     const targetRole = b.dataset.role;
@@ -694,11 +714,11 @@ function updateDockSpeech() {
   const activeOrders = state.orders.filter(o => o.table === table && ['pending', 'approved', 'preparing'].includes(o.status));
   if (activeOrders.length) {
     const o = activeOrders[activeOrders.length - 1];
-    dockSpeechText = `Round ${o.round || 1} is cooking (~12m)! Tap me for heritage story & service →`;
+    dockSpeechText = `Round ${o.round || 1} is with the kitchen in this demo.`;
   } else if (getTableSession(state, table).cart.length) {
-    dockSpeechText = `Table ${table} · ${count()} items in cart! Looking delicious!`;
+    dockSpeechText = `Table ${table} · ${count()} in the cart. Send the round when you are ready.`;
   } else {
-    dockSpeechText = `Table ${table}? Our charcoal steamboat is simmering fresh—1 pot is great to share!`;
+    dockSpeechText = `Ask ${restaurant.hostName} for a dish or a suggestion.`;
   }
   const dockTextEl = document.getElementById('dock-speech-text');
   if (dockTextEl) dockTextEl.innerHTML = `<span>${esc(dockSpeechText)}</span>`;
@@ -707,7 +727,7 @@ function updateDockSpeech() {
 function handleLoreChip(chipId) {
   dispatchOp({ type: 'RECORD_AH_HUA_EVENT', eventType: 'CHIP_CLICK' });
   const langKey = state.replyLanguage === 'zh' ? 'zh' : state.replyLanguage === 'singlish' ? 'singlish' : 'en';
-  const ans = LORE_ANSWERS[chipId]?.[langKey] || LORE_ANSWERS[chipId]?.en || 'Nan Hwa Chong has served authentic Teochew charcoal steamboat since 1927.';
+  const ans = LORE_ANSWERS[chipId]?.[langKey] || LORE_ANSWERS[chipId]?.en || `${restaurant.name} is a fictional house in this demo. I can help with dishes, sample prices, and how a round is approved.`;
   const qChip = [...QUICK_CHIPS.viewing, ...QUICK_CHIPS.waiting].find(c => c.id === chipId);
   const questionText = qChip?.label || 'Dish question';
 
@@ -855,17 +875,17 @@ function openCartCheckDialog(check) {
 function getStageGreeting(latestOrder) {
   if (state.replyLanguage === 'zh') {
     return latestOrder
-      ? `您的第 ${latestOrder.round || 1} 轮订单已下发厨房！百年传统炭火慢炖大约需要12分钟。在此期间，您可以探索潮州老饕吃法，或随时轻触呼叫桌边服务。`
-      : '欢迎来到南华昌！您可以随时浏览菜单点单，或向我咨询潮州鱼头炉的经典搭配。';
+      ? `第 ${latestOrder.round || 1} 轮已交给演示厨房。炭火炉在真实餐厅大约要十二分钟。您可以看吃法说明，或呼叫服务员。`
+      : `欢迎。我是${restaurant.hostNameZh}，按固定脚本招呼。您可以看菜单，或问我怎么搭配。`;
   }
   if (state.replyLanguage === 'singlish') {
     return latestOrder
-      ? `Order ${latestOrder.id} fired to kitchen already! Charcoal pot simmering fresh ~12 mins. While waiting, check out how regulars makan this or ask me any questions lah!`
-      : 'Welcome to Nan Hwa Chong! Feel free to browse menu or tap me for recommendation lah!';
+      ? `Order ${latestOrder.id} is with the demo kitchen. A real charcoal pot takes about 12 minutes. Can ask me a saved question while you wait.`
+      : `Welcome. I’m ${restaurant.hostName}. This is a fixed script. Browse the menu, or ask me what to order.`;
   }
   return latestOrder
-    ? `Order ${latestOrder.id} is cooking in the kitchen! The charcoal braziers take ~12 minutes to gently simmer the broth. Meanwhile, discover our heritage eating guide or tap for table service below.`
-    : 'Welcome to Nan Hwa Chong! Explore our menu or let Ah Hua assist your table.';
+    ? `Order ${latestOrder.id} is with the demo kitchen. A real charcoal pot takes about 12 minutes. You can read the notes below, or call the floor.`
+    : `Welcome. I’m ${restaurant.hostName}, on a fixed script. Browse the menu, or ask for a suggestion.`;
 }
 
 function renderStoryCardContent(story) {
@@ -897,7 +917,7 @@ function renderStoryCardContent(story) {
       <p class="story-text">${esc(story.text)}</p>
     `;
   }
-  if (story.id === 'loop') {
+  if (story.id === 'rounds') {
     return `
       <div class="story-badge">${esc(story.badge)}</div>
       <h3>${esc(story.title)}</h3>
@@ -957,11 +977,11 @@ function renderCenterStage(summary) {
   return `<section class="welcome">
     <div>
       <div class="eyebrow-row">
-        <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
-        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${esc(currentGuest.name)}</strong></span>
+        <span class="eyebrow">${esc(restaurant.shortName.toUpperCase())} · CONCEPT DEMO</span>
+        ${peerChip()}
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
-      <p>Concierge Stage · Table companionship while kitchen prepares your meal</p>
+      <p>While the kitchen works, you can still ask ${esc(restaurant.hostName)} or call the floor.</p>
       <div class="seating-status-row">
         <button type="button" class="seating-status-badge compact ${session.seatingConfirmed ? 'confirmed' : 'needs-setup'}" id="stage-open-seating-btn" title="View or edit table seating">
           <span class="seating-status-icon">👥</span>
@@ -1085,13 +1105,13 @@ function renderCenterStage(summary) {
       <div class="stage-hero-top">
         ${avatarMarkup()}
         <div class="stage-hero-speech">
-          <div class="speech-bubble-tag">AH HUA CONCIERGE · 阿华说</div>
+          <div class="speech-bubble-tag">${esc(restaurant.hostName.toUpperCase())} · 固定回复</div>
           <p id="stage-speech-bubble" class="stage-bubble-text">${esc(getStageGreeting(latestOrder))}</p>
         </div>
       </div>
 
       <div class="stage-chips-bar">
-        <span class="stage-chips-title">Tap for instant 0ms answers from Ah Hua:</span>
+        <span class="stage-chips-title">Saved answers from ${esc(restaurant.hostName)}:</span>
         <div class="stage-chips-scroll">
           ${QUICK_CHIPS.waiting.map(c => `<button type="button" class="stage-chip-btn" data-stage-chip="${c.id}">${c.label}</button>`).join('')}
         </div>
@@ -1162,27 +1182,27 @@ function openAhHuaDialog() {
   const renderContent = () => {
     dialog.innerHTML = `<div class="ah-hua-sheet-body">
       <div class="dialog-top">
-        <span class="eyebrow">AH HUA CONCIERGE · 智能点餐助手</span>
+        <span class="eyebrow">${esc(restaurant.hostName.toUpperCase())} · FIXED SCRIPT</span>
         <button type="button" class="close-dialog" aria-label="Close Ah Hua">×</button>
       </div>
       <div class="ah-hua-sheet-header">
         ${avatarMarkup()}
         <div>
-          <h3 id="ah-hua-dialog-title">Chat with Ah Hua <span class="online-dot"></span></h3>
-          <p>Nan Hwa Chong Host · English · 中文 · Singlish</p>
+          <h3 id="ah-hua-dialog-title">Ask ${esc(restaurant.hostName)}</h3>
+          <p>Scripted ${esc(restaurant.hostRole)} · English · 中文 · Singlish</p>
           <small class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></small>
         </div>
         <button type="button" id="sheet-speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice: on' : 'Voice: off'}</button>
       </div>
       <div class="quick-chips-section">
-        <span class="quick-chips-label">Instant 0ms Questions (Tap to ask):</span>
+        <span class="quick-chips-label">Saved questions:</span>
         <div class="quick-chips-row">
           ${QUICK_CHIPS.viewing.map(c => `<button type="button" class="quick-chip-btn" data-lore-chip="${c.id}">${c.label}</button>`).join('')}
         </div>
       </div>
       ${mealPlanner()}
       <div class="chat-log sheet-chat-log" role="log" aria-label="Conversation with Ah Hua">
-        ${state.messages.map((m, i) => `<div class="message ${m.role}"><small>${m.role === 'host' ? 'AH HUA' : 'YOU'}</small><div>${esc(m.text)}</div>${m.role === 'host' && speechSupported ? `<button type="button" class="replay" data-replay="${i}">Listen ↗</button>` : ''}</div>`).join('')}
+        ${state.messages.map((m, i) => `<div class="message ${m.role}"><small>${m.role === 'host' ? esc(restaurant.hostName.toUpperCase()) : 'YOU'}</small><div>${m.role === 'host' ? esc(applyHost(m.text)) : esc(m.text)}</div>${m.role === 'host' && speechSupported ? `<button type="button" class="replay" data-replay="${i}">Listen ↗</button>` : ''}</div>`).join('')}
       </div>
       ${state.proposal.length ? `<div class="proposal"><b>${esc(T('suggestion'))}</b><ul>${state.proposal.map((x, i) => `<li><div>${x.qty} × ${esc(dishName(state.replyLanguage, dish(x.id)))} <span>${esc(x.size)} · ${money(x.qty * x.unitPrice)}${x.notes ? ' · ' + esc(x.notes) : ''}</span></div><button type="button" class="proposal-remove" data-remove-proposal="${i}">×</button></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button type="button" id="sheet-accept-proposal" class="primary small">${esc(T('add'))}</button></div></div>` : ''}
       <div class="chat-bottom">
@@ -1261,13 +1281,6 @@ function customer() {
   const summary = tableSummary(state, table, splitPax);
   const tableCart = session.cart;
 
-  if (role === 'customer' && !session.seatingConfirmed && !activeQueueTicket && seatingPromptShownForTable !== table) {
-    seatingPromptShownForTable = table;
-    setTimeout(() => {
-      if (role === 'customer') openSeatingModal(false);
-    }, 250);
-  }
-
   if (customerGear === 'stage') {
     return renderCenterStage(summary);
   }
@@ -1284,8 +1297,8 @@ function customer() {
   return `<section class="welcome">
     <div>
       <div class="eyebrow-row">
-        <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
-        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${esc(currentGuest.name)}</strong></span>
+        <span class="eyebrow">${esc(restaurant.shortName.toUpperCase())} · CONCEPT DEMO</span>
+        ${peerChip()}
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>${esc(T('tableSubtitle'))}</p>
@@ -1319,7 +1332,7 @@ function customer() {
 
   ${latestOrder ? `<div class="active-stage-banner">
     <span>🍲 Round ${latestOrder.round || 1} (${latestOrder.id}) is simmering in the kitchen (~12 mins)</span>
-    <button type="button" id="switch-to-stage-btn" class="stage-switch-btn">Enter Concierge Stage →</button>
+    <button type="button" id="switch-to-stage-btn" class="stage-switch-btn">While you wait →</button>
   </div>` : ''}
 
   <section class="service-bar" aria-label="Quick table service">
@@ -1345,7 +1358,7 @@ function customer() {
       <span class="spotlight-count">Top picks for table sharing</span>
     </div>
     <div class="spotlight-scroll">
-      ${menu.filter(d => (d.popularity || 0) >= 90).map(d => {
+      ${menu.filter(d => (d.popularity || 0) >= 90).slice(0, 4).map(d => {
         const soldOut = state.unavailable.includes(d.id);
         const inCartQty = tableCart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
         return `<div class="spotlight-card ${inCartQty ? 'in-cart' : ''}">
@@ -1369,8 +1382,8 @@ function customer() {
         <div class="host-heading">
           ${avatarMarkup()}
           <div>
-            <h2>Have a chat with Ah Hua <span class="online-dot"></span></h2>
-            <p>Nan Hwa Chong Digital Host · English · 中文 · Singlish · Melayu · Français</p>
+            <h2>Ask ${esc(restaurant.hostName)}</h2>
+            <p>Scripted ${esc(restaurant.hostRole)} · English · 中文 · Singlish · Melayu · Français</p>
           </div>
           <div class="reply-controls">
             <button type="button" id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice replies: on' : 'Turn on voice replies'}</button>
@@ -1379,7 +1392,7 @@ function customer() {
         </div>
         <div class="avatar-caption">
           <div class="host-caption-row">
-            <span class="host-role-badge">Ah Hua · Nan Hwa Chong Host</span>
+            <span class="host-role-badge">${esc(restaurant.hostName)} · fixed script, not a live chat</span>
             <span class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></span>
           </div>
           <div class="language-voice-note">${esc(T('voiceNote'))}</div>
@@ -1388,7 +1401,7 @@ function customer() {
         </div>
         ${mealPlanner()}
         <div class="chat-log" role="log" aria-label="Conversation with Ah Hua" aria-live="polite">
-          ${state.messages.map((m, i) => `<div class="message ${m.role}" ${m.role === 'host' ? `lang="${languages[normaliseLanguage(m.language)].html}"` : ''}><small>${m.role === 'host' ? 'AH HUA' : 'YOU'}</small><div>${esc(m.text)}</div>${m.role === 'host' && speechSupported ? `<button type="button" class="replay" data-replay="${i}" aria-label="Read response ${i + 1} aloud">Listen ↗</button>` : ''}</div>`).join('')}
+          ${state.messages.map((m, i) => `<div class="message ${m.role}" ${m.role === 'host' ? `lang="${languages[normaliseLanguage(m.language)].html}"` : ''}><small>${m.role === 'host' ? esc(restaurant.hostName.toUpperCase()) : 'YOU'}</small><div>${m.role === 'host' ? esc(applyHost(m.text)) : esc(m.text)}</div>${m.role === 'host' && speechSupported ? `<button type="button" class="replay" data-replay="${i}" aria-label="Read response ${i + 1} aloud">Listen ↗</button>` : ''}</div>`).join('')}
         </div>
         ${state.proposal.length ? `<div class="proposal"><b>${esc(T('suggestion'))}</b><ul>${state.proposal.map((x, i) => `<li><div>${x.qty} × ${esc(dishName(state.replyLanguage, dish(x.id)))} <span>${esc(x.size)} · ${money(x.qty * x.unitPrice)}${x.notes ? ' · ' + esc(x.notes) : ''}</span></div><button type="button" class="proposal-remove" data-remove-proposal="${i}" aria-label="${esc(T('remove'))} ${esc(dishName(state.replyLanguage, dish(x.id)))}">×</button></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button type="button" data-chat="Another suggestion" class="text-button">${esc(T('another'))}</button><button type="button" id="cheaper-proposal" class="text-button">${esc(T('cheaper'))}</button><button type="button" id="edit-preferences" class="text-button">${esc(T('edit'))}</button><button type="button" id="dismiss-proposal" class="text-button">${esc(T('dismiss'))}</button><button type="button" id="accept-proposal" class="primary small">${esc(T('add'))}</button></div></div>` : ''}
         <div class="chat-bottom">
@@ -1408,7 +1421,7 @@ function customer() {
           </div>
           <details class="voice-privacy">
             <summary>About voice & this demo</summary>
-            <p>Your browser may send audio to its speech provider. Ah Hua stores no recordings. Spoken replies use your device’s available voices. This is a limited, rule-based menu assistant; no AI service is connected. Allergy and dietary details need staff confirmation.</p>
+            <p>Your browser may send microphone audio to its own speech provider. This demo stores no recordings. Spoken replies use voices already on your device. ${esc(restaurant.hostName)} answers from a fixed script — dishes, sample prices, and meal suggestions. No AI service is connected. Allergy and dietary details need staff confirmation.</p>
           </details>
         </div>
       </section>
@@ -1416,10 +1429,10 @@ function customer() {
       <section class="menu-section">
         <div class="section-top">
           <div>
-            <div class="eyebrow">NAN HWA CHONG HERITAGE · 南华昌传统鱼头炉与煮炒</div>
-            <h2>Authentic Teochew charcoal steamboat & zi char.</h2>
+            <div class="eyebrow">${esc(restaurant.nameZh)} · SAMPLE MENU</div>
+            <h2>Steamboat and zi char.</h2>
           </div>
-          <span class="sample-label">100+ Authentic Dishes & Real Photos</span>
+          <span class="sample-label">Illustrative dishes and prices</span>
         </div>
         <search class="menu-tools sticky-categories" aria-label="Filter and search menu">
           <div class="categories" aria-label="Menu category">
@@ -1497,9 +1510,9 @@ function customer() {
                 ${tableOrderedQty ? `<div class="ordered-table-indicator" role="status">✓ Table ${table} already ordered ${tableOrderedQty} in earlier round</div>` : ''}
                 <h3>${esc(dishName(state.replyLanguage, d))}</h3>
                 <p>${esc(d.desc)}</p>
+                <p class="dish-price-line">${esc(priceLabel(d))}</p>
                 ${d.modifiers?.length ? `<div class="modifier-preview">${d.modifiers.slice(0, 2).map(m => `<span>${esc(m)}</span>`).join('')}</div>` : ''}
                 <div class="dish-bottom">
-                  <strong>${money(d.price)} <small>${d.singleSize ? (d.id === 'rice' ? '/ bowl' : '') : 'from'}</small></strong>
                   <div class="dish-card-actions">
                     ${!soldOut ? (inCartQty > 0 ? `
                       <div class="card-stepper" aria-label="Quantity of ${esc(d.name)} in cart">
@@ -1525,14 +1538,11 @@ function customer() {
     ${cart(summary)}
   </div>
   <aside class="ah-hua-floating-dock" id="ah-hua-dock" aria-label="Ah Hua Assistant">
-    <button type="button" class="dock-avatar-btn" id="dock-avatar-trigger" aria-label="Open Ah Hua Concierge">
+    <button type="button" class="dock-avatar-btn" id="dock-avatar-trigger" aria-label="Open ${esc(restaurant.hostName)}, the table host">
       <div class="dock-avatar-circle">
-        <span class="dock-avatar-emoji">👨‍🍳</span>
-        <span class="dock-online-dot"></span>
+        <img src="/assets/seal.png" alt="" width="36" height="36" />
       </div>
-      <div class="dock-speech-bubble" id="dock-speech-text">
-        <span>${esc(dockSpeechText)}</span>
-      </div>
+      ${(tableCart.length || latestOrder) ? `<div class="dock-speech-bubble" id="dock-speech-text"><span>${esc(dockSpeechText)}</span></div>` : ''}
     </button>
   </aside>`;
 }
@@ -1725,12 +1735,12 @@ function staff() {
       <section class="ops-panel ah-hua-sales-panel">
         <div class="host-caption-row">
           <div>
-            <div class="eyebrow" style="color:#8b754f">AH HUA SALESPERSON METRICS</div>
-            <h2>AI Host Revenue Engine</h2>
+            <div class="eyebrow" style="color:#8b754f">THIS BROWSER</div>
+            <h2>Suggestion notes</h2>
           </div>
           <span class="sales-live-pill">LIVE METRICS</span>
         </div>
-        <p style="font-size:11px;color:#78836f;margin-bottom:12px">Track Ah Hua's upsell performance, extra revenue and conversion rates.</p>
+        <p style="font-size:11px;color:#78836f;margin-bottom:12px">Counts from this browser: suggestions accepted and extra dishes added by the scripted checks.</p>
         <div class="sales-metric-grid">
           <div class="sales-stat-card">
             <small>Extra Revenue</small>
@@ -2401,12 +2411,6 @@ function openDish(id) {
   renderDishModal();
   dialog.showModal();
 }
-      toast(existingIndex >= 0 ? `Updated ${d.name} (${qty}) in cart.` : `${currentGuest.emoji} Added ${d.name} to shared cart.`);
-    } catch (error) {
-      toast(error.message);
-    }
-  };
-}
 
 function openBillDialog() {
   const dialog = $('#bill-dialog');
@@ -2503,8 +2507,8 @@ function openBillDialog() {
                 </svg>
               </div>
               <div class="sgqr-details">
-                <div class="sgqr-entity-name">NAN HWA CHONG STEAMBOAT PTE. LTD.</div>
-                <div class="sgqr-uen">UEN: 201619270H</div>
+                <div class="sgqr-entity-name">${esc(restaurant.paynowDisplayName)}</div>
+                <div class="sgqr-uen">UEN: ${esc(restaurant.paynowUen)} · sample, nothing is charged</div>
                 <div class="sgqr-ref">Ref: T${table}-SPLIT-${splitPax}PAX</div>
                 <div class="sgqr-amount-pill">Exact PayNow: ${money(summary.grandTotalPerPax)} / pax</div>
               </div>
@@ -2795,7 +2799,7 @@ function openShareBillDialog() {
         pax: splitPax
       });
       hapticPulse();
-      const tgUrl = `https://t.me/share/url?text=${encodeURIComponent(textToSend)}&url=${encodeURIComponent('https://ahhua.vercel.app/?table=' + table)}`;
+      const tgUrl = `https://t.me/share/url?text=${encodeURIComponent(textToSend)}&url=${encodeURIComponent(demoUrl(table))}`;
       window.open(tgUrl, '_blank');
     });
   };
@@ -3025,7 +3029,7 @@ function openMemberDialog() {
       dialog.innerHTML = `
         <div class="member-modal-body" style="padding:14px">
           <div class="dialog-top">
-            <span class="eyebrow">NAN HWA CHONG VIP · 贵宾会员礼遇</span>
+            <span class="eyebrow">MEMBERSHIP · sample stored value</span>
             <button type="button" class="close-dialog" aria-label="Close member modal">×</button>
           </div>
           <div style="text-align:center;margin:12px 0 16px">
@@ -3184,7 +3188,7 @@ function openReviewDialog() {
     'Charcoal Broth (百年炭火浓汤)',
     'Fresh Sliced Fish (鱼肉鲜甜嫩滑)',
     'Fast Service (上菜迅速周到)',
-    'Ah Hua AI (阿华点单贴心)',
+    'Table host, fixed script (固定回复的招呼)',
     'Crispy Tofu & Chicken (小吃酥脆)',
     'Rich Broth Refill (免费续汤极赞)'
   ];
@@ -3199,7 +3203,7 @@ function openReviewDialog() {
         <div style="margin:10px 0 14px">
           <div style="font-size:32px;margin-bottom:4px">⭐️</div>
           <h2 id="review-dialog-title" style="margin:0 0 4px">Rate Your Experience</h2>
-          <p style="font-size:11px;color:var(--muted)">Your feedback helps our charcoal masters maintain 1927 standards.</p>
+          <p style="font-size:11px;color:var(--muted)">Your note stays in this demo only.</p>
         </div>
 
         <div class="star-rating-box">
@@ -3451,7 +3455,7 @@ function formatBillShareText(summary, tableNum, pax) {
     const items = o.items.map(x => `  • ${x.qty}× ${x.name} (${money(x.qty * x.unitPrice)})`).join('\n');
     return `Round ${o.round || 1} (${o.id}):\n${items}`;
   }).join('\n\n');
-  return `🍲 Nan Hwa Chong (南华昌) · Table ${tableNum} Bill
+  return `🍲 ${restaurant.name} (${restaurant.nameZh}) · Table ${tableNum} Bill
 ──────────────────────────
 ${roundsText}
 ──────────────────────────
@@ -3565,7 +3569,7 @@ function openOrderSuccessDialog(order) {
 
 function openQrDialog(targetTable) {
   const dialog = $('#qr-dialog');
-  const tableUrl = `${location.origin}/?table=${targetTable}${state.replyLanguage && state.replyLanguage !== 'en' ? `&lang=${state.replyLanguage}` : ''}`;
+  const tableUrl = `${location.origin}${restaurant.demoPath}?table=${targetTable}${state.replyLanguage && state.replyLanguage !== 'en' ? `&lang=${state.replyLanguage}` : ''}`;
   dialog.innerHTML = `<div class="qr-modal-body">
     <div class="dialog-top">
       <span class="eyebrow">TABLE QR & LINK · 桌号二维码</span>
@@ -3586,7 +3590,7 @@ function openQrDialog(targetTable) {
         <text x="60" y="65" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">${targetTable}</text>
         <path d="M50 16h6v6h-6zM62 16h8v6h-8zM50 28h12v6H50zM16 50h10v6H16zM32 54h8v8h-8zM80 50h12v6H80zM96 58h10v10H96zM50 82h8v10h-8zM66 86h10v8H66zM82 82h14v14H82zM90 100h16v8H90z" fill="#173f35"/>
       </svg>
-      <strong>Nan Hwa Chong 南华昌 · Table ${targetTable}</strong>
+      <strong>${esc(restaurant.name)} ${esc(restaurant.nameZh)} · Table ${targetTable}</strong>
       <code>${esc(tableUrl)}</code>
     </div>
     <div class="dialog-actions">

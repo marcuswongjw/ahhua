@@ -1,4 +1,5 @@
-import { mkdir, copyFile, cp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, cp, rm, readFile, writeFile } from 'node:fs/promises';
+import { marketingDocument } from './src/marketing.js';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
@@ -57,6 +58,10 @@ async function applyOrderPatch() {
 await applyOrderPatch();
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist');
-await copyFile('index.html', 'dist/index.html');
+const homepage = marketingDocument();
+await writeFile('dist/index.html', homepage);
+await writeFile('index.html', homepage);
+await cp('demo', 'dist/demo', { recursive: true });
 await cp('src', 'dist/src', { recursive: true });
-console.log('Built Ah Hua demo → dist (no runtime dependencies)');
+await cp('assets', 'dist/assets', { recursive: true });
+console.log('Built TableHua → dist (owner site at /, concept demo at /demo)');

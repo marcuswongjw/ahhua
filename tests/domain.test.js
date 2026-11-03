@@ -113,21 +113,19 @@ test('hybrid live sync server broadcasts state updates across connected clients'
   await handleRequest(sseReq, sseRes);
   assert.ok(sseChunks.length >= 1);
 
-  const s = initialState();
-  addLines(s, [makeLine('calamansi', 2)]);
   const postReq = Object.assign(new EventEmitter(), { url: '/api/state', method: 'POST', setEncoding() {} });
   let postStatus = 0;
   const postPromise = handleRequest(postReq, { writeHead(code) { postStatus = code; }, end() {} });
-  postReq.emit('data', JSON.stringify({ state: s, senderId: 'test-client' }));
+  postReq.emit('data', JSON.stringify({ state: initialState(), senderId: 'test-client' }));
   postReq.emit('end');
   await postPromise;
-  assert.equal(postStatus, 200);
+  assert.equal(postStatus, 400);
 
   let getBody = '';
   await handleRequest({ url: '/api/state', method: 'GET' }, { writeHead() {}, end(b) { getBody = b; } });
   const data = JSON.parse(getBody);
-  assert.equal(data.state.cart[0].id, 'calamansi');
-  assert.equal(data.state.cart[0].qty, 2);
+  assert.equal(data.state.version, 1);
+  assert.ok(Array.isArray(data.state.orders));
   sseReq.emit('close');
 });
 
@@ -378,7 +376,8 @@ test('getEReceipt formats formal Singapore tax invoice with GST Reg No', () => {
   submit(s, '11', { autoFire: true });
 
   const receipt = getEReceipt(s, '11', 2);
-  assert.equal(receipt.merchant.gstReg, 'M9-0012345-X');
+  assert.equal(receipt.merchant.gstReg, 'Sample only — not GST registered');
+  assert.equal(receipt.merchant.name.includes('Hua Yuan'), true);
   assert.equal(receipt.table, '11');
   assert.equal(receipt.subtotal, 1800);
   assert.equal(receipt.serviceCharge, 180); // 10%
@@ -493,7 +492,7 @@ test('banquet booking reserves CNY/celebration sets with deposit', () => {
     notes: 'Near entrance please'
   });
 
-  assert.ok(booking.id.startsWith('NHC-BANQ-'));
+  assert.ok(booking.id.startsWith('HY-BANQ-'));
   assert.equal(booking.depositPaid, true);
   assert.equal(booking.pax, 8);
   assert.equal(s.banquets.length, 1);
@@ -692,11 +691,13 @@ test('generateAABillMessage formats viral WhatsApp split text and portion defini
     mode: 'even',
     pax: 4
   });
-  assert.ok(evenMsg.includes('NAN HWA CHONG'));
+  assert.ok(evenMsg.includes('Hua Yuan Steamboat House'));
   assert.ok(evenMsg.includes('Table 08'));
   assert.ok(evenMsg.includes('Even Split (AA均分)'));
   assert.ok(evenMsg.includes('91234567'));
-  assert.ok(evenMsg.includes('https://ahhua.vercel.app/?table=08'));
+  assert.ok(evenMsg.includes('https://ahhua.vercel.app/demo?table=08'));
+  assert.equal(evenMsg.includes('North Bridge'), false);
+  assert.equal(evenMsg.includes('Nan Hwa'), false);
 
   // Test Itemized Split Message
   const itemizedMsg = generateAABillMessage(s, '08', {

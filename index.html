@@ -1,14 +1,194 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#982226" />
-  <meta name="description" content="Nan Hwa Chong (南华昌) Fish Head Steamboat Corner · Established 1927. Authentic charcoal fish head steamboat and traditional Teochew zi char table ordering." />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://ucarecdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://ucarecdn.com; connect-src 'self' https://api.whatsapp.com https://t.me; media-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self';" />
-  <title>Nan Hwa Chong 南华昌 · Fish Head Steamboat (Est. 1927)</title>
-  <link rel="icon" href="https://ucarecdn.com/3fcbba39-c037-4087-9aa9-c018c3ec8d87/-/crop/330x330/144,0/-/preview/32x32/-/format/png/" />
-  <link rel="stylesheet" href="/src/styles.css" />
+  <title>TableHua 招呼 — Ah Hua serves every table.</title>
+  <meta name="description" content="TableHua, with Ah Hua your table host. Ah Hua serves every table. 每一桌，都有阿华招呼。 A digital host for heritage zi char and steamboat restaurants: greet every table, help groups order in their own language, and send each round to staff before the kitchen cooks." />
+  <link rel="canonical" href="https://ahhua.vercel.app/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TableHua 招呼" />
+  <meta property="og:title" content="TableHua 招呼 — Ah Hua serves every table." />
+  <meta property="og:description" content="TableHua, with Ah Hua your table host. Ah Hua serves every table. 每一桌，都有阿华招呼。 A digital host for heritage zi char and steamboat restaurants: greet every table, help groups order in their own language, and send each round to staff before the kitchen cooks." />
+  <meta property="og:url" content="https://ahhua.vercel.app/" />
+  <meta property="og:image" content="https://ahhua.vercel.app/assets/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="en_SG" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="TableHua 招呼 — Ah Hua serves every table." />
+  <meta name="twitter:description" content="TableHua, with Ah Hua your table host. Ah Hua serves every table. 每一桌，都有阿华招呼。 A digital host for heritage zi char and steamboat restaurants: greet every table, help groups order in their own language, and send each round to staff before the kitchen cooks." />
+  <meta name="twitter:image" content="https://ahhua.vercel.app/assets/og.png" />
+  <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch.png" />
+  <link rel="stylesheet" href="/src/site.css" />
+  <script src="/src/legacy-table-redirect.js" defer></script>
 </head>
-<body><div id="app"></div><div id="toast" role="status" aria-live="polite"></div><script type="module" src="/src/app.js"></script></body>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="TableHua 招呼 home">
+        <img src="/assets/seal.png" width="44" height="44" alt="" />
+        <span class="word">TableHua <small>招呼</small></span>
+      </a>
+      <nav class="nav" aria-label="Page">
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+        <a class="btn btn-red" href="#talk">WhatsApp Marcus</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow">For zi char and steamboat houses short on staff</p>
+          <h1>Ah Hua serves every table.</h1>
+          <p class="zh-line">每一桌，都有阿华招呼。</p>
+          <p class="lede">TableHua, with Ah Hua your table host. A digital host greets every table, helps a group order the right dishes in their own language, and sends each round to staff before the kitchen cooks.</p>
+          <div class="actions">
+            <a class="btn btn-red" href="#talk">WhatsApp Marcus</a>
+            <a class="btn btn-ghost" href="/demo">Open the concept demo</a>
+          </div>
+          <p class="fine">Unlike a QR menu that only lists dishes, Ah Hua serves like your best captain, and gives regulars a reason to come back. S$129 a month per outlet. No per-bill fee.</p>
+        </div>
+        <aside class="captain" aria-label="Sample greeting">
+          <div class="captain-top">
+            <img src="/assets/seal.png" width="56" height="56" alt="Round chop seal with the character 华" />
+            <div>
+              <strong>Ah Hua · your table host</strong>
+              <span>Gender-neutral. The name is set per restaurant.</span>
+            </div>
+          </div>
+          <p class="bubble">Welcome. Four of you, and not too spicy? I would start with one charcoal pot, a plate of greens, and rice. I will hold the round until your floor approves it.</p>
+          <div class="langs" aria-label="Languages">
+            <span>English</span><span>中文</span><span>Singlish</span><span>Melayu</span><span>Français</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="problem">
+      <div class="wrap">
+        <p class="eyebrow">The problem</p>
+        <h2>The floor is short. The QR code does not serve.</h2>
+        <p class="section-lead">On a busy night the captain cannot stand at every table. A QR menu can list the dishes. It does not greet anyone, it does not help a mixed table choose, and it does not keep a round off the wok until a person has looked at it.</p>
+        <div class="cards">
+          <article class="card">
+            <h3>Not enough captains</h3>
+            <p>Heritage houses run on people who remember regulars, portions, and how a family likes the pot. Those people are hard to hire, and they cannot be at twenty tables at once.</p>
+          </article>
+          <article class="card">
+            <h3>A list is not a host</h3>
+            <p>Guests still wave for help, still over-order, still miss the rice. The kitchen receives whatever was tapped, with no one on the floor to say yes first.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="wrap">
+        <p class="eyebrow">How it works</p>
+        <h2>Greet, plan, then ask the floor.</h2>
+        <p class="section-lead">Each step is something your captain already does. TableHua does it at every table, and still waits for your staff.</p>
+        <div class="steps">
+          <article class="step"><span class="num">1</span><h3>Greet</h3><p>Ah Hua welcomes the table and asks how many people are eating.</p></article>
+          <article class="step"><span class="num">2</span><h3>Plan</h3><p>Guests set a budget, a spice level, and what to leave out. They can edit the suggestion before anything is sent.</p></article>
+          <article class="step"><span class="num">3</span><h3>Approve the round</h3><p>The table sends a round. Staff check it. The kitchen does not start until that yes.</p></article>
+          <article class="step"><span class="num">4</span><h3>Kitchen</h3><p>Approved tickets show on the kitchen screen. A declined or waiting round never reaches the pass.</p></article>
+          <article class="step"><span class="num">5</span><h3>PayNow split</h3><p>The bill can be split for the table, with a sample PayNow code. TableHua does not take the payment.</p></article>
+          <article class="step"><span class="num">6</span><h3>Membership</h3><p>Regulars can keep a stored-value balance and come back to a host that remembers the house, not a new QR each visit.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="languages">
+      <div class="wrap">
+        <p class="eyebrow">Languages</p>
+        <h2>The table’s language, not only the menu’s.</h2>
+        <p class="section-lead">Guests read and speak with Ah Hua in English, 中文, Singlish, Bahasa Melayu, or Français. The floor still sees the order in the kitchen’s own words.</p>
+        <div class="lang-grid">
+          <article class="lang-card"><strong>English · 中文 · Singlish</strong><p>A family can mix a clear English order with a Singlish aside, and an auntie can ask in Mandarin.</p></article>
+          <article class="lang-card"><strong>Bahasa Melayu · Français</strong><p>The same host, the same menu, another language. Useful for mixed tables and for guests who are not local.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="wrap">
+        <p class="eyebrow">Pricing</p>
+        <h2>One price for the outlet. Nothing on the bill.</h2>
+        <div class="price-grid">
+          <article class="price-main">
+            <p>Per outlet, per month</p>
+            <p class="amount">S$129 <small>/ month</small></p>
+            <ul>
+              <li>No per-bill fee</li>
+              <li>S$300 setup</li>
+              <li>Staff approval before the kitchen</li>
+              <li>Host name set per restaurant. Ah Hua is the default.</li>
+            </ul>
+          </article>
+          <article class="founding">
+            <p class="eyebrow">Founding offer</p>
+            <p>First 10 restaurants</p>
+            <p class="amount">S$69 <small>/ month</small></p>
+            <p>For 3 months, then S$129. <span class="was">S$129</span></p>
+            <p class="scope">Not included: Delivery · A full point-of-sale · Taking the payment ourselves.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="faq">
+      <div class="wrap">
+        <p class="eyebrow">FAQ</p>
+        <h2>Before you write to us</h2>
+        <details>
+          <summary>Does it work alongside the POS we already use?</summary>
+          <p>Yes. TableHua sits with the till you already have. Staff approve each round before it is cooked. It does not replace your POS.</p>
+        </details>
+        <details>
+          <summary>Do we need new hardware?</summary>
+          <p>No. Diners use their own phones on the table link. Staff and the kitchen use a browser on a phone, tablet, or computer you already have.</p>
+        </details>
+        <details>
+          <summary>Can this be claimed under a grant?</summary>
+          <p>You may be eligible for the EDGE Grant. Ask us.</p>
+        </details>
+        <details>
+          <summary>Do you deliver, run the till, or take the payment?</summary>
+          <p>No. Delivery, A full point-of-sale, Taking the payment ourselves. PayNow on the bill is a split your guests can pay to you. The concept demo charges S$0.00.</p>
+        </details>
+      </div>
+    </section>
+
+    <section id="talk">
+      <div class="wrap">
+        <div class="talk">
+          <p class="eyebrow" style="color:#f0d2d3">Talk to Marcus</p>
+          <h2>Tell us about the house.</h2>
+          <p class="section-lead">How many outlets, what you cook, and whether the floor is short on Friday. We will reply like a captain: warm, polite, brief.</p>
+          <div class="actions">
+            <a class="btn btn-red" href="#talk">WhatsApp Marcus</a>
+            <a class="btn btn-ghost" href="/demo">Try the concept demo</a>
+          </div>
+          <p class="todo"><strong>TODO:</strong> Marcus’s WhatsApp number is not set. It is marked <code>TODO</code> in <code>src/config.js</code> (<code>contact.whatsappNumber</code>). This button only scrolls here until that field is a real number. Do not guess one.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <strong>TableHua 招呼</strong>
+      <span>TableHua, with Ah Hua your table host.</span>
+      <span>Ah Hua serves every table. 每一桌，都有阿华招呼。</span>
+      <span>The diner flow is a concept demo for Hua Yuan Steamboat House (华园鱼头炉), a fictional house. Fictional address for this demo. Not a real outlet.</span>
+      <a href="/demo">Open the concept demo</a>
+    </div>
+  </footer>
+</body>
 </html>
