@@ -24,7 +24,7 @@ Customers can choose **English**, **中文（普通话）**, or **Singlish** in 
 
 ## Run, test and build
 
-Requires Node.js 22 or newer; no third-party runtime or build dependencies.
+Requires Node.js 22 or newer (`package.json` allows `>=22`); no third-party runtime or build dependencies.
 
 ```sh
 npm ci
