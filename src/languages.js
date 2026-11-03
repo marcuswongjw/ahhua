@@ -8,7 +8,10 @@ export const languages = {
   zh: { label: '中文（普通话）', speech: 'zh-CN', html: 'zh-Hans' },
   singlish: { label: 'Singlish', speech: 'en-SG', html: 'en-SG' },
   ms: { label: 'Bahasa Melayu', speech: 'ms-MY', html: 'ms' },
-  fr: { label: 'Français', speech: 'fr-FR', html: 'fr' }
+  fr: { label: 'Français', speech: 'fr-FR', html: 'fr' },
+  ta: { label: 'தமிழ்', speech: 'ta-SG', html: 'ta' },
+  teochew: { label: '潮州话', speech: 'zh-CN', html: 'zh-Hant' },
+  hokkien: { label: '福建话', speech: 'zh-CN', html: 'zh-Hant' }
 };
 export const normaliseLanguage = value => Object.hasOwn(languages, value) ? value : 'en';
 const messages = {
@@ -150,6 +153,69 @@ const extraMessages = {
     added: 'La sélection a été ajoutée au panier. Vérifiez-la et apportez vos modifications avant de l’envoyer au personnel.',
     submitted: ({id}) => `La commande ${id} attend la validation du personnel. Ouvrez Staff pour la vérifier, puis Kitchen pour suivre la préparation simulée.`,
     placeholder: 'Ah Hua, que conseillez-vous pour quatre personnes ?',
+  },
+  ta: {
+    welcome: `வணக்கம். நான் ${host}, உங்கள் மேசை உதவியாளர். ஒரு உணவின் பெயர் சொல்லுங்கள், விலை கேளுங்கள், அல்லது எத்தனை பேர் மற்றும் பட்ஜெட் சொல்லுங்கள். இது நிலையான பதில். செயற்கை நுண்ணறிவு இல்லை.`,
+    switched: 'சரி. இனி தமிழில் பதில் அளிப்பேன். உங்கள் கூடை மாறவில்லை. என்ன சாப்பிட வேண்டும்?',
+    voiceEnabled: 'இந்த நிலையான பதிலை தமிழில் படிக்கிறேன். ஒரு உணவு சொல்லுங்கள், அல்லது பரிந்துரை கேளுங்கள்.',
+    allergy: 'ஒவ்வாமை இருந்தால் பணியாளரை அழையுங்கள். இந்த மாதிரி குறிப்புகள் உறுதி செய்யப்படவில்லை. நான் எதையும் சேர்க்கவில்லை.',
+    call: 'பணியாளரை அழைக்க மேலே உள்ள பொத்தானை அழுத்துங்கள். இது ஒரு மாதிரி கோரிக்கை.',
+    checkout: 'கூடையை பாருங்கள், பிறகு பணியாளருக்கு அனுப்புங்கள். பணியாளர் ஒப்புதலுக்குப் பிறகுதான் சமையலறை. உண்மையான பணம் இல்லை.',
+    cart: ({count,amount}) => `உங்கள் கூடையில் ${count} உணவுகள், மாதிரி தொகை ${amount}. அளவை கூடையில் மாற்றலாம்.`,
+    emptyCart: 'கூடை காலியாக உள்ளது. ஒரு ஸ்டீம்போட்டுடன் தொடங்கலாமா?',
+    dietary: 'சைவம் அல்லது ஹலால் என்பதை இந்த மாதிரி மெனுவில் உறுதி செய்ய முடியாது. பணியாளரிடம் கேளுங்கள். எதுவும் சேர்க்கப்படவில்லை.',
+    recommendation: ({pax,amount,dishes,details}) => `${pax} பேருக்கு ${dishes} எப்படி? பரிந்துரை ${amount}${details?` (${details})`:''}. இது ஏற்கெனவே உள்ள கூடையை சேர்க்காது. சமையல் குறிப்பை பணியாளர் உறுதி செய்ய வேண்டும்.`,
+    noRecommendation: 'இந்த விருப்பத்திலும் பட்ஜெட்டிலும் பொருத்தம் இல்லை. பட்ஜெட்டை உயர்த்துங்கள் அல்லது மெனுவை பாருங்கள். கூடை மாறவில்லை.',
+    excluded: 'கூடையை மாற்றவில்லை. கழித்தல் பொத்தானால் நீக்குங்கள், அல்லது என்ன சேர்க்க வேண்டும் என்று சொல்லுங்கள்.',
+    unavailable: 'அந்த உணவுகள் இந்த டெமோவில் இல்லை. வேறு உணவைத் தேர்ந்தெடுங்கள்.',
+    selected: 'உங்கள் தேர்வு கீழே உள்ளது. அளவையும் குறிப்பையும் பார்த்து கூடையில் சேருங்கள். இன்னும் பணியாளருக்கு அனுப்பவில்லை.',
+    menu: 'மெனு அருகில் அல்லது கைபேசியில் கீழே உள்ளது. ஒவ்வொரு உணவையும் அதே கூடையில் சேர்க்கலாம்.',
+    fallback: 'நான் நிலையான பதில் மட்டுமே தருவேன். “recommend for 4, not spicy” என்று முயற்சிக்கவும், விலை கேளுங்கள், அல்லது மெனுவைப் பாருங்கள்.',
+    added: 'கூடையில் சேர்த்தாயிற்று. பார்த்து, தயாரானதும் பணியாளருக்கு அனுப்புங்கள்.',
+    submitted: ({id}) => `ஆர்டர் ${id} பணியாளர் ஒப்புதலுக்காக காத்திருக்கிறது. Staff திரையில் பாருங்கள், பிறகு Kitchen.`,
+    placeholder: 'Ah Hua, நான்கு பேருக்கு என்ன நல்லது?',
+  },
+  teochew: {
+    welcome: `汝好。我是${host}，这桌的招呼。汝讲菜名、问价钱，或者几个人、预算多少。我按固定稿回复。这是演示，无智能客服。`,
+    switched: '好。以后我用潮州话回复汝。购物车无变。汝爱食乜？',
+    voiceEnabled: '我会把这段固定稿读出来。设备若无潮州话音，就用中文音。汝讲一道菜，或叫我配一桌。',
+    allergy: '有过敏，请叫服务员当面确认。示例食谱未核实，我无加任何菜。',
+    call: '请按呼叫服务员。这是演示请求，不是真的下厨。',
+    checkout: '先看购物车，再送给服务员。服务员点头，厨房才做。无真实付款。',
+    cart: ({count,amount}) => `购物车有 ${count} 项，示例共 ${amount}。数量可在购物车改。`,
+    emptyCart: '购物车还空。先来一炉鱼头好吗？',
+    dietary: '素食或清真，这份示例菜单无法保证。请先问服务员。我无加菜。',
+    recommendation: ({pax,amount,dishes,details}) => `${pax} 人，看这几样：${dishes}。建议 ${amount}${details?`（${details}）`:''}。不含购物车已有的菜。食谱要服务员确认。`,
+    noRecommendation: '这个预算和口味配不出一桌。提高预算或自己看菜单。购物车无变。',
+    excluded: '购物车无改。用减号去掉，或告诉我要加什么。',
+    unavailable: '这些菜演示里暂时无。请换一道。',
+    selected: '汝选的在下面。看数量和备注，再放入购物车。还没送给服务员。',
+    menu: '菜单在旁边，手机就在下面。每道菜都进同一个购物车。',
+    fallback: '我只会固定稿，不是随意聊天。试 “recommend for 4, not spicy”，或问价钱，或看菜单。',
+    added: '已放入购物车。看一看，好了再送给服务员。',
+    submitted: ({id}) => `单 ${id} 等服务员看。到 Staff 核准，再到 Kitchen 看演示。`,
+    placeholder: '阿华，四人食乜好？',
+  },
+  hokkien: {
+    welcome: `食饱未？我是${host}。汝讲菜名、问价钱，抑是几个人和预算。我用固定的回复。这是演示，不是智能客服。`,
+    switched: '好。以后我用福建话回复。购物车没有改。汝要食什么？',
+    voiceEnabled: '我来读这段固定回复。手机若没有福建话，就用华语声音。讲一道菜，或叫我建议。',
+    allergy: '有过敏一定要叫服务员。这些说明没有核实，我没有加菜。',
+    call: '按上面叫服务员。这是演示的呼叫。',
+    checkout: '先看购物车，再按送给服务员。服务员同意，厨房才开始。没有真的收钱。',
+    cart: ({count,amount}) => `购物车 ${count} 项，示例 ${amount}。数量可以在购物车改。`,
+    emptyCart: '购物车空空。要不要先来一炉？',
+    dietary: '素、全素或清真，这份菜单不能保证。请问服务员。没有加菜。',
+    recommendation: ({pax,amount,dishes,details}) => `${pax} 人可以考虑 ${dishes}。建议 ${amount}${details?`（${details}）`:''}。不算购物车里已经有的。食谱要服务员确认。`,
+    noRecommendation: '这样的预算和口味配不出来。把预算提高，或自己看菜单。购物车没变。',
+    excluded: '购物车没动。用减号拿掉，或告诉我要加哪一道。',
+    unavailable: '这些菜这回演示没有。请换一道。',
+    selected: '汝选的在下面。对一下数量和备注，再放进购物车。还没有送给服务员。',
+    menu: '菜单在旁边；手机的话在下面。每道菜进同一个购物车。',
+    fallback: '我只按稿回复，不能自由聊天。试 “recommend for 4, not spicy”，问价钱，或看菜单。',
+    added: '已经放进购物车。看一看，准备好再送给服务员。',
+    submitted: ({id}) => `订单 ${id} 等服务员。去 Staff 看，再到 Kitchen 看演示。`,
+    placeholder: '阿华，四个人食什么好？',
   }
 };
 for (const [language, entries] of Object.entries(extraMessages)) {
@@ -168,16 +234,39 @@ const ui = {
   ms: { plan:'Jom rancang hidangan anda', people:'Bilangan orang', budget:'Bajet cadangan ini', any:'Tiada had', spice:'Tahap kepedasan', mild:'Tidak pedas', spicy:'Pedas', avoid:'Elakkan', none:'Tiada', pork:'Hidangan daging babi', fish:'Hidangan ikan', build:'Cadangkan hidangan →', another:'Cadangan lain', cheaper:'Cuba bajet lebih rendah', edit:'Ubah pilihan', remove:'Buang', suggestion:'Cadangan untuk meja anda', add:'Tambah ke troli +', dismiss:'Batal', recommend:'✧ Bantu saya memilih', review:'Semak troli saya', voiceNote:'Jawapan dan mikrofon menggunakan bahasa pilihan anda. Suara bergantung pada peranti.', price:'Harga contoh bermula', verify:'Resipi, alergen dan harga perlu disahkan oleh staf.', quickAdd:'Tambah +1', customise:'Suaikan', soupRefill:'🍲 Tambah kuah sup', teaRefill:'🍵 Tambah teh panas', extraBowls:'🥢 Mangkuk & sudu', cutChilli:'🌶️ Cili padi kicap', extraWipes:'🧻 Tisu basah ekstra', tableBill:'🧾 Bil & kongsi bil', splitBy:'Bahagi mengikut', perPerson:'setiap orang (contoh)', round:'Pusingan', orderPlaced:'Pesanan dihantar kepada staf!', orderPlacedDesc:'Staf akan menyemak sebelum dapur mula memasak.', callService:'🛎️ Perlukan bantuan meja?', callServiceDesc:'Pilih keperluan meja anda dan staf akan membawanya.', potGuide:'🍲 Panduan Memasak & Pemasa', payShare:'Bayar bahagian saya (Simulasi)', reviewOrder:'Semak pesanan meja', chooseLang:'Pilih Bahasa', filterAll:'Semua item', filterSignatures:'👑 Pilihan Utama', filterMild:'Tidak pedas', filterNoPork:'Tanpa babi', welcomeTitle:'Selamat datang ke Meja ', tableSubtitle:'Nan Hwa Chong sejak 1927, steamboat kepala ikan arang di North Bridge Road. Pesan mengikut pusingan, atau tanya Ah Hua. Jawapan daripada skrip tetap.', shareBill:'📲 Salin pecahan bil untuk WhatsApp / PayNow', copiedBill:'Pecahan bil disalin! Boleh tampal ke kumpulan WhatsApp.', elderMode:'Aa Teks Besar', standardMode:'Aa Standard', orderedBadge:'dipesan' },
   fr: { plan:'Composons votre repas', people:'Nombre de personnes', budget:'Budget de cette suggestion', any:'Sans limite', spice:'Préférence épicée', mild:'Doux', spicy:'Épicé', avoid:'Écarter', none:'Aucune', pork:'Plats de porc', fish:'Plats de poisson', build:'Proposer mon repas →', another:'Une autre suggestion', cheaper:'Essayer un budget plus bas', edit:'Modifier mes préférences', remove:'Retirer', suggestion:'Une suggestion pour votre table', add:'Ajouter au panier +', dismiss:'Ignorer', recommend:'✧ Aidez-moi à choisir', review:'Voir mon panier', voiceNote:'Réponses et microphone dans la langue choisie. Les voix dépendent de votre appareil.', price:'Prix indicatif à partir de', verify:'Recettes, allergènes et prix à confirmer auprès du personnel.', quickAdd:'Ajout +1', customise:'Options', soupRefill:'🍲 Rajouter du bouillon', teaRefill:'🍵 Remplir le thé chaud', extraBowls:'🥢 Bols et couverts', cutChilli:'🌶️ Piment & soja', extraWipes:'🧻 Serviettes & rince-doigts', tableBill:'🧾 Addition et partage', splitBy:'Partager entre', perPerson:'par convive (exemple)', round:'Service', orderPlaced:'Commande transmise au personnel !', orderPlacedDesc:'Le personnel valide avant le début de la cuisson.', callService:'🛎️ Besoin d’aide à table ?', callServiceDesc:'Sélectionnez votre demande et un serveur vous l’apportera.', potGuide:'🍲 Guide fondue & minuteurs', payShare:'Payer ma part (Simulé)', reviewOrder:'Voir la commande', chooseLang:'Choisir la langue', filterAll:'Tous les articles', filterSignatures:'👑 Incontournables', filterMild:'Non épicé', filterNoPork:'Sans porc', welcomeTitle:'Bienvenue à la table ', tableSubtitle:'Nan Hwa Chong depuis 1927, fondue au charbon au coin de North Bridge Road et Jalan Sultan. Commandez par service, ou demandez à Ah Hua. Réponses d’un script fixe.', shareBill:'📲 Partager / Copier l’addition pour WhatsApp', copiedBill:'Détail de l’addition copié ! Prêt à partager.', elderMode:'Aa Grand texte', standardMode:'Aa Standard', orderedBadge:'commandé' }
 };
+const firstStep = {
+  en: { nextStep:'Choose a dish from the menu.', seeMenu:'See the menu', askHost:'Ask Ah Hua', tableService:'Tea, bowls, or the bill' },
+  zh: { nextStep:'请从菜单里选一道菜。', seeMenu:'看菜单', askHost:'问阿华', tableService:'茶水、碗筷或账单' },
+  singlish: { nextStep:'Choose one dish from the menu below.', seeMenu:'See the menu', askHost:'Ask Ah Hua', tableService:'Tea, bowls, or the bill' },
+  ms: { nextStep:'Pilih satu hidangan dari menu.', seeMenu:'Lihat menu', askHost:'Tanya Ah Hua', tableService:'Teh, mangkuk atau bil' },
+  fr: { nextStep:'Choisissez un plat dans le menu.', seeMenu:'Voir le menu', askHost:'Demander à Ah Hua', tableService:'Thé, bols ou addition' },
+  ta: { nextStep:'மெனுவிலிருந்து ஒரு உணவைத் தேர்ந்தெடுங்கள்.', seeMenu:'மெனுவைப் பாருங்கள்', askHost:'ஆ ஹுவாவிடம் கேளுங்கள்', tableService:'தேநீர், கிண்ணம் அல்லது பில்' },
+  teochew: { nextStep:'请从菜单选一道菜。', seeMenu:'看菜单', askHost:'问阿华', tableService:'茶、碗或账单' },
+  hokkien: { nextStep:'从菜单选一道菜。', seeMenu:'看菜单', askHost:'问阿华', tableService:'茶、碗筷或账单' }
+};
+for (const [language, extra] of Object.entries(firstStep)) {
+  ui[language] = { ...(ui[language] || ui.en), ...extra };
+}
 export const uiText = (language, key) => ui[normaliseLanguage(language)][key] || ui.en[key];
 export function plannerMessage(language, pax, budget) {
   const amount = budget!==null ? `S$${(budget/100).toFixed(2)}` : uiText(language,'any');
-  return ({en:`Help me plan a meal for ${pax}. Budget: ${amount}.`,zh:`请为 ${pax} 位推荐，预算：${amount}。`,singlish:`${pax} people, help me choose ah. Budget: ${amount}.`,ms:`Cadangkan hidangan untuk ${pax} orang. Bajet: ${amount}.`,fr:`Proposez un repas pour ${pax} personnes. Budget : ${amount}.`})[normaliseLanguage(language)];
+  const line = {
+    en:`Help me plan a meal for ${pax}. Budget: ${amount}.`,
+    zh:`请为 ${pax} 位推荐，预算：${amount}。`,
+    singlish:`${pax} people, help me choose ah. Budget: ${amount}.`,
+    ms:`Cadangkan hidangan untuk ${pax} orang. Bajet: ${amount}.`,
+    fr:`Proposez un repas pour ${pax} personnes. Budget : ${amount}.`,
+    ta:`${pax} பேருக்கு உணவு பரிந்துரைக்கவும். பட்ஜெட்: ${amount}.`,
+    teochew:`${pax} 人，帮我配一桌。预算：${amount}。`,
+    hokkien:`${pax} 人，帮我建议。预算：${amount}。`
+  };
+  return line[normaliseLanguage(language)];
 }
 const dishNames = {
   ms: {grouper:'Sup steamboat kepala ikan kerapu',pomfret:'Steamboat ikan bawal',snapper:'Steamboat ikan merah',chicken:'Ayam pes udang',pork:'Perut babi istimewa',ribs:'Rusuk babi masam manis',tofu:'Tauhu buatan sendiri',kang:'Kangkung sambal',egg:'Telur dadar tiram',rice:'Nasi putih',yam:'Keladi rangup & gelembung ikan',mushroom:'Set cendawan enoki & tauhu pok',tea:'Teh Pu’er tua (teko)',calamansi:'Jus limau kasturi asam boi',barley:'Air barli pandan buatan sendiri'},
   fr: {grouper:'Fondue de tête de mérou',pomfret:'Fondue de pomfret',snapper:'Fondue de vivaneau',chicken:'Poulet à la pâte de crevettes',pork:'Poitrine de porc maison',ribs:'Travers de porc aigre-doux',tofu:'Tofu maison',kang:'Liseron d’eau au sambal',egg:'Omelette aux huîtres',rice:'Riz blanc',yam:'Taro croustillant et vessie de poisson',mushroom:'Assortiment enoki dorés et tofu frit',tea:'Thé Pu’er affiné (théière)',calamansi:'Jus de calamansi à la prune salée',barley:'Eau d’orge au pandan maison'}
 };
-export const dishName = (language, dish) => language==='zh' ? dish.cn : dishNames[language]?.[dish.id] || dish.name;
+export const dishName = (language, dish) => ['zh', 'teochew', 'hokkien'].includes(language) ? dish.cn : dishNames[language]?.[dish.id] || dish.name;
 
 export const categoryNames = {
   zh: {

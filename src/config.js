@@ -76,7 +76,7 @@ export const restaurant = {
   paynowUen: '201619270H',
   receiptPrefix: 'NHC',
   staffPin: '1927',
-  staffPinHint: 'Heritage Est. 1927',
+  staffPinHint: 'Demo PIN',
   logo: 'https://ucarecdn.com/3fcbba39-c037-4087-9aa9-c018c3ec8d87/-/crop/330x330/144,0/-/preview/',
   demoPath: '/demo'
 };

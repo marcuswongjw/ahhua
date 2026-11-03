@@ -511,9 +511,9 @@ function openStaffPinDialog(targetRole) {
       </div>
       <div class="pin-header">
         <div class="pin-icon">🔒</div>
-        <h2 id="staff-pin-title">Floor Staff &amp; Kitchen PIN</h2>
-        <p>Enter the 4-digit Floor Staff PIN to access order approvals, kitchen tickets, and table management.</p>
-        <div class="pin-hint-tag">Floor PIN: <strong>${esc(restaurant.staffPin)}</strong> · ${esc(restaurant.staffPinHint)}</div>
+        <h2 id="staff-pin-title">Demo PIN</h2>
+        <p>This is a demo PIN for the simulated staff and kitchen screens. It is printed here so you can try the floor without a real login.</p>
+        <div class="pin-hint-tag">Demo PIN: <strong>${esc(restaurant.staffPin)}</strong></div>
       </div>
       <form id="staff-pin-form" class="pin-form">
         <div class="pin-input-wrap">
@@ -682,8 +682,10 @@ function mealPlanner() {
 }
 
 function bindPlanner() {
-  $('#meal-planner').ontoggle = e => { plannerOpen = e.target.open; };
-  $('#start-planner').addEventListener('click', () => {
+  const planner = $('#meal-planner');
+  if (!planner) return;
+  planner.ontoggle = e => { plannerOpen = e.target.open; };
+  $('#start-planner')?.addEventListener('click', () => {
     plannerOpen = true;
     $('#meal-planner').open = true;
     $('#planner-pax').focus();
@@ -1189,7 +1191,7 @@ function openAhHuaDialog() {
         ${avatarMarkup()}
         <div>
           <h3 id="ah-hua-dialog-title">Ask ${esc(restaurant.hostName)}</h3>
-            <p>${esc(restaurant.shortName)} host · English · 中文 · Singlish</p>
+            <p>Fixed script · ${esc(languages[state.replyLanguage].label)}</p>
           <small class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></small>
         </div>
         <button type="button" id="sheet-speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice: on' : 'Voice: off'}</button>
@@ -1294,33 +1296,28 @@ function customer() {
   );
   const activeTableCalls = state.calls.filter(c => c.table === table && !c.done);
 
-  return `<section class="welcome">
+  const teaLabel = session.teaChoice === 'water' ? 'Water' : (session.teaChoice === 'chrysanthemum' ? 'Chrysanthemum tea' : 'Pu’er tea');
+  return `<section class="welcome welcome-simple">
     <div>
       <div class="eyebrow-row">
-        <span class="eyebrow">${esc(restaurant.heritageLine)}</span>
+        <span class="eyebrow">${esc(brand.productName)} concept demo · ${esc(restaurant.shortName)}</span>
         ${peerChip()}
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
-      <p>${esc(T('tableSubtitle'))}</p>
-      <div class="seating-status-row">
-        <button type="button" class="seating-status-badge ${session.seatingConfirmed ? 'confirmed' : 'needs-setup'}" id="open-seating-btn" title="Click to view or edit seating pax and tea">
-          <span class="seating-status-icon">👥</span>
-          <span class="seating-status-text">
-            <strong>${session.pax || 4} Pax</strong>
-            <span class="seating-sep">·</span>
-            <span>${session.teaChoice === 'water' ? 'Water (白开水)' : (session.teaChoice === 'chrysanthemum' ? 'Chrysanthemum (胎菊王)' : 'Pu’er Tea (陈年普洱)')}</span>
-            ${session.babyChair ? '<span class="seating-sep">·</span><span>👶 High chair</span>' : ''}
-            ${session.kidsCutlery ? '<span class="seating-sep">·</span><span>🥢 Kids cutlery</span>' : ''}
-          </span>
-          <span class="seating-status-action">${session.seatingConfirmed ? 'Edit ✎' : 'Setup Seating →'}</span>
-        </button>
-      </div>
     </div>
     <div class="welcome-controls">
       <label class="table-select">TABLE NUMBER
         <select id="table" aria-label="Table number">${Array.from({ length: 20 }, (_, i) => `<option value="${String(i + 1).padStart(2, '0')}" ${String(i + 1).padStart(2, '0') === table ? 'selected' : ''}>Table ${String(i + 1).padStart(2, '0')}</option>`).join('')}</select>
       </label>
     </div>
+  </section>
+  <section class="next-step" aria-label="What to do next">
+    <p>${esc(T('nextStep'))}</p>
+    <a class="primary" href="#the-menu">${esc(T('seeMenu'))}</a>
+    <button type="button" class="secondary" id="ask-ah-hua">${esc(T('askHost'))}</button>
+    <button type="button" class="quiet-link" id="open-seating-btn">${session.pax || 4} guests · ${teaLabel}</button>
+    <button type="button" class="quiet-link" id="open-table-service">${esc(T('tableService'))}</button>
+    ${summary.subtotal ? `<button type="button" class="quiet-link" data-open-bill>${esc(T('tableBill'))} · ${money(summary.subtotal)}</button>` : ''}
   </section>
 
   ${activeQueueTicket ? `
@@ -1335,102 +1332,15 @@ function customer() {
     <button type="button" id="switch-to-stage-btn" class="stage-switch-btn">While you wait →</button>
   </div>` : ''}
 
-  <section class="service-bar" aria-label="Quick table service">
-    <div class="service-bar-label">
-      <span class="eyebrow">AT YOUR TABLE · 桌面服务</span>
-      <strong>Need a top-up or extra bowls?</strong>
-    </div>
-    <div class="service-buttons">
-      <button type="button" class="service-chip guide-chip" id="open-steamboat-guide">${esc(T('potGuide'))}</button>
-      <button type="button" class="service-chip" data-service="soup">${esc(T('soupRefill'))}</button>
-      <button type="button" class="service-chip" data-service="tea">${esc(T('teaRefill'))}</button>
-      <button type="button" class="service-chip" data-service="bowls">${esc(T('extraBowls'))}</button>
-      <button type="button" class="service-chip" data-service="chilli">${esc(T('cutChilli'))}</button>
-      <button type="button" class="service-chip" data-service-more title="More table service options">🛎️ More...</button>
-      <button type="button" class="service-chip bill-chip" data-open-bill>${esc(T('tableBill'))}${summary.subtotal ? ` · ${money(summary.subtotal)}` : ''}</button>
-    </div>
-    ${activeTableCalls.length ? `<div class="active-calls-strip" role="status"><span>Waiting for staff:</span>${activeTableCalls.map(c => `<span class="call-pill">${serviceTypes[c.type || 'assistance']?.icon || '♧'} ${esc(c.label || 'Customer would like assistance')}</span>`).join('')}</div>` : ''}
-  </section>
-
-  <section class="spotlight-strip" aria-label="Trending & Most Ordered at Ah Hua">
-    <div class="spotlight-header">
-      <span class="eyebrow">POPULAR WITH FAMILIES · 招牌热点</span>
-      <span class="spotlight-count">Top picks for table sharing</span>
-    </div>
-    <div class="spotlight-scroll">
-      ${menu.filter(d => (d.popularity || 0) >= 90).slice(0, 4).map(d => {
-        const soldOut = state.unavailable.includes(d.id);
-        const inCartQty = tableCart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
-        return `<div class="spotlight-card ${inCartQty ? 'in-cart' : ''}">
-          ${d.image ? `<img class="spotlight-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span class="spotlight-icon">${d.icon}</span>`}
-          <div class="spotlight-info">
-            <small>${d.cn}</small>
-            <strong>${esc(dishName(state.replyLanguage, d))}</strong>
-            <span>${money(d.price)}</span>
-          </div>
-          <button type="button" class="spotlight-add" data-quick-add="${d.id}" ${soldOut ? 'disabled' : ''} aria-label="Add ${esc(d.name)}">
-            ${soldOut ? 'Sold out' : inCartQty ? `+${inCartQty}` : '+'}
-          </button>
-        </div>`;
-      }).join('')}
-    </div>
-  </section>
+  ${activeTableCalls.length ? `<div class="active-calls-strip" role="status"><span>Waiting for staff:</span>${activeTableCalls.map(c => `<span class="call-pill">${esc(c.label || 'Assistance requested')}</span>`).join('')}</div>` : ''}
 
   <div class="dining-grid">
     <div class="left-column">
-      <section class="host-card dock-collapsed">
-        <div class="host-heading">
-          ${avatarMarkup()}
-          <div>
-            <h2>Ask ${esc(restaurant.hostName)}</h2>
-            <p>${esc(restaurant.shortName)} host · English · 中文 · Singlish · Melayu · Français</p>
-          </div>
-          <div class="reply-controls">
-            <button type="button" id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice replies: on' : 'Turn on voice replies'}</button>
-            <button type="button" id="stop-playback" class="text-button" hidden>Stop voice</button>
-          </div>
-        </div>
-        <div class="avatar-caption">
-          <div class="host-caption-row">
-            <span class="host-role-badge">${esc(restaurant.hostName)} · ${esc(restaurant.shortName)} host · fixed script</span>
-            <span class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></span>
-          </div>
-          <div class="language-voice-note">${esc(T('voiceNote'))}</div>
-          <span id="avatar-status" role="status"></span>
-          <p id="voice-reply-help"></p>
-        </div>
-        ${mealPlanner()}
-        <div class="chat-log" role="log" aria-label="Conversation with Ah Hua" aria-live="polite">
-          ${state.messages.map((m, i) => `<div class="message ${m.role}" ${m.role === 'host' ? `lang="${languages[normaliseLanguage(m.language)].html}"` : ''}><small>${m.role === 'host' ? esc(restaurant.hostName.toUpperCase()) : 'YOU'}</small><div>${m.role === 'host' ? esc(applyHost(m.text)) : esc(m.text)}</div>${m.role === 'host' && speechSupported ? `<button type="button" class="replay" data-replay="${i}" aria-label="Read response ${i + 1} aloud">Listen ↗</button>` : ''}</div>`).join('')}
-        </div>
-        ${state.proposal.length ? `<div class="proposal"><b>${esc(T('suggestion'))}</b><ul>${state.proposal.map((x, i) => `<li><div>${x.qty} × ${esc(dishName(state.replyLanguage, dish(x.id)))} <span>${esc(x.size)} · ${money(x.qty * x.unitPrice)}${x.notes ? ' · ' + esc(x.notes) : ''}</span></div><button type="button" class="proposal-remove" data-remove-proposal="${i}" aria-label="${esc(T('remove'))} ${esc(dishName(state.replyLanguage, dish(x.id)))}">×</button></li>`).join('')}</ul><div class="proposal-actions"><strong>${money(total(state.proposal))}</strong><button type="button" data-chat="Another suggestion" class="text-button">${esc(T('another'))}</button><button type="button" id="cheaper-proposal" class="text-button">${esc(T('cheaper'))}</button><button type="button" id="edit-preferences" class="text-button">${esc(T('edit'))}</button><button type="button" id="dismiss-proposal" class="text-button">${esc(T('dismiss'))}</button><button type="button" id="accept-proposal" class="primary small">${esc(T('add'))}</button></div></div>` : ''}
-        <div class="chat-bottom">
-          <div class="suggestions">
-            <button type="button" id="start-planner">${esc(T('recommend'))}</button>
-            <button type="button" data-chat="Another suggestion">${esc(T('another'))}</button>
-            <button type="button" data-chat="Review my cart">${esc(T('review'))}</button>
-          </div>
-          <form id="chat-form">
-            <label class="sr-only" for="message">Message Ah Hua</label>
-            <input id="message" maxlength="500" placeholder="${esc(localReply('placeholder'))}" value="${esc(draft)}">
-            <button class="send" type="submit" aria-label="Send message">↑</button>
-          </form>
-          <div class="voice-controls">
-            <button type="button" id="mic" class="voice-button" ${SpeechRecognition && window.isSecureContext ? '' : 'disabled'} aria-pressed="false">🎙 Speak</button>
-            <span id="voice-status"></span>
-          </div>
-          <details class="voice-privacy">
-            <summary>About voice & this demo</summary>
-            <p>Your browser may send microphone audio to its own speech provider. This demo stores no recordings. Spoken replies use voices already on your device. ${esc(restaurant.hostName)} answers from a fixed script — dishes, sample prices, and meal suggestions. No AI service is connected. Allergy and dietary details need staff confirmation.</p>
-          </details>
-        </div>
-      </section>
-
-      <section class="menu-section">
+      <section class="menu-section" id="the-menu">
         <div class="section-top">
           <div>
-            <div class="eyebrow">${esc(restaurant.shortName.toUpperCase())} HERITAGE · ${esc(restaurant.nameZh)}传统鱼头炉与煮炒</div>
-            <h2>Charcoal steamboat and zi char since ${restaurant.established}.</h2>
+            <div class="eyebrow">Menu</div>
+            <h2>The menu</h2>
           </div>
           <span class="sample-label">Illustrative dishes and prices</span>
         </div>
@@ -1487,19 +1397,9 @@ function customer() {
           ${shown.map(d => {
             const soldOut = state.unavailable.includes(d.id);
             const inCartQty = tableCart.filter(x => x.id === d.id).reduce((n, x) => n + x.qty, 0);
-            const tableOrders = state.orders.filter(o => o.table === table);
-            const tableOrderedQty = tableOrders.flatMap(o => o.items.filter(x => x.id === d.id)).reduce((n, x) => n + x.qty, 0);
-            const scarcityBadge = computeDishBadge(d.id, state);
             return `<article class="dish-card ${soldOut ? 'sold-out' : ''} ${inCartQty ? 'in-cart' : ''}">
               <div class="dish-art ${d.id} ${d.image ? 'has-photo' : ''}">
                 ${d.image ? `<img class="dish-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
-                <div class="dish-badges-overlay">
-                  ${(d.popularity || 0) >= 95 ? `<span class="dish-badge bestseller" title="Top table favourite">👑 Top Pick</span>` : d.tag ? `<span class="dish-badge tag">${esc(d.tag)}</span>` : ''}
-                  ${scarcityBadge ? `<span class="dish-badge scarcity" title="Real-time table demand">${scarcityBadge}</span>` : ''}
-                  ${d.spicyLevel === 1 ? `<span class="dish-badge spice-mild" title="Mild spicy">🌶️ Mild</span>` : d.spicyLevel >= 2 ? `<span class="dish-badge spice-hot" title="Spicy heat">🌶️🌶️ Spicy</span>` : ''}
-                  ${d.category === 'Steamboat' && !['grouper', 'pomfret', 'snapper', 'song-fish-head'].includes(d.id) ? `<span class="dish-badge steamboat-side" title="Add to steamboat broth">🍲 Pot Side</span>` : ''}
-                  ${tableOrderedQty ? `<span class="dish-badge prev-ordered" title="Already ordered by Table ${table}">✓ ${tableOrderedQty} ${esc(T('orderedBadge'))}</span>` : ''}
-                </div>
                 ${inCartQty ? `<b class="in-cart-badge">${inCartQty} in cart</b>` : ''}
               </div>
               <div class="dish-info">
@@ -1507,7 +1407,6 @@ function customer() {
                   <small>${d.cn}</small>
                   <span class="dish-category-tag">${esc(d.category)}</span>
                 </div>
-                ${tableOrderedQty ? `<div class="ordered-table-indicator" role="status">✓ Table ${table} already ordered ${tableOrderedQty} in earlier round</div>` : ''}
                 <h3>${esc(dishName(state.replyLanguage, d))}</h3>
                 <p>${esc(d.desc)}</p>
                 <p class="dish-price-line">${esc(priceLabel(d))}</p>
@@ -1536,15 +1435,7 @@ function customer() {
       </section>
     </div>
     ${cart(summary)}
-  </div>
-  <aside class="ah-hua-floating-dock" id="ah-hua-dock" aria-label="Ah Hua Assistant">
-    <button type="button" class="dock-avatar-btn" id="dock-avatar-trigger" aria-label="Open ${esc(restaurant.hostName)}, the table host">
-      <div class="dock-avatar-circle">
-        <img src="${esc(restaurant.logo)}" alt="${esc(restaurant.nameZh)}" width="36" height="36" />
-      </div>
-      ${(tableCart.length || latestOrder) ? `<div class="dock-speech-bubble" id="dock-speech-text"><span>${esc(dockSpeechText)}</span></div>` : ''}
-    </button>
-  </aside>`;
+  </div>`;
 }
 
 function cart(summary) {
@@ -1870,8 +1761,9 @@ function kitchen() {
 }
 
 function bindCustomer() {
-  $('#chat-form').onsubmit = e => { e.preventDefault(); send($('#message').value); };
-  $('#message').oninput = e => { draft = e.target.value; };
+  const chatForm = $('#chat-form');
+  if (chatForm) chatForm.onsubmit = e => { e.preventDefault(); send($('#message').value); };
+  $('#message') && ($('#message').oninput = e => { draft = e.target.value; });
   $('#table').onchange = e => {
     table = e.target.value;
     const url = new URL(location.href);
@@ -1879,7 +1771,7 @@ function bindCustomer() {
     history.replaceState(null, '', url);
     render();
   };
-  $('#mic').onclick = startVoice;
+  if ($('#mic')) $('#mic').onclick = startVoice;
   const switchLanguage = (newLang) => act(() => {
     draft = $('#message')?.value || '';
     stopVoice();
@@ -1891,13 +1783,13 @@ function bindCustomer() {
     state.messages = state.messages.slice(-80);
   });
   $('#top-language-select')?.addEventListener('change', e => switchLanguage(e.target.value));
-  $('#speaker').onclick = () => {
+  if ($('#speaker')) $('#speaker').onclick = () => {
     speaking = !speaking;
     updateSpeaker();
     if (speaking) speak(localReply('voiceEnabled')); else voicePlayer.stop();
   };
-  $('#stop-playback').onclick = () => voicePlayer.stop();
-  $('#ah-hua-avatar').onclick = () => {
+  if ($('#stop-playback')) $('#stop-playback').onclick = () => voicePlayer.stop();
+  if ($('#ah-hua-avatar')) $('#ah-hua-avatar').onclick = () => {
     if (!speechSupported) { toast('Voice isn’t available in this browser. Chat with me below.'); return; }
     speaking = true;
     updateSpeaker();
@@ -1920,6 +1812,8 @@ function bindCustomer() {
   }));
   document.querySelectorAll('[data-service-more]').forEach(b => b.onclick = () => openServiceModal());
   document.querySelectorAll('[data-open-bill]').forEach(b => b.onclick = () => openBillDialog());
+  $('#ask-ah-hua')?.addEventListener('click', () => openAhHuaDialog());
+  $('#open-table-service')?.addEventListener('click', () => openServiceModal());
   $('#open-steamboat-guide')?.addEventListener('click', () => openSteamboatGuide());
   $('#open-mobile-cart')?.addEventListener('click', () => openMobileCart());
   $('#open-member-btn')?.addEventListener('click', () => openMemberDialog());
@@ -1963,12 +1857,12 @@ function bindCustomer() {
   });
 
   document.querySelectorAll('[data-category]').forEach(b => b.onclick = () => {
-    draft = $('#message').value;
+    draft = $('#message')?.value || draft;
     category = b.dataset.category;
     render();
   });
   document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => {
-    draft = $('#message').value;
+    draft = $('#message')?.value || draft;
     menuFilter = b.dataset.filter;
     render();
   });

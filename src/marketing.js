@@ -90,7 +90,7 @@ export function marketingDocument() {
           </div>
           <p class="bubble">Welcome. Four of you, and not too spicy? I would start with one charcoal pot, a plate of greens, and rice. I will hold the round until your floor approves it.</p>
           <div class="langs" aria-label="Languages">
-            <span>English</span><span>中文</span><span>Singlish</span><span>Melayu</span><span>Français</span>
+            <span>English</span><span>中文</span><span>Singlish</span><span>Melayu</span><span>தமிழ்</span><span>潮州话</span><span>福建话</span>
           </div>
         </aside>
       </div>
@@ -134,10 +134,10 @@ export function marketingDocument() {
       <div class="wrap">
         <p class="eyebrow">Languages</p>
         <h2>The table’s language, not only the menu’s.</h2>
-        <p class="section-lead">Guests read and speak with ${esc(restaurant.hostName)} in English, 中文, Singlish, Bahasa Melayu, or Français. The floor still sees the order in the kitchen’s own words.</p>
+        <p class="section-lead">Guests read with ${esc(restaurant.hostName)} in English, 中文, Singlish, Bahasa Melayu, Tamil, Teochew, or Hokkien. Spoken playback uses a voice the phone already has, so Teochew and Hokkien may be read in Mandarin. The floor still sees the order in the kitchen’s own words.</p>
         <div class="lang-grid">
           <article class="lang-card"><strong>English · 中文 · Singlish</strong><p>A family can mix a clear English order with a Singlish aside, and an auntie can ask in Mandarin.</p></article>
-          <article class="lang-card"><strong>Bahasa Melayu · Français</strong><p>The same host, the same menu, another language. Useful for mixed tables and for guests who are not local.</p></article>
+          <article class="lang-card"><strong>தமிழ் · 潮州话 · 福建话</strong><p>Tamil, Teochew, and Hokkien are on the table for this house. Bahasa Melayu is there too.</p></article>
         </div>
       </div>
     </section>
