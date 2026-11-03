@@ -7,7 +7,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
 function cta(className = 'btn btn-red') {
   const href = whatsappHref();
   const label = esc(contact.cta);
-  if (href) return `<a class="${className}" href="${esc(href)}">${label}</a>`;
+  if (href) return `<a class="${className}" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
   return `<a class="${className}" href="#talk">${label}</a>`;
 }
 
@@ -179,10 +179,6 @@ export function marketingDocument() {
         <details>
           <summary>Do we need new hardware?</summary>
           <p>No. Diners use their own phones on the table link. Staff and the kitchen use a browser on a phone, tablet, or computer you already have.</p>
-        </details>
-        <details>
-          <summary>Can this be claimed under a grant?</summary>
-          <p>You may be eligible for the EDGE Grant. Ask us.</p>
         </details>
         <details>
           <summary>Do you deliver, run the till, or take the payment?</summary>

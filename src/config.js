@@ -2,8 +2,7 @@
  * TableHua brand, pricing, contact, and the demo restaurant.
  * Swap `restaurant` when another house tries the demo.
  * `exampleRestaurant` is an unused sample of that shape.
- * Leave contact.whatsappNumber as TODO until a real number is supplied.
- * Do not invent a phone number.
+ * The WhatsApp buttons use contact.whatsappNumber. Do not put a personal name in this file.
  */
 
 export const brand = {
@@ -41,12 +40,9 @@ export const outOfScope = [
 
 export const contact = {
   cta: 'WhatsApp us',
-  /**
-   * TODO: replace with the restaurant’s WhatsApp number.
-   * Digits only, country code included, no plus and no spaces.
-   * Example shape, not a real number: 6591234567
-   */
-  whatsappNumber: 'TODO'
+  /** Singapore 9630 4128, digits only with country code. */
+  whatsappNumber: '6596304128',
+  whatsappMessage: "Hi, I'd like to know more about TableHua"
 };
 
 export const site = {
@@ -124,8 +120,8 @@ export function sgd(amount) {
 export function whatsappHref() {
   const n = String(contact.whatsappNumber || '');
   if (!/^[0-9]{8,15}$/.test(n)) return '';
-  const text = encodeURIComponent('Hello, I would like to ask about TableHua for my restaurant.');
-  return `https://wa.me/${n}?text=${text}`;
+  const text = encodeURIComponent(contact.whatsappMessage || '');
+  return text ? `https://wa.me/${n}?text=${text}` : `https://wa.me/${n}`;
 }
 
 export function restaurantAddress() {

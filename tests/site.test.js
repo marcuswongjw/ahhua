@@ -7,7 +7,7 @@ import { brand, pricing, contact, restaurant, exampleRestaurant, whatsappHref, s
 import { handleRequest } from '../server.mjs';
 import { EventEmitter } from 'node:events';
 
-test('brand config is the single place for price, host, and the TODO WhatsApp number', () => {
+test('brand config is the single place for price, host, and the WhatsApp number', () => {
   assert.equal(brand.productName, 'TableHua');
   assert.equal(brand.tagline, 'Ah Hua serves every table.');
   assert.equal(brand.taglineZh, '每一桌，都有阿华招呼。');
@@ -16,8 +16,9 @@ test('brand config is the single place for price, host, and the TODO WhatsApp nu
   assert.equal(pricing.perBillFee, 0);
   assert.equal(pricing.founding.monthlyPerOutlet, 69);
   assert.equal(pricing.founding.restaurantCap, 10);
-  assert.equal(contact.whatsappNumber, 'TODO');
-  assert.equal(whatsappHref(), '');
+  assert.equal(contact.whatsappNumber, '6596304128');
+  assert.equal(contact.whatsappMessage, "Hi, I'd like to know more about TableHua");
+  assert.equal(whatsappHref(), "https://wa.me/6596304128?text=Hi%2C%20I'd%20like%20to%20know%20more%20about%20TableHua");
   assert.equal(restaurant.hostName, 'Ah Hua');
   assert.equal(restaurant.fictional, false);
   assert.equal(restaurant.shortName, 'Nan Hwa Chong');
@@ -28,16 +29,17 @@ test('brand config is the single place for price, host, and the TODO WhatsApp nu
   assert.equal('person' in contact, false);
 });
 
-test('owner page states the offer, the grant line, and does not invent a WhatsApp number', () => {
+test('owner page states the offer and links WhatsApp us to the configured chat', () => {
   const html = marketingDocument();
   assert.match(html, /TableHua 招呼/);
   assert.match(html, new RegExp(brand.tagline));
   assert.match(html, new RegExp(brand.taglineZh));
   assert.ok(html.includes(sgd(pricing.monthlyPerOutlet)));
   assert.ok(html.includes(sgd(pricing.founding.monthlyPerOutlet)));
-  assert.match(html, /You may be eligible for the EDGE Grant\. Ask us\./);
-  assert.match(html, /whatsappNumber/);
-  assert.doesNotMatch(html, /wa\.me\/659/);
+  assert.doesNotMatch(html, /EDGE Grant|claimed under a grant/i);
+  assert.equal([...html.matchAll(/WhatsApp us/g)].length >= 3, true);
+  assert.equal([...html.matchAll(/href="https:\/\/wa\.me\/6596304128\?text=Hi%2C%20I&#39;d%20like%20to%20know%20more%20about%20TableHua"/g)].length, 3);
+  assert.doesNotMatch(html, /TODO/);
   assert.match(html, /href="\/demo"/);
   assert.match(html, /property="og:title"/);
   assert.match(html, /No per-bill fee/);
