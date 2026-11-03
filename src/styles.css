@@ -26,6 +26,13 @@
 .house-more>summary::-webkit-details-marker{display:none}
 .house-more-panel{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:30;min-width:190px;box-shadow:0 10px 28px #2c28261f}
 .house-more-panel .member-top-pill,.house-more-panel .banquet-top-pill,.house-more-panel .font-toggle-btn{width:100%;justify-content:flex-start}
+.welcome-simple{margin-bottom:16px}
+.welcome-simple .next-copy{font-size:18px;color:#2c2826;max-width:36em}
+.next-step{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 22px}
+.next-step p{font-size:18px;flex:1 1 240px;color:#2c2826}
+.next-step .primary,.next-step .secondary{min-height:48px;font-size:16px;padding:12px 18px}
+.quiet-link{background:none;border:0;color:var(--green);text-decoration:underline;font-size:15px;padding:10px 4px;min-height:44px}
+#the-menu{scroll-margin-top:72px}
 @media(max-width:640px){
   .top-actions{max-width:none!important;overflow:visible;flex:1;justify-content:flex-end;gap:6px!important}
   .top-lang-dropdown{padding:4px 8px!important}
