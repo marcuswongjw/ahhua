@@ -7,7 +7,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
 function cta(className = 'btn btn-red') {
   const href = whatsappHref();
   const label = esc(contact.cta);
-  if (href) return `<a class="${className}" href="${esc(href)}">${label}</a>`;
+  if (href) return `<a class="${className}" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
   return `<a class="${className}" href="#talk">${label}</a>`;
 }
 
