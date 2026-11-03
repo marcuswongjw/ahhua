@@ -3370,6 +3370,92 @@ export function guestBreakdown(state, table) {
   }
   return breakdown;
 }
+
+export const STEAMBOAT_PORTIONS = {
+  Regular: {
+    label: 'Medium Pot (中炉 · 招牌)',
+    paxLabel: '2–4 Pax (建议2–4人)',
+    paxMin: 2,
+    paxMax: 4,
+    fishWeight: '~700g Fresh Cutlets',
+    brothVolume: '1.8L Charcoal Broth',
+    desc: 'Simmered over glowing charcoal with fried yam cubes, sour plum & seasonal greens.'
+  },
+  Large: {
+    label: 'Large Pot (大炉 · 欢聚)',
+    paxLabel: '5–8 Pax (建议5–8人)',
+    paxMin: 5,
+    paxMax: 8,
+    fishWeight: '~1,100g Jumbo Cutlets & Whole Head',
+    brothVolume: '2.8L Charcoal Broth',
+    desc: 'Bountiful family size with double yam portions, sole fish & extra rich charcoal broth refill.'
+  }
+};
+
+export const STEAMBOAT_BROTHS = [
+  {
+    id: 'milky',
+    name: 'Charcoal Milky Broth',
+    cn: '招牌炭火奶白浓汤',
+    desc: 'Simmered 8 hours with deep-sea fish bones & old hen. Velvety sweet.',
+    icon: '🍲'
+  },
+  {
+    id: 'clear',
+    name: 'Clear Teochew Ginger Broth',
+    cn: '潮州清甜老姜鲜汤',
+    desc: 'Traditional Teochew recipe with fresh old ginger, sour plum & celery. Clean & light.',
+    icon: '🥣'
+  }
+];
+
+export function generateAABillMessage(state, tableId, { hostName = 'Host', hostPhone = '', mode = 'even', pax = 4 } = {}) {
+  const summary = tableSummary(state, tableId, pax);
+  const guests = guestBreakdown(state, tableId);
+  const safePax = Math.max(1, Number(pax) || 4);
+  const dateStr = new Date().toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  let text = `🍲 *NAN HWA CHONG (南华昌) · Table ${tableId} Bill Split (好友分账)*\n`;
+  text += `📍 812/814/816 North Bridge Rd · Est. 1927\n`;
+  text += `📅 ${dateStr} · ${safePax} Diners\n`;
+  text += `────────────────────────────\n`;
+  text += `💰 *Total Bill:* ${money(summary.grandTotal)} (Dishes: ${money(summary.rawSubtotal ?? summary.subtotal)}`;
+  if (summary.discount > 0) text += `, Voucher: -${money(summary.discount)}`;
+  text += ` + 10% SC + 9% GST)\n`;
+
+  if (mode === 'even' || guests.length <= 1) {
+    text += `👥 *Even Split (AA均分):* *${money(summary.grandTotalPerPax)}* / person\n\n`;
+    text += `📋 *Dishes Ordered:*\n`;
+    for (const o of summary.activeOrders) {
+      for (const it of o.items) {
+        if (!it.voided) {
+          text += `  • ${it.qty}× ${it.name}${it.size === 'Large' ? ' (Large)' : ''} (${money(it.qty * it.unitPrice)})\n`;
+        }
+      }
+    }
+  } else {
+    text += `👥 *Itemized Breakdown (按人分账):*\n`;
+    for (const g of guests) {
+      text += `\n${g.emoji} *${g.guestName}:* *${money(g.grandTotal)}*\n`;
+      for (const it of g.items) {
+        text += `  • ${it.qty}× ${it.name}${it.size === 'Large' ? ' (Large)' : ''} (${money(it.qty * it.unitPrice)})\n`;
+      }
+      text += `  └ Incl. 10% SC & 9% GST\n`;
+    }
+  }
+
+  text += `\n────────────────────────────\n`;
+  if (hostPhone) {
+    text += `👉 *PayNow to ${hostName}:* \`${hostPhone}\`\n`;
+    text += `📲 PayNow Amount: *${mode === 'even' ? money(summary.grandTotalPerPax) : 'See your share above'}*\n`;
+  } else {
+    text += `👉 *PayNow to Table Host (${hostName})*\n`;
+  }
+  text += `🔗 *View Live Table Check:* https://ahhua.vercel.app/?table=${tableId}\n`;
+  text += `✨ Thank you for dining with Ah Hua! 欢聚南华昌，炭火传温情。`;
+
+  return text;
+}
 export function closeTableSession(state, table) {
   const session = table ? getTableSession(state, table) : null;
   const activeOrders = state.orders.filter(x => x.table === table && x.status !== 'rejected');

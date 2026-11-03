@@ -9,7 +9,8 @@ import {
   getMember, registerMember, topUpMemberBalance, applyCoupon,
   removeCoupon, payWithMemberBalance, submitReview, createBanquetBooking,
   createQueueTicket, transferQueueToTable,
-  DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics
+  DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics,
+  generateAABillMessage, STEAMBOAT_PORTIONS, STEAMBOAT_BROTHS
 } from '../src/domain.js';
 import { computeDishBadge } from '../src/lore.js';
 import { handleRequest } from '../server.mjs';
@@ -674,4 +675,45 @@ test('confirmTableSeating configures covers, tea choice and family care alerts',
   const teaLine9 = session9.cart.find(x => x.id === 'tea');
   assert.ok(teaLine9);
   assert.ok(teaLine9.notes.includes('Chrysanthemum'));
+});
+
+test('generateAABillMessage formats viral WhatsApp split text and portion definitions exist', () => {
+  const s = initialState();
+  addLines(s, [
+    makeLine('grouper', 1, 'Regular', '', 'fire', 'Marcus', '🧑'),
+    makeLine('chicken', 1, 'Regular', '', 'fire', 'Sarah', '👩')
+  ], '08');
+  submit(s, '08');
+
+  // Test Even Split Message
+  const evenMsg = generateAABillMessage(s, '08', {
+    hostName: 'Marcus',
+    hostPhone: '91234567',
+    mode: 'even',
+    pax: 4
+  });
+  assert.ok(evenMsg.includes('NAN HWA CHONG'));
+  assert.ok(evenMsg.includes('Table 08'));
+  assert.ok(evenMsg.includes('Even Split (AA均分)'));
+  assert.ok(evenMsg.includes('91234567'));
+  assert.ok(evenMsg.includes('https://ahhua.vercel.app/?table=08'));
+
+  // Test Itemized Split Message
+  const itemizedMsg = generateAABillMessage(s, '08', {
+    hostName: 'Marcus',
+    hostPhone: '91234567',
+    mode: 'itemized',
+    pax: 2
+  });
+  assert.ok(itemizedMsg.includes('Itemized Breakdown (按人分账)'));
+  assert.ok(itemizedMsg.includes('Marcus'));
+  assert.ok(itemizedMsg.includes('Sarah'));
+  assert.ok(itemizedMsg.includes('Incl. 10% SC & 9% GST'));
+
+  // Test Steamboat portion metadata
+  assert.equal(STEAMBOAT_PORTIONS.Regular.fishWeight, '~700g Fresh Cutlets');
+  assert.equal(STEAMBOAT_PORTIONS.Large.fishWeight, '~1,100g Jumbo Cutlets & Whole Head');
+  assert.equal(STEAMBOAT_BROTHS.length, 2);
+  assert.equal(STEAMBOAT_BROTHS[0].id, 'milky');
+  assert.equal(STEAMBOAT_BROTHS[1].id, 'clear');
 });

@@ -6,7 +6,8 @@ import {
   getMember, registerMember, topUpMemberBalance, applyCoupon, removeCoupon, payWithMemberBalance,
   submitReview, createBanquetBooking, createQueueTicket, transferQueueToTable,
   DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics,
-  confirmTableSeating, MID_MEAL_REORDER_ITEMS
+  confirmTableSeating, MID_MEAL_REORDER_ITEMS,
+  generateAABillMessage, STEAMBOAT_PORTIONS, STEAMBOAT_BROTHS
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
@@ -181,6 +182,7 @@ function ensureDialogRoot() {
       <dialog id="banquet-dialog" class="bottom-sheet-dialog" aria-labelledby="banquet-dialog-title"></dialog>
       <dialog id="queue-dialog" class="bottom-sheet-dialog" aria-labelledby="queue-dialog-title"></dialog>
       <dialog id="seating-dialog" class="bottom-sheet-dialog" aria-labelledby="seating-dialog-title"></dialog>
+      <dialog id="share-bill-dialog" class="bottom-sheet-dialog" aria-labelledby="share-bill-title"></dialog>
       <dialog id="reset-dialog" aria-labelledby="reset-dialog-title">
         <form method="dialog">
           <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -198,7 +200,7 @@ function ensureDialogRoot() {
       '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog',
       '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog',
       '#e-receipt-dialog', '#member-dialog', '#review-dialog', '#banquet-dialog',
-      '#queue-dialog', '#seating-dialog', '#reset-dialog'
+      '#queue-dialog', '#seating-dialog', '#share-bill-dialog', '#reset-dialog'
     ].forEach(sel => wireDialog(document.querySelector(sel)));
   }
 }
@@ -1018,6 +1020,7 @@ function renderCenterStage(summary) {
         <div class="tracker-actions">
           <button type="button" class="primary small" id="stage-back-to-menu-btn">← Add More Dishes (Round ${nextRound})</button>
           <button type="button" class="secondary small bill-chip" data-open-bill>🧾 Table Bill & PayNow SGQR (${money(summary.subtotal)})</button>
+          <button type="button" class="secondary small share-aa-chip" id="stage-share-bill-btn">📲 Share AA Bill (好友分账)</button>
         </div>
       </div>
     ` : `
@@ -2088,6 +2091,10 @@ function bindCustomer() {
     openMobileCart();
   });
 
+  $('#stage-share-bill-btn')?.addEventListener('click', () => {
+    openShareBillDialog();
+  });
+
   $('#dock-avatar-trigger')?.addEventListener('click', () => {
     openAhHuaDialog();
   });
@@ -2134,6 +2141,7 @@ function openDish(id) {
   const d = dish(id);
   const dialog = $('#dish-dialog');
   const selectedMods = new Set();
+  const isSteamboat = d.category === 'Steamboat';
 
   const allModifiers = [
     ...POPULAR_MODIFIERS.map(m => m.label),
@@ -2141,125 +2149,241 @@ function openDish(id) {
   ];
   const uniqueMods = [...new Set(allModifiers)];
 
-  dialog.innerHTML = `<form id="dish-form">
-    <div class="dialog-top">
-      <span class="eyebrow">FOR YOUR TABLE · ${esc(d.category.toUpperCase())}</span>
-      <button type="button" class="close-dialog" aria-label="Close dish details">×</button>
-    </div>
-    <div class="dialog-art ${d.image ? 'has-photo' : ''}">
-      ${d.image ? `<img class="dialog-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
-    </div>
-    <small>${d.cn}</small>
-    <h2 id="dish-dialog-title">${esc(d.name)}</h2>
-    <p>${esc(d.desc)}</p>
-    <div class="allergen-note"><b>Sample allergens:</b> ${esc(d.allergens)}. Recipe unverified. For allergies, call a server; no safety guarantee.</div>
-    <div class="dish-options">
-      <label>Portion
-        <select name="size" id="dish-size-select">
-          <option value="Regular" data-price="${d.price}">Regular · ${money(d.price)}</option>
-          ${!d.singleSize ? `<option value="Large" data-price="${d.price + 800}">Large · ${money(d.price + 800)}</option>` : ''}
-        </select>
-        <small>${d.category === 'Steamboat' ? 'Sample sharing portion; ask staff to confirm.' : 'Sample portion; ask staff to confirm.'}</small>
-      </label>
-      <label>Quantity
-        <div class="modal-stepper">
-          <button type="button" id="modal-qty-minus" aria-label="Decrease quantity">−</button>
-          <input name="qty" id="modal-qty-input" type="number" min="1" max="20" value="1" readonly required>
-          <button type="button" id="modal-qty-plus" aria-label="Increase quantity">+</button>
+  let currentSize = 'Regular';
+  let selectedBroth = isSteamboat ? 'Charcoal Milky Broth' : '';
+
+  function renderDishModal() {
+    const basePrice = d.price + (currentSize === 'Large' ? 800 : 0);
+    const existingQty = Number(dialog.querySelector('#modal-qty-input')?.value) || 1;
+
+    dialog.innerHTML = `<form id="dish-form">
+      <div class="dialog-top">
+        <span class="eyebrow">FOR YOUR TABLE · ${esc(d.category.toUpperCase())}</span>
+        <button type="button" class="close-dialog" aria-label="Close dish details">×</button>
+      </div>
+      <div class="dialog-art ${d.image ? 'has-photo' : ''}">
+        ${d.image ? `<img class="dialog-photo" src="${esc(d.image)}" alt="${esc(d.name)}" loading="lazy">` : `<span>${d.icon}</span>`}
+      </div>
+      <small>${d.cn}</small>
+      <h2 id="dish-dialog-title">${esc(d.name)}</h2>
+      <p>${esc(d.desc)}</p>
+      <div class="allergen-note"><b>Sample allergens:</b> ${esc(d.allergens)}. Recipe unverified. For allergies, call a server; no safety guarantee.</div>
+
+      <div class="dish-options-section">
+        <span class="modifier-label">${isSteamboat ? 'Steamboat Portion & Fish Weight (分量与克重):' : 'Portion Sizing (分量选择):'}</span>
+        ${isSteamboat ? `
+          <div class="visual-size-grid" role="radiogroup" aria-label="Steamboat portion size">
+            <label class="size-card ${currentSize === 'Regular' ? 'active' : ''}">
+              <input type="radio" name="size" value="Regular" ${currentSize === 'Regular' ? 'checked' : ''}>
+              <div class="size-card-inner">
+                <div class="size-card-top">
+                  <strong>${STEAMBOAT_PORTIONS.Regular.label}</strong>
+                  <span class="size-price">${money(d.price)}</span>
+                </div>
+                <div class="size-pax-badge">👥 ${STEAMBOAT_PORTIONS.Regular.paxLabel}</div>
+                <div class="size-weight-badge">⚖️ ${STEAMBOAT_PORTIONS.Regular.fishWeight} · ${STEAMBOAT_PORTIONS.Regular.brothVolume}</div>
+                <p class="size-card-desc">${STEAMBOAT_PORTIONS.Regular.desc}</p>
+              </div>
+            </label>
+            <label class="size-card ${currentSize === 'Large' ? 'active' : ''}">
+              <input type="radio" name="size" value="Large" ${currentSize === 'Large' ? 'checked' : ''}>
+              <div class="size-card-inner">
+                <div class="size-card-top">
+                  <strong>${STEAMBOAT_PORTIONS.Large.label}</strong>
+                  <span class="size-price">${money(d.price + 800)}</span>
+                </div>
+                <div class="size-pax-badge banquet">🎉 ${STEAMBOAT_PORTIONS.Large.paxLabel}</div>
+                <div class="size-weight-badge">⚖️ ${STEAMBOAT_PORTIONS.Large.fishWeight} · ${STEAMBOAT_PORTIONS.Large.brothVolume}</div>
+                <p class="size-card-desc">${STEAMBOAT_PORTIONS.Large.desc}</p>
+              </div>
+            </label>
+          </div>
+        ` : `
+          <div class="visual-size-grid zi-char-size-grid" role="radiogroup" aria-label="Portion size">
+            <label class="size-card ${currentSize === 'Regular' ? 'active' : ''}">
+              <input type="radio" name="size" value="Regular" ${currentSize === 'Regular' ? 'checked' : ''}>
+              <div class="size-card-inner">
+                <div class="size-card-top">
+                  <strong>Regular · 标准例牌</strong>
+                  <span class="size-price">${money(d.price)}</span>
+                </div>
+                <div class="size-pax-badge">👥 2–3 Pax sharing</div>
+              </div>
+            </label>
+            ${!d.singleSize ? `
+              <label class="size-card ${currentSize === 'Large' ? 'active' : ''}">
+                <input type="radio" name="size" value="Large" ${currentSize === 'Large' ? 'checked' : ''}>
+                <div class="size-card-inner">
+                  <div class="size-card-top">
+                    <strong>Large · 大份宴席</strong>
+                    <span class="size-price">${money(d.price + 800)}</span>
+                  </div>
+                  <div class="size-pax-badge banquet">🎉 4–6 Pax sharing</div>
+                </div>
+              </label>
+            ` : ''}
+          </div>
+        `}
+      </div>
+
+      ${isSteamboat ? `
+        <div class="broth-selector-section">
+          <span class="modifier-label">Select Heritage Charcoal Broth · 百年炭火汤底:</span>
+          <div class="broth-cards-grid" role="radiogroup" aria-label="Broth choice">
+            ${STEAMBOAT_BROTHS.map(b => `
+              <label class="broth-card ${selectedBroth === b.name ? 'active' : ''}">
+                <input type="radio" name="brothChoice" value="${b.name}" ${selectedBroth === b.name ? 'checked' : ''}>
+                <div class="broth-card-inner">
+                  <div class="broth-card-header">
+                    <span class="broth-icon">${b.icon}</span>
+                    <div>
+                      <strong>${b.name}</strong>
+                      <small>${b.cn}</small>
+                    </div>
+                  </div>
+                  <p>${b.desc}</p>
+                </div>
+              </label>
+            `).join('')}
+          </div>
         </div>
-      </label>
-    </div>
-    <div class="modifier-group">
-      <span class="modifier-label">1-Tap Modifiers (Zero typing required):</span>
-      <div class="modifier-chips">
-        ${uniqueMods.map(mod => `<button type="button" class="mod-chip" data-mod="${esc(mod)}" aria-pressed="false">${esc(mod)}</button>`).join('')}
-      </div>
-    </div>
-    <div class="timing-selector-row" style="margin: 12px 0;">
-      <span class="modifier-label">Serving Timing · 上菜时机:</span>
-      <div class="timing-chips" style="display:flex;gap:8px;margin-top:6px;">
-        <label class="timing-option-label" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;background:#f5f8f2;padding:6px 10px;border-radius:6px;border:1px solid #dce2d4;cursor:pointer;">
-          <input type="radio" name="timing" value="fire" checked> 🔥 Cook &amp; Serve (即起)
+      ` : ''}
+
+      <div class="qty-and-timing-row">
+        <label class="qty-control-label">Quantity
+          <div class="modal-stepper">
+            <button type="button" id="modal-qty-minus" aria-label="Decrease quantity">−</button>
+            <input name="qty" id="modal-qty-input" type="number" min="1" max="20" value="${existingQty}" readonly required>
+            <button type="button" id="modal-qty-plus" aria-label="Increase quantity">+</button>
+          </div>
         </label>
-        <label class="timing-option-label" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;background:#fdfcf8;padding:6px 10px;border-radius:6px;border:1px solid #e5ded0;cursor:pointer;">
-          <input type="radio" name="timing" value="hold"> ⏸️ Hold until requested (叫起)
-        </label>
+
+        <div class="timing-selector-col">
+          <span class="modifier-label">Serving Timing · 上菜时机:</span>
+          <div class="timing-chips">
+            <label class="timing-option-label">
+              <input type="radio" name="timing" value="fire" checked> 🔥 Cook &amp; Serve (即起)
+            </label>
+            <label class="timing-option-label">
+              <input type="radio" name="timing" value="hold"> ⏸️ Hold (叫起)
+            </label>
+          </div>
+        </div>
       </div>
-    </div>
-    <details class="custom-note-details">
-      <summary>Other special request for kitchen? (optional)</summary>
-      <textarea name="notes" maxlength="160" placeholder="e.g. sauce on side, less salty">${esc(state.preference)}</textarea>
-    </details>
-    <p class="muted">Requests need staff confirmation.</p>
-    <button class="primary wide" id="modal-add-btn" type="submit">Add to shared cart · <span id="modal-price-calc">${money(d.price)}</span> +</button>
-  </form>`;
 
-  dialog.showModal();
-  dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
-  const sizeSelect = dialog.querySelector('#dish-size-select');
-  const qtyInput = dialog.querySelector('#modal-qty-input');
-  const minusBtn = dialog.querySelector('#modal-qty-minus');
-  const plusBtn = dialog.querySelector('#modal-qty-plus');
-  const priceCalc = dialog.querySelector('#modal-price-calc');
+      <div class="modifier-group">
+        <span class="modifier-label">1-Tap Modifiers (Zero typing required):</span>
+        <div class="modifier-chips">
+          ${uniqueMods.map(mod => `<button type="button" class="mod-chip ${selectedMods.has(mod) ? 'active' : ''}" data-mod="${esc(mod)}" aria-pressed="${selectedMods.has(mod)}">${esc(mod)}</button>`).join('')}
+        </div>
+      </div>
 
-  function updateCalc() {
-    const basePrice = d.price + (sizeSelect?.value === 'Large' ? 800 : 0);
-    const q = Number(qtyInput?.value) || 1;
-    if (priceCalc) priceCalc.textContent = money(basePrice * q);
-  }
+      <details class="custom-note-details">
+        <summary>Other special request for kitchen? (optional)</summary>
+        <textarea name="notes" maxlength="160" placeholder="e.g. sauce on side, less salty">${esc(state.preference)}</textarea>
+      </details>
+      <p class="muted">Requests need staff confirmation.</p>
+      <button class="primary wide" id="modal-add-btn" type="submit">Add to shared cart · <span id="modal-price-calc">${money(basePrice * existingQty)}</span> +</button>
+    </form>`;
 
-  sizeSelect?.addEventListener('change', updateCalc);
-  minusBtn?.addEventListener('click', () => {
-    let val = Number(qtyInput.value) || 1;
-    if (val > 1) { qtyInput.value = val - 1; updateCalc(); }
-  });
-  plusBtn?.addEventListener('click', () => {
-    let val = Number(qtyInput.value) || 1;
-    if (val < 20) { qtyInput.value = val + 1; updateCalc(); }
-  });
-  dialog.querySelectorAll('[data-mod]').forEach(chip => {
-    chip.onclick = () => {
-      const mod = chip.dataset.mod;
-      if (selectedMods.has(mod)) selectedMods.delete(mod); else selectedMods.add(mod);
-      chip.setAttribute('aria-pressed', String(selectedMods.has(mod)));
-      chip.classList.toggle('active', selectedMods.has(mod));
-    };
-  });
-  $('#dish-form').onsubmit = e => {
-    e.preventDefault();
-    const form = new FormData(e.target);
-    const qty = Number(form.get('qty'));
-    const size = form.get('size');
-    const timing = form.get('timing') || 'fire';
-    const customNote = String(form.get('notes') || '').trim();
-    const combinedNotes = [...selectedMods, ...(customNote ? [customNote] : [])].join(', ');
-    if (!Number.isInteger(qty) || qty < 1) return;
+    // Wire size radio cards
+    dialog.querySelectorAll('input[name="size"]').forEach(r => {
+      r.onchange = () => {
+        currentSize = r.value;
+        renderDishModal();
+      };
+    });
 
-    const tableCart = getTableSession(state, table).cart;
-    const otherGuestItem = tableCart.find(y => y.id === id && y.addedBy && y.addedBy !== (currentGuest?.name || 'Guest'));
-    const isDuplicate = Boolean(otherGuestItem);
-    if (isDuplicate) {
-      dockSpeechText = `Eh! ${otherGuestItem.addedBy} already added ${d.name}! Another portion or sharing?`;
-      toast(`⚠️ Duplicate notice: ${otherGuestItem.addedBy} already added ${d.name} in this round.`);
+    // Wire broth radio cards
+    dialog.querySelectorAll('input[name="brothChoice"]').forEach(r => {
+      r.onchange = () => {
+        selectedBroth = r.value;
+        renderDishModal();
+      };
+    });
+
+    // Wire stepper
+    const qtyInput = dialog.querySelector('#modal-qty-input');
+    const priceCalc = dialog.querySelector('#modal-price-calc');
+
+    function updateCalc() {
+      const p = d.price + (currentSize === 'Large' ? 800 : 0);
+      const q = Number(qtyInput?.value) || 1;
+      if (priceCalc) priceCalc.textContent = money(p * q);
     }
 
-    const existingIndex = tableCart.findIndex(y => y.id === id && y.size === size && y.notes === combinedNotes && (y.timing || 'fire') === timing);
-    try {
-      if (existingIndex >= 0) {
-        if (qty > 20) throw Error('Maximum 20 of each dish.');
-        const delta = qty - tableCart[existingIndex].qty;
-        if (delta !== 0) {
-          dispatchOp({ type: 'UPDATE_QTY', table, lineIndex: existingIndex, delta });
-        }
-      } else {
-        const newLine = makeLine(id, qty, size, combinedNotes);
-        newLine.addedBy = currentGuest?.name || 'Table';
-        newLine.guestEmoji = currentGuest?.emoji || '👤';
-        newLine.timing = timing;
-        dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
+    dialog.querySelector('#modal-qty-minus')?.addEventListener('click', () => {
+      let val = Number(qtyInput.value) || 1;
+      if (val > 1) { qtyInput.value = val - 1; updateCalc(); }
+    });
+    dialog.querySelector('#modal-qty-plus')?.addEventListener('click', () => {
+      let val = Number(qtyInput.value) || 1;
+      if (val < 20) { qtyInput.value = val + 1; updateCalc(); }
+    });
+
+    // Wire modifier chips
+    dialog.querySelectorAll('[data-mod]').forEach(chip => {
+      chip.onclick = () => {
+        const mod = chip.dataset.mod;
+        if (selectedMods.has(mod)) selectedMods.delete(mod); else selectedMods.add(mod);
+        chip.setAttribute('aria-pressed', String(selectedMods.has(mod)));
+        chip.classList.toggle('active', selectedMods.has(mod));
+      };
+    });
+
+    // Form submit
+    dialog.querySelector('#dish-form').onsubmit = e => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const qty = Number(form.get('qty'));
+      const timing = form.get('timing') || 'fire';
+      const customNote = String(form.get('notes') || '').trim();
+
+      const notesParts = [];
+      if (isSteamboat && selectedBroth) {
+        notesParts.push(selectedBroth);
       }
-      updateDockSpeech();
-      closeTopLayer(dialog);
+      notesParts.push(...selectedMods);
+      if (customNote) notesParts.push(customNote);
+
+      const combinedNotes = notesParts.join(', ');
+      if (!Number.isInteger(qty) || qty < 1) return;
+
+      const tableCart = getTableSession(state, table).cart;
+      const otherGuestItem = tableCart.find(y => y.id === id && y.addedBy && y.addedBy !== (currentGuest?.name || 'Guest'));
+      const isDuplicate = Boolean(otherGuestItem);
+      if (isDuplicate) {
+        dockSpeechText = `Eh! ${otherGuestItem.addedBy} already added ${d.name}! Another portion or sharing?`;
+        toast(`⚠️ Duplicate notice: ${otherGuestItem.addedBy} already added ${d.name} in this round.`);
+      }
+
+      const existingIndex = tableCart.findIndex(y => y.id === id && y.size === currentSize && y.notes === combinedNotes && (y.timing || 'fire') === timing);
+      try {
+        if (existingIndex >= 0) {
+          if (qty > 20) throw Error('Maximum 20 of each dish.');
+          const delta = qty - tableCart[existingIndex].qty;
+          if (delta !== 0) {
+            dispatchOp({ type: 'UPDATE_QTY', table, lineIndex: existingIndex, delta });
+          }
+        } else {
+          const newLine = makeLine(id, qty, currentSize, combinedNotes);
+          newLine.addedBy = currentGuest?.name || 'Table';
+          newLine.guestEmoji = currentGuest?.emoji || '👤';
+          newLine.timing = timing;
+          dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
+        }
+        updateDockSpeech();
+        closeTopLayer(dialog);
+        toast(existingIndex >= 0 ? `Updated ${d.name} (${qty}) in cart.` : `${currentGuest.emoji} Added ${d.name} (${currentSize}) to shared cart.`);
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+  }
+
+  renderDishModal();
+  dialog.showModal();
+}
       toast(existingIndex >= 0 ? `Updated ${d.name} (${qty}) in cart.` : `${currentGuest.emoji} Added ${d.name} to shared cart.`);
     } catch (error) {
       toast(error.message);
@@ -2503,12 +2627,7 @@ function openBillDialog() {
     });
     dialog.querySelector('#share-bill-btn')?.addEventListener('click', () => {
       hapticPulse();
-      const text = formatBillShareText(summary, table, splitPax);
-      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        navigator.share({ title: `Nan Hwa Chong Table ${table} Bill`, text }).catch(() => copyBillText(text));
-      } else {
-        copyBillText(text);
-      }
+      openShareBillDialog();
     });
     dialog.querySelector('#settle-table-btn')?.addEventListener('click', () => {
       act(() => { settleTable(state, table); });
@@ -2517,6 +2636,154 @@ function openBillDialog() {
     });
   };
   renderBillContent();
+  dialog.showModal();
+}
+
+function openShareBillDialog() {
+  const dialog = $('#share-bill-dialog');
+  if (!dialog) return;
+
+  const summary = tableSummary(state, table, splitPax);
+  const guests = guestBreakdown(state, table);
+  let shareMode = 'even';
+  let hostName = currentMemberPhone ? (getMember(state, currentMemberPhone)?.name || currentGuest?.name || 'Marcus') : (currentGuest?.name || 'Marcus');
+  let hostPhone = currentMemberPhone || '9123 4567';
+
+  const renderContent = () => {
+    const shareText = generateAABillMessage(state, table, {
+      hostName,
+      hostPhone,
+      mode: shareMode,
+      pax: splitPax
+    });
+
+    dialog.innerHTML = `
+      <div class="share-aa-body">
+        <div class="dialog-top">
+          <span class="eyebrow">FRIENDS AA BILL GENERATOR · 好友分账神器</span>
+          <button type="button" class="close-dialog" aria-label="Close share AA modal">×</button>
+        </div>
+
+        <div class="share-aa-header">
+          <div class="aa-header-icon">💸</div>
+          <div>
+            <h2 id="share-bill-title">1-Tap WhatsApp &amp; PayNow AA Split</h2>
+            <p>Generate an instant bill breakdown card to paste into your WhatsApp or Telegram chat group.</p>
+          </div>
+        </div>
+
+        <div class="aa-config-grid">
+          <label class="aa-field">
+            <span>Table Host Name (付款人姓名):</span>
+            <input type="text" id="aa-host-name" value="${esc(hostName)}" placeholder="e.g. Marcus">
+          </label>
+          <label class="aa-field">
+            <span>PayNow Mobile / UEN (收款电话):</span>
+            <input type="tel" id="aa-host-phone" value="${esc(hostPhone)}" placeholder="e.g. 9123 4567">
+          </label>
+        </div>
+
+        <div class="aa-mode-tabs" role="tablist">
+          <button type="button" class="aa-tab-btn ${shareMode === 'even' ? 'active' : ''}" id="aa-mode-even">
+            👥 Even Split · AA均分 (${splitPax} Pax · ${money(summary.grandTotalPerPax)} / pax)
+          </button>
+          <button type="button" class="aa-tab-btn ${shareMode === 'itemized' ? 'active' : ''}" id="aa-mode-itemized">
+            🧾 Itemized · 按人分账 (${guests.length} diners)
+          </button>
+        </div>
+
+        <div class="aa-preview-card">
+          <div class="aa-preview-label">
+            <span>WhatsApp / Chat Card Live Preview:</span>
+            <button type="button" class="copy-preview-btn" id="aa-copy-btn">📋 Copy Text</button>
+          </div>
+          <pre class="aa-preview-text" id="aa-preview-pre">${esc(shareText)}</pre>
+        </div>
+
+        <div class="aa-actions-grid">
+          <button type="button" class="whatsapp-share-btn" id="aa-whatsapp-btn">
+            <span>💬 Send to WhatsApp Group (发送至微信/WhatsApp)</span>
+          </button>
+          <button type="button" class="telegram-share-btn" id="aa-telegram-btn">
+            <span>✈️ Share to Telegram</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
+
+    const nameInput = dialog.querySelector('#aa-host-name');
+    nameInput?.addEventListener('input', e => {
+      hostName = e.target.value.trim() || 'Host';
+      updatePreview();
+    });
+
+    const phoneInput = dialog.querySelector('#aa-host-phone');
+    phoneInput?.addEventListener('input', e => {
+      hostPhone = e.target.value.trim();
+      updatePreview();
+    });
+
+    dialog.querySelector('#aa-mode-even')?.addEventListener('click', () => {
+      shareMode = 'even';
+      renderContent();
+    });
+
+    dialog.querySelector('#aa-mode-itemized')?.addEventListener('click', () => {
+      shareMode = 'itemized';
+      renderContent();
+    });
+
+    function updatePreview() {
+      const curText = generateAABillMessage(state, table, {
+        hostName,
+        hostPhone,
+        mode: shareMode,
+        pax: splitPax
+      });
+      const pre = dialog.querySelector('#aa-preview-pre');
+      if (pre) pre.textContent = curText;
+    }
+
+    dialog.querySelector('#aa-copy-btn')?.addEventListener('click', () => {
+      const textToCopy = generateAABillMessage(state, table, {
+        hostName,
+        hostPhone,
+        mode: shareMode,
+        pax: splitPax
+      });
+      copyBillText(textToCopy);
+      hapticPulse();
+      toast('📋 AA Bill split copied to clipboard! Ready to paste into WhatsApp.');
+    });
+
+    dialog.querySelector('#aa-whatsapp-btn')?.addEventListener('click', () => {
+      const textToSend = generateAABillMessage(state, table, {
+        hostName,
+        hostPhone,
+        mode: shareMode,
+        pax: splitPax
+      });
+      hapticPulse();
+      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textToSend)}`;
+      window.open(waUrl, '_blank');
+    });
+
+    dialog.querySelector('#aa-telegram-btn')?.addEventListener('click', () => {
+      const textToSend = generateAABillMessage(state, table, {
+        hostName,
+        hostPhone,
+        mode: shareMode,
+        pax: splitPax
+      });
+      hapticPulse();
+      const tgUrl = `https://t.me/share/url?text=${encodeURIComponent(textToSend)}&url=${encodeURIComponent('https://ahhua.vercel.app/?table=' + table)}`;
+      window.open(tgUrl, '_blank');
+    });
+  };
+
+  renderContent();
   dialog.showModal();
 }
 
