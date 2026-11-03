@@ -4,7 +4,8 @@ import {
   getTableSession, applyOp, STATIONS, getDishStation, SET_MENUS, fireHeldItem, hurryItem, voidItem,
   guestBreakdown, closeTableSession, getEReceipt, STORED_VALUE_TIERS, COUPON_TEMPLATES,
   getMember, registerMember, topUpMemberBalance, applyCoupon, removeCoupon, payWithMemberBalance,
-  submitReview, createBanquetBooking, createQueueTicket, transferQueueToTable
+  submitReview, createBanquetBooking, createQueueTicket, transferQueueToTable,
+  DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
@@ -670,6 +671,7 @@ function updateDockSpeech() {
 }
 
 function handleLoreChip(chipId) {
+  dispatchOp({ type: 'RECORD_AH_HUA_EVENT', eventType: 'CHIP_CLICK' });
   const langKey = state.replyLanguage === 'zh' ? 'zh' : state.replyLanguage === 'singlish' ? 'singlish' : 'en';
   const ans = LORE_ANSWERS[chipId]?.[langKey] || LORE_ANSWERS[chipId]?.en || 'Nan Hwa Chong has served authentic Teochew charcoal steamboat since 1927.';
   const qChip = [...QUICK_CHIPS.viewing, ...QUICK_CHIPS.waiting].find(c => c.id === chipId);
@@ -701,50 +703,13 @@ function handleLoreChip(chipId) {
 }
 
 function checkCartRules(cartItems) {
-  const ziCharIds = ['kang', 'pork', 'ribs', 'tofu', 'egg', 'sambal-prawn', 'chicken'];
-  const ziCharCount = cartItems.filter(x => ziCharIds.includes(x.id)).reduce((n, x) => n + x.qty, 0);
-  const riceCount = cartItems.filter(x => x.id === 'rice').reduce((n, x) => n + x.qty, 0);
-
-  if (ziCharCount >= 2 && riceCount === 0 && !state.unavailable.includes('rice')) {
-    const isZh = state.replyLanguage === 'zh';
-    const isSinglish = state.replyLanguage === 'singlish';
-    return {
-      type: 'missing_rice',
-      dishId: 'rice',
-      suggestQty: 2,
-      title: isZh ? '点白饭了吗？' : 'Missing White Rice?',
-      message: isZh
-        ? `您点了 ${ziCharCount} 道浓香多汁的经典煮炒，但尚未添加米饭。确认不需要来 2 碗茉莉香米饭（每碗 S$1.50）吗？`
-        : isSinglish
-          ? `Wah, you ordered ${ziCharCount} zi char dishes with rich gravy but zero rice leh! Sure don't need fluffy Jasmine rice (S$1.50) to eat together?`
-          : `You ordered ${ziCharCount} savoury zi char dishes with rich gravy, but zero white rice! Confirm no need fragrant Jasmine rice (S$1.50)?`,
-      actionLabel: isZh ? '+ 添加2碗白饭并下单' : '+ Add 2 White Rice (S$3.00) & Send Order',
-      skipLabel: isZh ? '不需要米饭，直接下单 →' : 'No rice needed, Send as is →'
-    };
-  }
-
-  const steamboatCount = cartItems.filter(x => ['pomfret', 'grouper', 'snapper', 'song-fish-head'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
-  const starterCount = cartItems.filter(x => ['chicken', 'prawn-paste', 'tofu'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
-
-  if (steamboatCount >= 1 && starterCount === 0 && !state.unavailable.includes('chicken')) {
-    const isZh = state.replyLanguage === 'zh';
-    const isSinglish = state.replyLanguage === 'singlish';
-    return {
-      type: 'missing_starter',
-      dishId: 'chicken',
-      suggestQty: 1,
-      title: isZh ? '等候鱼头炉时的开胃前菜？' : 'Starter while Steamboat Simmers?',
-      message: isZh
-        ? `提示：炭火鱼头炉起炭慢煨需约12分钟。要不要先来一份招牌现炸虾酱鸡（S$13.00），边吃边等？`
-        : isSinglish
-          ? `Heads up ah! Charcoal steamboat takes ~12 mins to fire up and simmer. Want me to send out some Har Cheong Gai (Prawn Paste Chicken) first so you can makan while waiting?`
-          : `Heads up! The charcoal steamboat takes ~12 mins to fire up and simmer. Want to send out our signature Har Cheong Gai (Prawn Paste Chicken) first so you can makan while waiting?`,
-      actionLabel: isZh ? '+ 添加招牌虾酱鸡并下单' : '+ Add Har Cheong Gai (S$13.00) & Send',
-      skipLabel: isZh ? '不需要前菜，直接下单 →' : 'Steamboat only, Send as is →'
-    };
-  }
-
-  return null;
+  const session = getTableSession(state, table);
+  return evaluateCartRules(cartItems, {
+    pax: session?.pax || 4,
+    unavailable: state.unavailable,
+    language: state.replyLanguage,
+    rulesConfig: state.cartRules
+  });
 }
 
 function executeOrderSubmission() {
@@ -764,6 +729,7 @@ function executeOrderSubmission() {
   }
   if (order) {
     customerGear = 'stage';
+    dispatchOp({ type: 'SET_TABLE_GEAR', table, gear: 'stage' });
     updateDockSpeech();
     triggerOrderAnimation();
     hapticPulse();
@@ -790,14 +756,19 @@ function openCartCheckDialog(check) {
     executeOrderSubmission();
     return;
   }
-  dialog.innerHTML = `<div class="cart-check-body">
+
+  if (!check.isOverOrder) {
+    dispatchOp({ type: 'RECORD_AH_HUA_EVENT', eventType: 'CART_CHECK_IMPRESSION' });
+  }
+
+  dialog.innerHTML = `<div class="cart-check-body ${check.isOverOrder ? 'portion-guard-body' : ''}">
     <div class="dialog-top">
-      <span class="eyebrow">AH HUA CART CHECK · 点单贴心提示</span>
+      <span class="eyebrow">${check.isOverOrder ? 'AH HUA PORTION CHECK · 份量温馨把关' : 'AH HUA CART CHECK · 点单贴心提示'}</span>
       <button type="button" class="close-dialog" aria-label="Close cart check">×</button>
     </div>
-    <div class="cart-check-hero">
+    <div class="cart-check-hero ${check.isOverOrder ? 'portion-guard-hero' : ''}">
       ${avatarMarkup()}
-      <div class="cart-check-speech">
+      <div class="cart-check-speech ${check.isOverOrder ? 'portion-guard-speech' : ''}">
         <strong>${esc(check.title)}</strong>
         <p>${esc(check.message)}</p>
       </div>
@@ -811,24 +782,39 @@ function openCartCheckDialog(check) {
   dialog.showModal();
   dialog.querySelector('.close-dialog').onclick = () => closeTopLayer(dialog);
   dialog.querySelector('#cart-check-accept-btn').onclick = () => {
-    dispatchOp({
-      type: 'ADD_LINES',
-      table,
-      lines: [{
-        id: check.dishId,
-        qty: check.suggestQty,
-        size: 'Regular',
-        notes: 'Added via Ah Hua recommendation',
-        addedBy: currentGuest.name,
-        guestEmoji: currentGuest.emoji
-      }]
-    });
     closeTopLayer(dialog);
-    executeOrderSubmission();
+    if (check.isOverOrder) {
+      executeOrderSubmission();
+    } else {
+      const dishObj = dish(check.dishId);
+      const extraCents = (dishObj?.price || 0) * (check.suggestQty || 1);
+      dispatchOp({
+        type: 'RECORD_AH_HUA_EVENT',
+        eventType: 'CART_CHECK_ACCEPTED',
+        data: { cents: extraCents }
+      });
+      dispatchOp({
+        type: 'ADD_LINES',
+        table,
+        lines: [{
+          id: check.dishId,
+          qty: check.suggestQty,
+          size: 'Regular',
+          notes: 'Added via Ah Hua recommendation',
+          addedBy: currentGuest?.name || 'Ah Hua Recommendation',
+          guestEmoji: currentGuest?.emoji || '✨'
+        }]
+      });
+      executeOrderSubmission();
+    }
   };
   dialog.querySelector('#cart-check-skip-btn').onclick = () => {
     closeTopLayer(dialog);
-    executeOrderSubmission();
+    if (check.isOverOrder) {
+      toast('Taking you back to review cart portions.');
+    } else {
+      executeOrderSubmission();
+    }
   };
 }
 
@@ -1135,7 +1121,22 @@ function openAhHuaDialog() {
       }
     };
     dialog.querySelector('#sheet-accept-proposal')?.addEventListener('click', () => act(() => {
-      const prop = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+      const rawProp = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+      const prop = rawProp.map(p => ({
+        ...p,
+        addedBy: currentGuest?.name || 'Ah Hua Recommendation',
+        guestEmoji: currentGuest?.emoji || '✨'
+      }));
+      const propCents = total(prop);
+      dispatchOp({
+        type: 'RECORD_AH_HUA_EVENT',
+        eventType: 'PROPOSAL_ACCEPTED',
+        data: { cents: propCents }
+      });
+      dispatchOp({
+        type: 'RECORD_AH_HUA_EVENT',
+        eventType: 'CHIP_CONVERSION'
+      });
       addLines(state, prop, table);
       getTableSession(state, table).proposal = [];
       state.proposal = [];
@@ -1154,8 +1155,12 @@ function openAhHuaDialog() {
 }
 
 function customer() {
+  const session = getTableSession(state, table);
+  if (session && session.gear) {
+    customerGear = session.gear;
+  }
   const summary = tableSummary(state, table, splitPax);
-  const tableCart = getTableSession(state, table).cart;
+  const tableCart = session.cart;
   if (customerGear === 'stage') {
     return renderCenterStage(summary);
   }
@@ -1431,7 +1436,7 @@ function cart(summary) {
             <h3>${esc(x.name)}</h3>
             <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
             <small>${money(x.unitPrice)} each</small>
-            <div><span class="cart-guest-tag">${x.guestEmoji || currentGuest.emoji || '👤'} ${esc(x.addedBy || currentGuest.name)}</span></div>
+            <div><span class="cart-guest-tag">${esc(x.guestEmoji || '👥')} ${esc(x.addedBy || 'Table')}</span></div>
           </div>
           <div class="cart-line-end">
             <strong>${money(x.qty * x.unitPrice)}</strong>
@@ -1516,6 +1521,8 @@ function staff() {
     .filter(o => staffTableFilter === 'all' || o.table === staffTableFilter)
     .slice()
     .reverse();
+  const salesMetrics = getAhHuaSalesMetrics(state);
+  const cartRules = state.cartRules || DEFAULT_CART_RULES;
 
   return `<section class="ops-header">
     <div>
@@ -1595,6 +1602,51 @@ function staff() {
       </article>`).join('') || '<div class="empty-card">No orders waiting.<p>Switch to Customer, add a dish and send it here.</p></div>'}
     </section>
     <aside>
+      <section class="ops-panel ah-hua-sales-panel">
+        <div class="host-caption-row">
+          <div>
+            <div class="eyebrow" style="color:#8b754f">AH HUA SALESPERSON METRICS</div>
+            <h2>AI Host Revenue Engine</h2>
+          </div>
+          <span class="sales-live-pill">LIVE METRICS</span>
+        </div>
+        <p style="font-size:11px;color:#78836f;margin-bottom:12px">Track Ah Hua's upsell performance, extra revenue and conversion rates.</p>
+        <div class="sales-metric-grid">
+          <div class="sales-stat-card">
+            <small>Extra Revenue</small>
+            <strong>${money(salesMetrics.totalExtraRevenue)}</strong>
+            <span>from upsell & proposals</span>
+          </div>
+          <div class="sales-stat-card">
+            <small>Cart Check Rate</small>
+            <strong>${salesMetrics.cartCheckRate}%</strong>
+            <span>${salesMetrics.cartCheckAccepted}/${salesMetrics.cartCheckImpressions} accepted</span>
+          </div>
+          <div class="sales-stat-card">
+            <small>Chip Conversions</small>
+            <strong>${salesMetrics.chipConversionRate}%</strong>
+            <span>${salesMetrics.chipConversions}/${salesMetrics.chipClicks} chips clicked</span>
+          </div>
+          <div class="sales-stat-card">
+            <small>Proposal Rate</small>
+            <strong>${salesMetrics.proposalRate}%</strong>
+            <span>${salesMetrics.proposalsAccepted} added to cart</span>
+          </div>
+        </div>
+
+        <div class="cart-rules-admin">
+          <h3 style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin:14px 0 8px;color:var(--green)">Dynamic Cart Check Rules</h3>
+          ${cartRules.map(r => `
+            <label class="rule-toggle-row">
+              <div>
+                <strong>${esc(r.name)}</strong>
+                <small>${esc(r.desc)}</small>
+              </div>
+              <input type="checkbox" data-rule-toggle="${r.id}" ${r.enabled !== false ? 'checked' : ''} aria-label="${esc(r.name)} enabled">
+            </label>
+          `).join('')}
+        </div>
+      </section>
       <section class="ops-panel">
         <h2>Server requests</h2>
         ${state.calls.filter(x => !x.done).map(c => {
@@ -1726,7 +1778,10 @@ function bindCustomer() {
     const m = state.messages[+b.dataset.replay];
     speak(m.text, m.language || null);
   });
-  document.querySelectorAll('[data-chat]').forEach(b => b.onclick = () => send(b.dataset.chat, b.textContent.trim()));
+  document.querySelectorAll('[data-chat]').forEach(b => b.onclick = () => {
+    dispatchOp({ type: 'RECORD_AH_HUA_EVENT', eventType: 'CHIP_CLICK' });
+    send(b.dataset.chat, b.textContent.trim());
+  });
   bindPlanner();
 
   document.querySelectorAll('[data-service]').forEach(b => b.onclick = () => act(() => {
@@ -1803,17 +1858,18 @@ function bindCustomer() {
   document.querySelectorAll('[data-quick-add]').forEach(b => b.onclick = () => {
     const d = dish(b.dataset.quickAdd);
     const tableCart = getTableSession(state, table).cart;
-    const isDuplicate = tableCart.some(y => y.id === d.id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === d.id));
+    const otherGuestItem = tableCart.find(y => y.id === d.id && y.addedBy && y.addedBy !== (currentGuest?.name || 'Guest'));
+    const isDuplicate = Boolean(otherGuestItem);
     if (isDuplicate) {
-      dockSpeechText = `Eh! Someone at Table ${table} already added ${d.name}! Another portion or sharing?`;
-      toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
+      dockSpeechText = `Eh! ${otherGuestItem.addedBy} already added ${d.name}! Another portion or sharing?`;
+      toast(`⚠️ Duplicate notice: ${otherGuestItem.addedBy} already added ${d.name} in this round.`);
     }
     const newLine = makeLine(d.id, 1, 'Regular', state.preference);
-    newLine.addedBy = currentGuest.name;
-    newLine.guestEmoji = currentGuest.emoji;
+    newLine.addedBy = currentGuest?.name || 'Table';
+    newLine.guestEmoji = currentGuest?.emoji || '👤';
     dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
     updateDockSpeech();
-    toast(`${currentGuest.emoji} ${currentGuest.name} added ${d.name} to shared cart.`);
+    toast(`${newLine.guestEmoji} ${newLine.addedBy} added ${d.name} to shared cart.`);
   });
   document.querySelectorAll('[data-card-qty]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
@@ -1822,8 +1878,8 @@ function bindCustomer() {
     const tableCart = getTableSession(state, table).cart;
     if (delta > 0) {
       const newLine = makeLine(id, 1, 'Regular', state.preference);
-      newLine.addedBy = currentGuest.name;
-      newLine.guestEmoji = currentGuest.emoji;
+      newLine.addedBy = currentGuest?.name || 'Table';
+      newLine.guestEmoji = currentGuest?.emoji || '👤';
       dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
       toast(`Added 1 ${dish(id).name} to cart.`);
     } else {
@@ -1841,7 +1897,22 @@ function bindCustomer() {
     updateDockSpeech();
   });
   $('#accept-proposal')?.addEventListener('click', () => act(() => {
-    const prop = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+    const rawProp = getTableSession(state, table).proposal.length ? getTableSession(state, table).proposal : state.proposal;
+    const prop = rawProp.map(p => ({
+      ...p,
+      addedBy: currentGuest?.name || 'Ah Hua Recommendation',
+      guestEmoji: currentGuest?.emoji || '✨'
+    }));
+    const propCents = total(prop);
+    dispatchOp({
+      type: 'RECORD_AH_HUA_EVENT',
+      eventType: 'PROPOSAL_ACCEPTED',
+      data: { cents: propCents }
+    });
+    dispatchOp({
+      type: 'RECORD_AH_HUA_EVENT',
+      eventType: 'CHIP_CONVERSION'
+    });
     addLines(state, prop, table);
     getTableSession(state, table).proposal = [];
     state.proposal = [];
@@ -1877,14 +1948,17 @@ function bindCustomer() {
   }
   $('#switch-to-stage-btn')?.addEventListener('click', () => {
     customerGear = 'stage';
+    dispatchOp({ type: 'SET_TABLE_GEAR', table, gear: 'stage' });
     render();
   });
   $('#stage-back-to-menu-btn')?.addEventListener('click', () => {
     customerGear = 'dock';
+    dispatchOp({ type: 'SET_TABLE_GEAR', table, gear: 'dock' });
     render();
   });
   $('#stage-bottom-menu-btn')?.addEventListener('click', () => {
     customerGear = 'dock';
+    dispatchOp({ type: 'SET_TABLE_GEAR', table, gear: 'dock' });
     render();
   });
   $('#dock-avatar-trigger')?.addEventListener('click', () => {
@@ -2035,10 +2109,11 @@ function openDish(id) {
     if (!Number.isInteger(qty) || qty < 1) return;
 
     const tableCart = getTableSession(state, table).cart;
-    const isDuplicate = tableCart.some(y => y.id === id) || state.orders.some(o => o.table === table && o.items.some(y => y.id === id));
+    const otherGuestItem = tableCart.find(y => y.id === id && y.addedBy && y.addedBy !== (currentGuest?.name || 'Guest'));
+    const isDuplicate = Boolean(otherGuestItem);
     if (isDuplicate) {
-      dockSpeechText = `Eh! Someone at Table ${table} already added ${d.name}! Another portion or sharing?`;
-      toast(`⚠️ Duplicate notice: ${d.name} already in Table ${table}'s order.`);
+      dockSpeechText = `Eh! ${otherGuestItem.addedBy} already added ${d.name}! Another portion or sharing?`;
+      toast(`⚠️ Duplicate notice: ${otherGuestItem.addedBy} already added ${d.name} in this round.`);
     }
 
     const existingIndex = tableCart.findIndex(y => y.id === id && y.size === size && y.notes === combinedNotes && (y.timing || 'fire') === timing);
@@ -2051,8 +2126,8 @@ function openDish(id) {
         }
       } else {
         const newLine = makeLine(id, qty, size, combinedNotes);
-        newLine.addedBy = currentGuest.name;
-        newLine.guestEmoji = currentGuest.emoji;
+        newLine.addedBy = currentGuest?.name || 'Table';
+        newLine.guestEmoji = currentGuest?.emoji || '👤';
         newLine.timing = timing;
         dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
       }
@@ -2510,16 +2585,16 @@ function openSetMenuDialog(setId) {
       const opt = slot.options.find(o => o.id === chosenId);
       if (opt) {
         const line = makeLine(opt.id, 1, 'Regular', `Set Menu: ${sm.name}`);
-        line.addedBy = currentGuest.name;
-        line.guestEmoji = currentGuest.emoji;
+        line.addedBy = currentGuest?.name || 'Table';
+        line.guestEmoji = currentGuest?.emoji || '👥';
         chosenLines.push(line);
       }
     });
 
     sm.fixedItems.forEach(f => {
       const line = makeLine(f.id, f.qty, f.size || 'Regular', `Set Menu: ${sm.name}`);
-      line.addedBy = currentGuest.name;
-      line.guestEmoji = currentGuest.emoji;
+      line.addedBy = currentGuest?.name || 'Table';
+      line.guestEmoji = currentGuest?.emoji || '👥';
       chosenLines.push(line);
     });
 
@@ -3140,7 +3215,7 @@ function openMobileCart() {
             <h3>${esc(x.name)}</h3>
             <p>${esc(x.size)}${x.notes ? ' · ' + esc(x.notes) : ''}</p>
             <small>${money(x.unitPrice)} each</small>
-            <div><span class="cart-guest-tag">${x.guestEmoji || currentGuest.emoji || '👤'} ${esc(x.addedBy || currentGuest.name)}</span></div>
+            <div><span class="cart-guest-tag">${esc(x.guestEmoji || '👥')} ${esc(x.addedBy || 'Table')}</span></div>
           </div>
           <div class="cart-line-end">
             <strong>${money(x.qty * x.unitPrice)}</strong>
@@ -3182,8 +3257,8 @@ function openMobileCart() {
     dialog.querySelectorAll('[data-modal-quick-add]').forEach(b => b.onclick = () => {
       const d = dish(b.dataset.modalQuickAdd);
       const newLine = makeLine(d.id, 1, 'Regular', state.preference);
-      newLine.addedBy = currentGuest.name;
-      newLine.guestEmoji = currentGuest.emoji;
+      newLine.addedBy = currentGuest?.name || 'Table';
+      newLine.guestEmoji = currentGuest?.emoji || '👤';
       dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
       updateDockSpeech();
       renderContent();
@@ -3341,6 +3416,16 @@ function bindOperations() {
       ? state.unavailable.filter(id => id !== b.dataset.availability)
       : [...new Set([...state.unavailable, b.dataset.availability])];
     dispatchOp({ type: 'SET_UNAVAILABLE', unavailable: next });
+  });
+  document.querySelectorAll('[data-rule-toggle]').forEach(box => {
+    box.onchange = e => {
+      dispatchOp({
+        type: 'TOGGLE_CART_RULE',
+        ruleId: e.target.dataset.ruleToggle,
+        enabled: e.target.checked
+      });
+      toast(`Rule ${e.target.dataset.ruleToggle} ${e.target.checked ? 'enabled' : 'disabled'}.`);
+    };
   });
   document.querySelectorAll('[data-resolve]').forEach(b => b.onclick = () => act(() => {
     const call = state.calls.find(c => c.id === b.dataset.resolve);

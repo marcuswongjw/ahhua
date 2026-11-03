@@ -2549,6 +2549,220 @@ export const serviceTypes = {
 };
 export const money = cents => `S$${(cents / 100).toFixed(2)}`;
 export const dish = id => menu.find(x => x.id === id);
+
+export function initialAhHuaAnalytics() {
+  return {
+    cartCheckImpressions: 0,
+    cartCheckAccepted: 0,
+    cartCheckRevenue: 0,
+    chipClicks: 0,
+    chipConversions: 0,
+    proposalsShown: 0,
+    proposalsAccepted: 0,
+    proposalRevenue: 0
+  };
+}
+
+export const DEFAULT_CART_RULES = [
+  {
+    id: 'portion_guard',
+    name: 'Portion Guard (份量控制 · 避免过度点单)',
+    desc: 'Alerts diners when dishes exceed pax + 2, building diner trust and preventing food waste',
+    enabled: true,
+    category: 'trust'
+  },
+  {
+    id: 'missing_staple',
+    name: 'Missing Staple Rice / Noodles (点白饭了吗)',
+    desc: 'Suggests fragrant Jasmine rice when 2+ savoury zi char gravy dishes are ordered without staples',
+    enabled: true,
+    category: 'pairing'
+  },
+  {
+    id: 'steamboat_starter',
+    name: 'Steamboat Wait Starter (等候开胃前菜)',
+    desc: 'Suggests quick Har Cheong Gai (Prawn Paste Chicken) when steamboat will take 12 mins to simmer',
+    enabled: true,
+    category: 'upsell'
+  },
+  {
+    id: 'cooling_drinks',
+    name: 'Cooling Drink Pairing (解腻清凉饮品)',
+    desc: 'Suggests refreshing Sour Plum Calamansi Juices to balance hot charcoal steamboat',
+    enabled: true,
+    category: 'pairing'
+  }
+];
+
+export function evaluateCartRules(cartItems, { pax = 4, unavailable = [], language = 'en', rulesConfig = DEFAULT_CART_RULES } = {}) {
+  const isRuleActive = id => {
+    const r = (rulesConfig || DEFAULT_CART_RULES).find(x => x.id === id);
+    return r ? r.enabled !== false : true;
+  };
+
+  const isZh = language === 'zh';
+  const isSinglish = language === 'singlish';
+
+  // Rule 1: Portion Guard by head count (avoid over-ordering)
+  if (isRuleActive('portion_guard') && pax > 0) {
+    const foodLines = cartItems.filter(x => !['tea', 'calamansi', 'barley', 'rice'].includes(x.id));
+    const foodDishesCount = foodLines.reduce((n, x) => n + x.qty, 0);
+    const steamboatCount = cartItems.filter(x => ['pomfret', 'grouper', 'snapper', 'song-fish-head-fishboat'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+    const effectiveDishes = foodDishesCount + (steamboatCount > 0 ? 1 : 0);
+    const maxRecommended = Math.max(3, pax + 2);
+
+    if (effectiveDishes > maxRecommended) {
+      return {
+        type: 'portion_guard',
+        isOverOrder: true,
+        title: isZh ? '份量温馨提示 · 避免点多' : 'Ah Hua Portion Check',
+        message: isZh
+          ? `温馨提示：您当前 ${pax} 位用餐，已选了 ${foodDishesCount} 道菜${steamboatCount ? '（含炭火大炉）' : ''}。南华昌份量实在，通常 ${pax} 位点 ${Math.max(2, pax - 1)}～${pax + 1} 道刚好饱足。确认要点这么多，还是先下这一批，不够再加？`
+          : isSinglish
+            ? `Wah, ${pax} pax ordering ${foodDishesCount} dishes${steamboatCount ? ' with steamboat' : ''}! Our portions are solid Teochew sizing leh. Most ${pax}-pax tables order ${Math.max(2, pax - 1)}–${pax + 1} dishes. Confirm want so much, or start with these first and order round 2 later?`
+            : `Heads up for ${pax} guests: You have selected ${foodDishesCount} dishes${steamboatCount ? ' including a charcoal steamboat' : ''}. Our traditional portions are generous; most tables of ${pax} are satisfied with ${Math.max(2, pax - 1)}–${pax + 1} dishes. Confirm you want this feast, or start with these and add more in Round 2?`,
+        actionLabel: isZh ? '坚持下单，我们胃口好 →' : 'Keep all & send order →',
+        skipLabel: isZh ? '返回购物车调整菜品' : 'Review & adjust cart'
+      };
+    }
+  }
+
+  // Rule 2: Missing Staple (gravy dishes without rice/noodles)
+  // Notice: 'chicken' (Har Cheong Gai) is deep-fried finger food, NOT in ziCharGravyIds!
+  if (isRuleActive('missing_staple') && !unavailable.includes('rice')) {
+    const ziCharGravyIds = [
+      'pork', 'ribs', 'tofu', 'kang', 'egg', 'sambal-prawn', 'sambal-lala',
+      'ginger-onion-lala', 'braised-pig-intestine', 'braised-pig-trotters',
+      'braised-beancurd', 'sweet-and-sour-pork', 'marmite-pork-ribs', 'salted-egg-pork-ribs'
+    ];
+    const stapleIds = [
+      'rice', 'mui-fan', 'fried-rice', 'sambal-fried-rice', 'salted-fish-fried-rice',
+      'seafood-fried-rice', 'hor-fun', 'hokkien-noodles', 'ee-mian', 'bee-hoon',
+      'fried-ee-fu-noodles', 'fried-bee-hoon', 'seafood-bee-hoon', 'crispy-bee-hoon',
+      'hong-kong-fried-noodles', 'mee-goreng', 'shan-lao-hor-fun', 'fried-hor-fun', 'seafood-hor-fun'
+    ];
+    const ziCharCount = cartItems.filter(x => ziCharGravyIds.includes(x.id)).reduce((n, x) => n + x.qty, 0);
+    const stapleCount = cartItems.filter(x => stapleIds.includes(x.id)).reduce((n, x) => n + x.qty, 0);
+
+    if (ziCharCount >= 2 && stapleCount === 0) {
+      return {
+        type: 'missing_rice',
+        dishId: 'rice',
+        suggestQty: 2,
+        title: isZh ? '点白饭了吗？' : 'Missing White Rice?',
+        message: isZh
+          ? `您点了 ${ziCharCount} 道浓香多汁的经典煮炒，但尚未添加米饭。确认不需要来 2 碗茉莉香米饭（每碗 S$1.50）配汁吗？`
+          : isSinglish
+            ? `Wah, you ordered ${ziCharCount} zi char dishes with rich gravy but zero rice leh! Sure don't need fluffy Jasmine rice (S$1.50) to eat together?`
+            : `You ordered ${ziCharCount} savoury zi char dishes with rich gravy, but zero white rice! Confirm no need fragrant Jasmine rice (S$1.50)?`,
+        actionLabel: isZh ? '+ 添加2碗白饭并下单' : '+ Add 2 White Rice (S$3.00) & Send Order',
+        skipLabel: isZh ? '不需要米饭，直接下单 →' : 'No rice needed, Send as is →'
+      };
+    }
+  }
+
+  // Rule 3: Steamboat starter (waiting for charcoal pot to simmer)
+  if (isRuleActive('steamboat_starter') && !unavailable.includes('chicken')) {
+    const steamboatCount = cartItems.filter(x => ['pomfret', 'grouper', 'snapper', 'song-fish-head-fishboat'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+    const starterCount = cartItems.filter(x => ['chicken', 'fried-shrimp-roll'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+
+    if (steamboatCount >= 1 && starterCount === 0) {
+      return {
+        type: 'missing_starter',
+        dishId: 'chicken',
+        suggestQty: 1,
+        title: isZh ? '等候鱼头炉时的开胃前菜？' : 'Starter while Steamboat Simmers?',
+        message: isZh
+          ? `提示：炭火鱼头炉起炭慢煨需约12分钟。要不要先来一份招牌现炸虾酱鸡（S$13.00），边吃边等？`
+          : isSinglish
+            ? `Heads up ah! Charcoal steamboat takes ~12 mins to fire up and simmer. Want me to send out some Har Cheong Gai (Prawn Paste Chicken) first so you can makan while waiting?`
+            : `Heads up! The charcoal steamboat takes ~12 mins to fire up and simmer. Want to send out our signature Har Cheong Gai (Prawn Paste Chicken) first so you can makan while waiting?`,
+        actionLabel: isZh ? '+ 添加招牌虾酱鸡并下单' : '+ Add Har Cheong Gai (S$13.00) & Send',
+        skipLabel: isZh ? '不需要前菜，直接下单 →' : 'Steamboat only, Send as is →'
+      };
+    }
+  }
+
+  // Rule 4: Cooling drinks pairing for hot steamboat
+  if (isRuleActive('cooling_drinks') && !unavailable.includes('calamansi')) {
+    const steamboatCount = cartItems.filter(x => ['pomfret', 'grouper', 'snapper', 'song-fish-head-fishboat'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+    const drinkCount = cartItems.filter(x => ['tea', 'calamansi', 'barley'].includes(x.id)).reduce((n, x) => n + x.qty, 0);
+
+    if (steamboatCount >= 1 && drinkCount === 0) {
+      return {
+        type: 'missing_drink',
+        dishId: 'calamansi',
+        suggestQty: 2,
+        title: isZh ? '来点清爽解腻饮品？' : 'Cooling Drinks for Steamboat?',
+        message: isZh
+          ? `炭火鱼头炉热气腾腾，来 2 杯传统金桔话梅冰露（每杯 S$3.20）解热生津，搭配最舒畅！`
+          : isSinglish
+            ? `Steamboat bubbling hot on the table! Want 2 Sour Plum Calamansi Juices (S$3.20 each) to quench thirst and cut grease?`
+            : `Charcoal steamboat runs hot! Add 2 refreshing Sour Plum Calamansi Juices (S$3.20 each) to balance the rich heritage broth?`,
+        actionLabel: isZh ? '+ 添加2杯金桔话梅冰 (S$6.40) 并下单' : '+ Add 2 Calamansi Juices (S$6.40) & Send',
+        skipLabel: isZh ? '暂不需要饮品 →' : 'No drinks, Send as is →'
+      };
+    }
+  }
+
+  return null;
+}
+
+export function recordAhHuaEvent(state, eventType, data = {}) {
+  if (!state.ahHuaAnalytics) {
+    state.ahHuaAnalytics = initialAhHuaAnalytics();
+  }
+  const a = state.ahHuaAnalytics;
+  switch (eventType) {
+    case 'CART_CHECK_IMPRESSION':
+      a.cartCheckImpressions = (a.cartCheckImpressions || 0) + 1;
+      break;
+    case 'CART_CHECK_ACCEPTED':
+      a.cartCheckAccepted = (a.cartCheckAccepted || 0) + 1;
+      a.cartCheckRevenue = (a.cartCheckRevenue || 0) + (data.cents || 0);
+      break;
+    case 'CHIP_CLICK':
+      a.chipClicks = (a.chipClicks || 0) + 1;
+      break;
+    case 'CHIP_CONVERSION':
+      a.chipConversions = (a.chipConversions || 0) + 1;
+      break;
+    case 'PROPOSAL_SHOWN':
+      a.proposalsShown = (a.proposalsShown || 0) + 1;
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      a.proposalsAccepted = (a.proposalsAccepted || 0) + 1;
+      a.proposalRevenue = (a.proposalRevenue || 0) + (data.cents || 0);
+      break;
+  }
+  return a;
+}
+
+export function getAhHuaSalesMetrics(state) {
+  const a = state.ahHuaAnalytics || initialAhHuaAnalytics();
+  const impressions = a.cartCheckImpressions || 0;
+  const accepted = a.cartCheckAccepted || 0;
+  const cartCheckRate = impressions > 0 ? Math.round((accepted / impressions) * 100) : 0;
+
+  const chipClicks = a.chipClicks || 0;
+  const chipConversions = a.chipConversions || 0;
+  const chipConversionRate = chipClicks > 0 ? Math.round((chipConversions / chipClicks) * 100) : 0;
+
+  const proposalsShown = a.proposalsShown || 0;
+  const proposalsAccepted = a.proposalsAccepted || 0;
+  const proposalRate = proposalsShown > 0 ? Math.round((proposalsAccepted / proposalsShown) * 100) : 0;
+
+  const totalExtraRevenue = (a.cartCheckRevenue || 0) + (a.proposalRevenue || 0);
+
+  return {
+    ...a,
+    cartCheckRate,
+    chipConversionRate,
+    proposalRate,
+    totalExtraRevenue
+  };
+}
+
 export function initialState() {
   return {
     version: 1,
@@ -2565,7 +2779,9 @@ export function initialState() {
     coupons: [],
     reviews: [],
     banquets: [],
-    queues: {}
+    queues: {},
+    cartRules: structuredClone(DEFAULT_CART_RULES),
+    ahHuaAnalytics: initialAhHuaAnalytics()
   };
 }
 export function total(items) { return items.reduce((sum, x) => sum + x.qty * x.unitPrice, 0); }
@@ -2717,7 +2933,7 @@ export const SET_MENUS = [
 ];
 
 export function getTableSession(state, tableId) {
-  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null };
+  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null, gear: 'dock' };
   if (!state.sessions) state.sessions = {};
   if (!state.sessions[tableId]) {
     state.sessions[tableId] = {
@@ -2729,12 +2945,13 @@ export function getTableSession(state, tableId) {
       pax: 4,
       teaFeeWaived: false,
       coupon: null,
+      gear: 'dock',
       openedAt: new Date().toISOString()
     };
   }
   return state.sessions[tableId];
 }
-export function makeLine(id, qty = 1, size = 'Regular', notes = '', timing = 'fire') {
+export function makeLine(id, qty = 1, size = 'Regular', notes = '', timing = 'fire', addedBy = 'Table', guestEmoji = '👥') {
   const d = dish(id);
   if (!d || !Number.isInteger(qty) || qty < 1 || qty > 20 || !['Regular', 'Large'].includes(size) || (d.singleSize && size !== 'Regular')) throw Error('Please choose a valid dish, size and quantity (1–20).');
   return {
@@ -2745,7 +2962,9 @@ export function makeLine(id, qty = 1, size = 'Regular', notes = '', timing = 'fi
     qty,
     unitPrice: d.price + (size === 'Large' ? 800 : 0),
     timing: timing === 'hold' ? 'hold' : 'fire',
-    station: getDishStation(d)
+    station: getDishStation(d),
+    addedBy: addedBy || 'Table',
+    guestEmoji: guestEmoji || '👥'
   };
 }
 export function addLines(state, lines, tableId = null) {
@@ -2753,8 +2972,7 @@ export function addLines(state, lines, tableId = null) {
   const next = structuredClone(targetCart);
   for (const raw of lines) {
     if (state.unavailable.includes(raw.id)) throw Error(`${dish(raw.id)?.name || 'Dish'} is unavailable. Please choose another dish.`);
-    const x = makeLine(raw.id, raw.qty, raw.size, raw.notes, raw.timing);
-    if (raw.addedBy) { x.addedBy = raw.addedBy; x.guestEmoji = raw.guestEmoji; }
+    const x = makeLine(raw.id, raw.qty, raw.size, raw.notes, raw.timing, raw.addedBy || 'Table', raw.guestEmoji || '👥');
     if (raw.station) { x.station = raw.station; }
     const existing = next.find(y => y.id === x.id && y.size === x.size && y.notes === x.notes && (y.timing || 'fire') === (x.timing || 'fire'));
     if (existing) { if (existing.qty + x.qty > 20) throw Error('Maximum 20 of each dish.'); existing.qty += x.qty; } else next.push(x);
@@ -2813,6 +3031,7 @@ export function submit(state, table, options = {}) {
     session.cart = [];
     session.proposal = [];
     session.status = 'dining';
+    session.gear = 'stage';
   }
   state.cart = [];
   state.proposal = [];
@@ -2959,6 +3178,22 @@ export function applyOp(state, op) {
     }
     case 'TRANSFER_QUEUE_TO_TABLE': {
       transferQueueToTable(state, op.queueId, opTable);
+      break;
+    }
+    case 'RECORD_AH_HUA_EVENT': {
+      recordAhHuaEvent(state, op.eventType, op.data);
+      break;
+    }
+    case 'SET_TABLE_GEAR': {
+      if (session && op.gear) {
+        session.gear = op.gear;
+      }
+      break;
+    }
+    case 'TOGGLE_CART_RULE': {
+      if (!state.cartRules) state.cartRules = structuredClone(DEFAULT_CART_RULES);
+      const r = state.cartRules.find(x => x.id === op.ruleId);
+      if (r) r.enabled = op.enabled !== undefined ? op.enabled : !r.enabled;
       break;
     }
   }

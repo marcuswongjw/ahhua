@@ -8,7 +8,8 @@ import {
   getEReceipt, dish, STORED_VALUE_TIERS, COUPON_TEMPLATES,
   getMember, registerMember, topUpMemberBalance, applyCoupon,
   removeCoupon, payWithMemberBalance, submitReview, createBanquetBooking,
-  createQueueTicket, transferQueueToTable
+  createQueueTicket, transferQueueToTable,
+  DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics
 } from '../src/domain.js';
 import { computeDishBadge } from '../src/lore.js';
 import { handleRequest } from '../server.mjs';
@@ -511,4 +512,117 @@ test('queue ticket creates pre-order cart and transfers seamlessly to seated tab
   assert.equal(session.cart.length, 2);
   assert.equal(ticket.status, 'seated');
   assert.equal(ticket.table, '16');
+});
+
+test('salesperson metrics track cart check upsell, revenue, and chip conversions', () => {
+  const s = initialState();
+  assert.equal(s.ahHuaAnalytics.cartCheckImpressions, 0);
+
+  // Record impressions and acceptances
+  recordAhHuaEvent(s, 'CART_CHECK_IMPRESSION');
+  recordAhHuaEvent(s, 'CART_CHECK_IMPRESSION');
+  recordAhHuaEvent(s, 'CART_CHECK_ACCEPTED', { cents: 1300 });
+
+  recordAhHuaEvent(s, 'CHIP_CLICK');
+  recordAhHuaEvent(s, 'CHIP_CLICK');
+  recordAhHuaEvent(s, 'CHIP_CONVERSION');
+
+  recordAhHuaEvent(s, 'PROPOSAL_SHOWN');
+  recordAhHuaEvent(s, 'PROPOSAL_ACCEPTED', { cents: 2500 });
+
+  const metrics = getAhHuaSalesMetrics(s);
+  assert.equal(metrics.cartCheckImpressions, 2);
+  assert.equal(metrics.cartCheckAccepted, 1);
+  assert.equal(metrics.cartCheckRate, 50); // 1/2 = 50%
+  assert.equal(metrics.cartCheckRevenue, 1300);
+  assert.equal(metrics.chipConversionRate, 50); // 1/2 = 50%
+  assert.equal(metrics.proposalsAccepted, 1);
+  assert.equal(metrics.totalExtraRevenue, 1300 + 2500); // 3800 cents (S$38.00)
+});
+
+test('portion intelligence warns on over-ordering based on head count (pax) and preserves customer trust', () => {
+  // Table of 2 ordering 6 food dishes + steamboat (way too much food)
+  const cart = [
+    makeLine('pomfret', 1),
+    makeLine('chicken', 1),
+    makeLine('tofu', 1),
+    makeLine('kang', 1),
+    makeLine('pork', 1),
+    makeLine('ribs', 1),
+    makeLine('rice', 2)
+  ];
+
+  const check = evaluateCartRules(cart, { pax: 2 });
+  assert.ok(check);
+  assert.equal(check.type, 'portion_guard');
+  assert.equal(check.isOverOrder, true);
+  assert.match(check.message, /2 guests/);
+
+  const checkZh = evaluateCartRules(cart, { pax: 2, language: 'zh' });
+  assert.match(checkZh.message, /2 位用餐/);
+
+  // Reasonable order for 4 pax: 1 steamboat + 2 dishes + rice -> no portion guard warning
+  const normalCart = [
+    makeLine('grouper', 1),
+    makeLine('chicken', 1),
+    makeLine('kang', 1),
+    makeLine('rice', 4)
+  ];
+  const normalCheck = evaluateCartRules(normalCart, { pax: 4 });
+  // Over-order guard should not fire on normal table
+  assert.notEqual(normalCheck?.type, 'portion_guard');
+});
+
+test('data-driven cart rules decouple starters from zi char and allow operator toggle', () => {
+  const s = initialState();
+  
+  // Test missing rice rule: 2 zi char dishes without staple
+  const gravyCart = [
+    makeLine('tofu', 1),
+    makeLine('pork', 1)
+  ];
+  const riceCheck = evaluateCartRules(gravyCart, { pax: 4, rulesConfig: s.cartRules });
+  assert.equal(riceCheck?.type, 'missing_rice');
+  assert.equal(riceCheck?.dishId, 'rice');
+
+  // Test steamboat starter rule: steamboat without quick starter
+  const steamboatCart = [
+    makeLine('pomfret', 1)
+  ];
+  const starterCheck = evaluateCartRules(steamboatCart, { pax: 4, rulesConfig: s.cartRules });
+  assert.equal(starterCheck?.type, 'missing_starter');
+  assert.equal(starterCheck?.dishId, 'chicken');
+
+  // Operator toggles off steamboat_starter rule via applyOp
+  applyOp(s, { type: 'TOGGLE_CART_RULE', ruleId: 'steamboat_starter', enabled: false });
+  const disabledCheck = evaluateCartRules(steamboatCart, { pax: 4, rulesConfig: s.cartRules });
+  // Now should fall through to cooling_drinks rule rather than disabled starter rule
+  assert.equal(disabledCheck?.type, 'missing_drink');
+});
+
+test('session gear synchronizes table transitions to stage upon order submission', () => {
+  const s = initialState();
+  const session = getTableSession(s, '08');
+  assert.equal(session.gear, 'dock');
+
+  // Submit order for Table 08
+  addLines(s, [makeLine('grouper', 1)], '08');
+  submit(s, '08');
+
+  // Session gear is now stage, so all devices connected to Table 08 switch to Center Stage together
+  assert.equal(session.gear, 'stage');
+
+  // Client toggles gear back to dock via SET_TABLE_GEAR op
+  applyOp(s, { type: 'SET_TABLE_GEAR', table: '08', gear: 'dock' });
+  assert.equal(session.gear, 'dock');
+});
+
+test('explicit line attribution defaults safely to Table without leaking viewer identity', () => {
+  const line = makeLine('tofu', 1);
+  assert.equal(line.addedBy, 'Table');
+  assert.equal(line.guestEmoji, '👥');
+
+  const namedLine = makeLine('chicken', 1, 'Regular', '', 'fire', 'Uncle Lim', '👴');
+  assert.equal(namedLine.addedBy, 'Uncle Lim');
+  assert.equal(namedLine.guestEmoji, '👴');
 });
