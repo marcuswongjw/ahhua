@@ -37,7 +37,17 @@ function readJsonBody(req) {
   });
 }
 
+function setSecurityHeaders(res) {
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "default-src 'self' https://ucarecdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://ucarecdn.com; connect-src 'self' https://api.whatsapp.com https://t.me; media-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self';");
+  }
+}
+
 export async function handleRequest(req, res) {
+  setSecurityHeaders(res);
   const url = new URL(req.url, 'http://localhost');
   const pathname = decodeURIComponent(url.pathname);
 
@@ -66,6 +76,20 @@ export async function handleRequest(req, res) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: 'Missing operation payload' }));
         return;
+      }
+      if (op.table && ['__proto__', 'constructor', 'prototype'].includes(String(op.table))) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Invalid table identifier' }));
+        return;
+      }
+      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM']);
+      if (STAFF_OPS.has(op.type)) {
+        const staffHeader = req.headers?.['x-staff-auth'];
+        if (staffHeader !== '1927' && body.staffPin !== '1927') {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: 'Staff authentication required for this operation' }));
+          return;
+        }
       }
       applyOp(sharedState, op);
       broadcast(String(body?.senderId || ''), op);
@@ -97,17 +121,53 @@ export async function handleRequest(req, res) {
       if (incoming.sessions && typeof incoming.sessions === 'object') {
         if (!sharedState.sessions) sharedState.sessions = {};
         for (const [tId, sess] of Object.entries(incoming.sessions)) {
-          sharedState.sessions[tId] = sess;
+          if (!['__proto__', 'constructor', 'prototype'].includes(tId) && sess && typeof sess === 'object') {
+            sharedState.sessions[tId] = sess;
+          }
         }
       }
       // Merge root cart if provided
       if (Array.isArray(incoming.cart)) {
         sharedState.cart = incoming.cart;
       }
-      if (Array.isArray(incoming.orders)) sharedState.orders = incoming.orders;
-      if (Array.isArray(incoming.calls)) sharedState.calls = incoming.calls;
+      // Merge orders by ID to prevent concurrent orders from different tables being overwritten
+      if (Array.isArray(incoming.orders)) {
+        const orderMap = new Map(sharedState.orders.map(o => [o.id, o]));
+        for (const o of incoming.orders) {
+          if (!orderMap.has(o.id)) {
+            sharedState.orders.push(o);
+            orderMap.set(o.id, o);
+          } else {
+            const existing = orderMap.get(o.id);
+            if (existing && existing.status !== o.status) {
+              existing.status = o.status;
+              existing.paid = o.paid;
+              if (o.checkedItems) existing.checkedItems = o.checkedItems;
+            }
+          }
+        }
+        if (sharedState.orders.length > 100) sharedState.orders = sharedState.orders.slice(-100);
+      }
+      // Merge calls by ID
+      if (Array.isArray(incoming.calls)) {
+        const callMap = new Map(sharedState.calls.map(c => [c.id, c]));
+        for (const c of incoming.calls) {
+          if (!callMap.has(c.id)) {
+            sharedState.calls.push(c);
+            callMap.set(c.id, c);
+          } else {
+            const existing = callMap.get(c.id);
+            if (existing) existing.done = c.done;
+          }
+        }
+        if (sharedState.calls.length > 50) {
+          const active = sharedState.calls.filter(x => !x.done);
+          const completed = sharedState.calls.filter(x => x.done).slice(-20);
+          sharedState.calls = [...active, ...completed];
+        }
+      }
       if (Array.isArray(incoming.unavailable)) sharedState.unavailable = incoming.unavailable;
-      if (Array.isArray(incoming.messages)) sharedState.messages = incoming.messages;
+      if (Array.isArray(incoming.messages)) sharedState.messages = incoming.messages.slice(-80);
       if (Array.isArray(incoming.proposal)) sharedState.proposal = incoming.proposal;
 
       broadcast(String(body?.senderId || ''));

@@ -2932,9 +2932,14 @@ export const SET_MENUS = [
   }
 ];
 
-export function getTableSession(state, tableId) {
-  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null, gear: 'dock', seatingConfirmed: false };
-  if (!state.sessions) state.sessions = {};
+export function getTableSession(state, rawTableId) {
+  if (!rawTableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null, gear: 'dock', seatingConfirmed: false };
+  const safeId = String(rawTableId).trim().slice(0, 16);
+  if (['__proto__', 'constructor', 'prototype'].includes(safeId)) {
+    throw Error('Invalid table identifier.');
+  }
+  const tableId = safeId;
+  if (!state.sessions || typeof state.sessions !== 'object' || Array.isArray(state.sessions)) state.sessions = {};
   if (!state.sessions[tableId]) {
     state.sessions[tableId] = {
       cart: [],
@@ -3073,6 +3078,9 @@ export function submit(state, table, options = {}) {
   };
 
   state.orders.push(order);
+  if (state.orders.length > 100) {
+    state.orders = state.orders.slice(-100);
+  }
   if (session) {
     session.cart = [];
     session.proposal = [];
@@ -3107,6 +3115,11 @@ export function hurryItem(state, table, orderId, itemIndex, dishName = '') {
     done: false
   };
   state.calls.push(entry);
+  if (state.calls.length > 50) {
+    const active = state.calls.filter(x => !x.done);
+    const completed = state.calls.filter(x => x.done).slice(-20);
+    state.calls = [...active, ...completed];
+  }
   return entry;
 }
 
@@ -3127,6 +3140,11 @@ export function voidItem(state, table, orderId, itemIndex, reason = '') {
     done: false
   };
   state.calls.push(entry);
+  if (state.calls.length > 50) {
+    const active = state.calls.filter(x => !x.done);
+    const completed = state.calls.filter(x => x.done).slice(-20);
+    state.calls = [...active, ...completed];
+  }
   return entry;
 }
 
@@ -3284,6 +3302,11 @@ export function requestService(state, table, type = 'assistance', note = '') {
     done: false
   };
   state.calls.push(entry);
+  if (state.calls.length > 50) {
+    const active = state.calls.filter(x => !x.done);
+    const completed = state.calls.filter(x => x.done).slice(-20);
+    state.calls = [...active, ...completed];
+  }
   return entry;
 }
 export function tableSummary(state, table, pax = 4) {

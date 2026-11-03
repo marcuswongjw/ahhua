@@ -236,9 +236,13 @@ function dispatchOp(op) {
     try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
     channel?.postMessage({ senderId: clientId, op, state });
     if (syncMode === 'live') {
+      const headers = { 'Content-Type': 'application/json' };
+      if (typeof isStaffAuthenticated === 'function' && isStaffAuthenticated()) {
+        headers['X-Staff-Auth'] = '1927';
+      }
       fetch('/api/op', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ op, senderId: clientId })
       }).catch(() => {
         pushServerState();
@@ -293,6 +297,10 @@ function connectLiveSync() {
     es.onerror = () => {
       syncMode = 'local';
       es.close();
+      clearTimeout(connectLiveSync.retryTimer);
+      connectLiveSync.retryTimer = setTimeout(() => {
+        connectLiveSync();
+      }, 4000);
     };
   } catch {}
 }
@@ -786,7 +794,7 @@ function openCartCheckDialog(check) {
     <div class="cart-check-hero ${check.isOverOrder ? 'portion-guard-hero' : ''}">
       ${avatarMarkup()}
       <div class="cart-check-speech ${check.isOverOrder ? 'portion-guard-speech' : ''}">
-        <strong>${esc(check.title)}</strong>
+        <strong id="cart-check-dialog-title">${esc(check.title)}</strong>
         <p>${esc(check.message)}</p>
       </div>
     </div>
@@ -941,7 +949,7 @@ function renderCenterStage(summary) {
     <div>
       <div class="eyebrow-row">
         <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
-        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${currentGuest.name}</strong></span>
+        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${esc(currentGuest.name)}</strong></span>
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>Concierge Stage · Table companionship while kitchen prepares your meal</p>
@@ -976,7 +984,7 @@ function renderCenterStage(summary) {
           </div>
           <div class="stage-cart-headline">
             <strong>${tableCart.length} item${tableCart.length > 1 ? 's' : ''} in cart (${money(total(tableCart))})</strong>
-            <small>Added by: ${tableCart.map(l => `${l.guestEmoji || '👥'} ${l.addedBy || 'Table'}`).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small>
+            <small>Added by: ${tableCart.map(l => `${l.guestEmoji || '👥'} ${esc(l.addedBy || 'Table')}`).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small>
           </div>
         </div>
         <div class="stage-pending-cart-actions">
@@ -1151,7 +1159,7 @@ function openAhHuaDialog() {
       <div class="ah-hua-sheet-header">
         ${avatarMarkup()}
         <div>
-          <h3>Chat with Ah Hua <span class="online-dot"></span></h3>
+          <h3 id="ah-hua-dialog-title">Chat with Ah Hua <span class="online-dot"></span></h3>
           <p>Nan Hwa Chong Host · English · 中文 · Singlish</p>
           <small class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></small>
         </div>
@@ -1268,7 +1276,7 @@ function customer() {
     <div>
       <div class="eyebrow-row">
         <span class="eyebrow">NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉</span>
-        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${currentGuest.name}</strong></span>
+        <span class="table-peer-chip" title="Live table sync"><span class="live-dot"></span> Table ${table} · Live table sync ${connectedPeers > 1 ? `(${connectedPeers} diners in sync)` : ''} · You: <strong class="guest-name-pill">${currentGuest.emoji} ${esc(currentGuest.name)}</strong></span>
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>${esc(T('tableSubtitle'))}</p>
@@ -2799,7 +2807,7 @@ function openEReceiptDialog() {
         <button type="button" class="close-dialog" aria-label="Close receipt">×</button>
       </div>
       <div class="e-receipt-header">
-        <h3>${rc.merchant.name}</h3>
+        <h3 id="e-receipt-title">${esc(rc.merchant.name)}</h3>
         <p>${rc.merchant.cn}</p>
         <p>${rc.merchant.address} · Tel: ${rc.merchant.phone}</p>
         <p>GST Reg No: ${rc.merchant.gstReg} · Co Reg: ${rc.merchant.regNo}</p>
@@ -2885,7 +2893,7 @@ function openVoidDialog(orderId, itemIndex, dishName) {
       </div>
       <div style="text-align:center;margin:10px 0 16px;">
         <div style="font-size:36px;margin-bottom:8px">❌</div>
-        <h2>Cancel ${esc(dishName)}?</h2>
+        <h2 id="void-dialog-title">Cancel ${esc(dishName)}?</h2>
         <p style="font-size:12px;color:var(--muted)">Select reason for voiding this unserved dish. The kitchen ticket will be updated immediately.</p>
       </div>
       <form id="void-reason-form">
@@ -2934,7 +2942,7 @@ function openSetMenuDialog(setId) {
       </div>
       <div style="margin:10px 0 14px">
         <span class="set-menu-pax">👥 ${sm.pax} PAX · ${esc(sm.cn)}</span>
-        <h2 style="font-size:18px;margin:4px 0">${esc(sm.name)}</h2>
+        <h2 id="set-menu-title" style="font-size:18px;margin:4px 0">${esc(sm.name)}</h2>
         <p style="font-size:11px;color:var(--muted);line-height:1.5">${esc(sm.desc)}</p>
       </div>
       <form id="set-menu-form">
@@ -3013,7 +3021,7 @@ function openMemberDialog() {
           </div>
           <div style="text-align:center;margin:12px 0 16px">
             <div style="font-size:36px;margin-bottom:6px">🎁</div>
-            <h2 style="margin:0 0 4px">Join VIP &amp; Waive Table Tea</h2>
+            <h2 id="member-dialog-title" style="margin:0 0 4px">Join VIP &amp; Waive Table Tea</h2>
             <p style="font-size:11px;color:var(--muted)">Instant privileges for Table ${table} with zero card fees:</p>
           </div>
           <div style="background:#fef7f5;border:1px dashed #f0c3b8;border-radius:10px;padding:12px;margin-bottom:16px;font-size:11px">
@@ -3060,7 +3068,7 @@ function openMemberDialog() {
           <div class="member-card">
             <div class="member-card-header">
               <div>
-                <strong style="font-size:16px;display:block">${esc(member.name)}</strong>
+                <strong id="member-dialog-title" style="font-size:16px;display:block">${esc(member.name)}</strong>
                 <small style="color:#d1d5db">+65 ${esc(member.phone)} · Member #${member.phone.slice(-4)}</small>
               </div>
               <span class="member-tier-pill ${member.tier}">${member.tier} VIP</span>
@@ -3181,7 +3189,7 @@ function openReviewDialog() {
         </div>
         <div style="margin:10px 0 14px">
           <div style="font-size:32px;margin-bottom:4px">⭐️</div>
-          <h2 style="margin:0 0 4px">Rate Your Experience</h2>
+          <h2 id="review-dialog-title" style="margin:0 0 4px">Rate Your Experience</h2>
           <p style="font-size:11px;color:var(--muted)">Your feedback helps our charcoal masters maintain 1927 standards.</p>
         </div>
 
@@ -3282,7 +3290,7 @@ function openBanquetDialog() {
         <button type="button" class="close-dialog" aria-label="Close banquet modal">×</button>
       </div>
       <div style="margin:8px 0 12px">
-        <h2 style="margin:0 0 4px">Reserve a Heritage Steamboat Feast</h2>
+        <h2 id="banquet-dialog-title" style="margin:0 0 4px">Reserve a Heritage Steamboat Feast</h2>
         <p style="font-size:11px;color:var(--muted)">Book ahead for family gatherings and festive celebrations. S$50 deposit secures your private table and brazier.</p>
       </div>
 
@@ -3290,7 +3298,7 @@ function openBanquetDialog() {
         <label style="display:block;margin-bottom:10px;font-size:11px">Select Banquet Set Menu
           <select id="banquet-set-select" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;font-size:12px">
             ${SET_MENUS.map(sm => `
-              <option value="${sm.id}">${sm.name} · ${sm.pax} Pax (${money(sm.price)})</option>
+              <option value="${sm.id}">${esc(sm.name)} · ${sm.pax} Pax (${money(sm.price)})</option>
             `).join('')}
           </select>
         </label>
@@ -3367,7 +3375,7 @@ function openQueueDialog() {
       </div>
       <div style="margin:10px 0 14px">
         <span class="queue-pill" style="font-size:24px;font-weight:900;color:var(--brand-red);display:inline-block;padding:4px 16px;border:2px solid var(--brand-red);border-radius:8px;margin-bottom:6px">${sampleTicket}</span>
-        <h2 style="margin:4px 0">Waiting in Line?</h2>
+        <h2 id="queue-dialog-title" style="margin:4px 0">Waiting in Line?</h2>
         <p style="font-size:11px;color:var(--muted)">Pre-build your table cart while waiting. Once your table is ready, dishes auto-fire to the kitchen to cut wait time by 10 minutes!</p>
       </div>
 
