@@ -144,19 +144,59 @@ function wireDialog(dialog) {
     event.preventDefault();
     closeTopLayer(dialog);
   });
-  if (!('closedBy' in HTMLDialogElement.prototype)) {
-    dialog.addEventListener('click', event => {
-      if (event.target !== dialog) return;
-      const rect = dialog.getBoundingClientRect();
-      const isDialogContent = (
-        rect.top <= event.clientY &&
-        event.clientY <= rect.top + rect.height &&
-        rect.left <= event.clientX &&
-        event.clientX <= rect.left + rect.width
-      );
-      if (isDialogContent) return;
-      closeTopLayer(dialog);
-    });
+}
+
+// Global click handler to close dialog ONLY when clicking the x icon (.close-dialog)
+document.addEventListener('click', event => {
+  const closeBtn = event.target.closest('.close-dialog');
+  if (closeBtn) {
+    const dialog = closeBtn.closest('dialog');
+    if (dialog) closeTopLayer(dialog);
+  }
+});
+
+function ensureDialogRoot() {
+  let root = document.getElementById('dialog-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'dialog-root';
+    root.innerHTML = `
+      <dialog id="dish-dialog" aria-labelledby="dish-dialog-title"></dialog>
+      <dialog id="bill-dialog" aria-labelledby="bill-dialog-title"></dialog>
+      <dialog id="service-dialog" aria-labelledby="service-dialog-title"></dialog>
+      <dialog id="order-success-dialog" aria-labelledby="order-success-dialog-title"></dialog>
+      <dialog id="qr-dialog" aria-labelledby="qr-dialog-title"></dialog>
+      <dialog id="steamboat-guide-dialog" aria-labelledby="steamboat-guide-title"></dialog>
+      <dialog id="mobile-cart-dialog" class="bottom-sheet-dialog" aria-labelledby="mobile-cart-dialog-title"></dialog>
+      <dialog id="ah-hua-dialog" class="bottom-sheet-dialog" aria-labelledby="ah-hua-dialog-title"></dialog>
+      <dialog id="cart-check-dialog" aria-labelledby="cart-check-dialog-title"></dialog>
+      <dialog id="staff-pin-dialog" aria-labelledby="staff-pin-title"></dialog>
+      <dialog id="set-menu-dialog" class="bottom-sheet-dialog" aria-labelledby="set-menu-title"></dialog>
+      <dialog id="void-dialog" aria-labelledby="void-dialog-title"></dialog>
+      <dialog id="e-receipt-dialog" aria-labelledby="e-receipt-title"></dialog>
+      <dialog id="member-dialog" class="bottom-sheet-dialog" aria-labelledby="member-dialog-title"></dialog>
+      <dialog id="review-dialog" class="bottom-sheet-dialog" aria-labelledby="review-dialog-title"></dialog>
+      <dialog id="banquet-dialog" class="bottom-sheet-dialog" aria-labelledby="banquet-dialog-title"></dialog>
+      <dialog id="queue-dialog" class="bottom-sheet-dialog" aria-labelledby="queue-dialog-title"></dialog>
+      <dialog id="reset-dialog" aria-labelledby="reset-dialog-title">
+        <form method="dialog">
+          <h2 id="reset-dialog-title">Start fresh?</h2>
+          <p>This clears this demo’s cart, conversations, table requests and kitchen tickets.</p>
+          <div class="dialog-actions">
+            <button value="cancel" class="secondary">Keep exploring</button>
+            <button value="reset" class="primary">Reset demo</button>
+          </div>
+        </form>
+      </dialog>
+    `;
+    document.body.appendChild(root);
+    [
+      '#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog',
+      '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog',
+      '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog',
+      '#e-receipt-dialog', '#member-dialog', '#review-dialog', '#banquet-dialog',
+      '#queue-dialog', '#reset-dialog'
+    ].forEach(sel => wireDialog(document.querySelector(sel)));
   }
 }
 
@@ -492,6 +532,7 @@ function openStaffPinDialog(targetRole) {
 }
 
 function render() {
+  ensureDialogRoot();
   const prevScrollY = window.scrollY;
   state.replyLanguage = normaliseLanguage(state.replyLanguage);
   const pending = state.orders.filter(x => x.status === 'pending').length;
@@ -545,36 +586,7 @@ function render() {
     </aside>
     <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(getTableSession(state, table).cart))} →</strong></a>
   ` : ''}
-  <footer><span class="footer-mark">南</span> Nan Hwa Chong (南华昌) Fish Head Steamboat Corner · Traditional Teochew Taste Since 1927 <span>North Bridge Road &amp; Jalan Sultan · Singapore</span></footer>
-  <dialog id="dish-dialog" closedby="any" aria-labelledby="dish-dialog-title"></dialog>
-  <dialog id="bill-dialog" closedby="any" aria-labelledby="bill-dialog-title"></dialog>
-  <dialog id="service-dialog" closedby="any" aria-labelledby="service-dialog-title"></dialog>
-  <dialog id="order-success-dialog" closedby="any" aria-labelledby="order-success-dialog-title"></dialog>
-  <dialog id="qr-dialog" closedby="any" aria-labelledby="qr-dialog-title"></dialog>
-  <dialog id="steamboat-guide-dialog" closedby="any" aria-labelledby="steamboat-guide-title"></dialog>
-  <dialog id="mobile-cart-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="mobile-cart-dialog-title"></dialog>
-  <dialog id="ah-hua-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="ah-hua-dialog-title"></dialog>
-  <dialog id="cart-check-dialog" closedby="any" aria-labelledby="cart-check-dialog-title"></dialog>
-  <dialog id="staff-pin-dialog" closedby="any" aria-labelledby="staff-pin-title"></dialog>
-  <dialog id="set-menu-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="set-menu-title"></dialog>
-  <dialog id="void-dialog" closedby="any" aria-labelledby="void-dialog-title"></dialog>
-  <dialog id="e-receipt-dialog" closedby="any" aria-labelledby="e-receipt-title"></dialog>
-  <dialog id="member-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="member-dialog-title"></dialog>
-  <dialog id="review-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="review-dialog-title"></dialog>
-  <dialog id="banquet-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="banquet-dialog-title"></dialog>
-  <dialog id="queue-dialog" class="bottom-sheet-dialog" closedby="any" aria-labelledby="queue-dialog-title"></dialog>
-  <dialog id="reset-dialog" closedby="any" aria-labelledby="reset-dialog-title">
-    <form method="dialog">
-      <h2 id="reset-dialog-title">Start fresh?</h2>
-      <p>This clears this demo’s cart, conversations, table requests and kitchen tickets.</p>
-      <div class="dialog-actions">
-        <button value="cancel" class="secondary">Keep exploring</button>
-        <button value="reset" class="primary">Reset demo</button>
-      </div>
-    </form>
-  </dialog>`;
-
-  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog', '#e-receipt-dialog', '#member-dialog', '#review-dialog', '#banquet-dialog', '#queue-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  <footer><span class="footer-mark">南</span> Nan Hwa Chong (南华昌) Fish Head Steamboat Corner · Traditional Teochew Taste Since 1927 <span>North Bridge Road &amp; Jalan Sultan · Singapore</span></footer>`;
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     const targetRole = b.dataset.role;
