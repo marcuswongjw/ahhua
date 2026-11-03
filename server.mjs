@@ -49,7 +49,9 @@ function setSecurityHeaders(res) {
 export async function handleRequest(req, res) {
   setSecurityHeaders(res);
   const url = new URL(req.url, 'http://localhost');
-  const pathname = decodeURIComponent(url.pathname);
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname); }
+  catch { res.writeHead(400).end('Bad request'); return; }
 
   if (pathname === '/api/events' && req.method === 'GET') {
     res.writeHead(200, {
@@ -82,7 +84,7 @@ export async function handleRequest(req, res) {
         res.end(JSON.stringify({ error: 'Invalid table identifier' }));
         return;
       }
-      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM', 'SETTLE_TABLE', 'TOGGLE_CART_RULE']);
+      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM', 'RESOLVE_CALL']);
       if (STAFF_OPS.has(op.type)) {
         const staffHeader = req.headers?.['x-staff-auth'];
         if (staffHeader !== '1927' && body.staffPin !== '1927') {
@@ -109,77 +111,8 @@ export async function handleRequest(req, res) {
   }
 
   if (pathname === '/api/state' && req.method === 'POST') {
-    try {
-      const body = await readJsonBody(req);
-      const incoming = body?.state ?? body;
-      if (!isValidState(incoming)) {
-        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ error: 'Invalid state payload' }));
-        return;
-      }
-      const isStaff = (req.headers && req.headers['x-staff-auth'] === '1927') || body?.staffPin === '1927';
-
-      // Merge table sessions cleanly so one table doesn't wipe another table's cart
-      if (incoming.sessions && typeof incoming.sessions === 'object') {
-        if (!sharedState.sessions) sharedState.sessions = {};
-        for (const [tId, sess] of Object.entries(incoming.sessions)) {
-          if (!['__proto__', 'constructor', 'prototype'].includes(tId) && /^[a-zA-Z0-9_\-\s]{1,16}$/.test(tId) && sess && typeof sess === 'object') {
-            sharedState.sessions[tId] = sess;
-          }
-        }
-      }
-      // Merge root cart if provided
-      if (Array.isArray(incoming.cart)) {
-        sharedState.cart = incoming.cart;
-      }
-      // Merge orders by ID to prevent concurrent orders from different tables being overwritten
-      if (Array.isArray(incoming.orders)) {
-        const orderMap = new Map(sharedState.orders.map(o => [o.id, o]));
-        for (const o of incoming.orders) {
-          if (!orderMap.has(o.id)) {
-            sharedState.orders.push(o);
-            orderMap.set(o.id, o);
-          } else if (isStaff) {
-            const existing = orderMap.get(o.id);
-            if (existing && existing.status !== o.status) {
-              existing.status = o.status;
-              existing.paid = o.paid;
-              if (o.checkedItems) existing.checkedItems = o.checkedItems;
-            }
-          }
-        }
-        if (sharedState.orders.length > 100) sharedState.orders = sharedState.orders.slice(-100);
-      }
-      // Merge calls by ID
-      if (Array.isArray(incoming.calls)) {
-        const callMap = new Map(sharedState.calls.map(c => [c.id, c]));
-        for (const c of incoming.calls) {
-          if (!callMap.has(c.id)) {
-            sharedState.calls.push(c);
-            callMap.set(c.id, c);
-          } else {
-            const existing = callMap.get(c.id);
-            if (existing) existing.done = c.done;
-          }
-        }
-        if (sharedState.calls.length > 50) {
-          const active = sharedState.calls.filter(x => !x.done);
-          const completed = sharedState.calls.filter(x => x.done).slice(-20);
-          sharedState.calls = [...active, ...completed];
-        }
-      }
-      if (isStaff && Array.isArray(incoming.unavailable)) sharedState.unavailable = incoming.unavailable;
-      if (isStaff && Array.isArray(incoming.cartRules)) sharedState.cartRules = incoming.cartRules;
-      if (Array.isArray(incoming.messages)) sharedState.messages = incoming.messages.slice(-80);
-      if (Array.isArray(incoming.proposal)) sharedState.proposal = incoming.proposal;
-
-      broadcast(String(body?.senderId || ''));
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: true, clients: clients.size }));
-    } catch {
-      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ error: 'Malformed JSON body' }));
-    }
+    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'Send changes to /api/op. Full state replacement is disabled.' }));
     return;
   }
 
