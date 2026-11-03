@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { menu } from '../src/domain.js';
 import { marketingDocument } from '../src/marketing.js';
-import { brand, pricing, contact, restaurant, whatsappHref, sgd } from '../src/config.js';
+import { brand, pricing, contact, restaurant, exampleRestaurant, whatsappHref, sgd } from '../src/config.js';
 import { handleRequest } from '../server.mjs';
 import { EventEmitter } from 'node:events';
 
@@ -19,8 +19,13 @@ test('brand config is the single place for price, host, and the TODO WhatsApp nu
   assert.equal(contact.whatsappNumber, 'TODO');
   assert.equal(whatsappHref(), '');
   assert.equal(restaurant.hostName, 'Ah Hua');
-  assert.equal(restaurant.fictional, true);
-  assert.equal(restaurant.phone, 'TODO');
+  assert.equal(restaurant.fictional, false);
+  assert.equal(restaurant.shortName, 'Nan Hwa Chong');
+  assert.equal(restaurant.established, 1927);
+  assert.equal(restaurant.addressLines[0], '812/814/816 North Bridge Road');
+  assert.equal(exampleRestaurant.shortName, 'Hua Yuan');
+  assert.equal(contact.cta, 'WhatsApp us');
+  assert.equal('person' in contact, false);
 });
 
 test('owner page states the offer, the grant line, and does not invent a WhatsApp number', () => {
@@ -36,6 +41,9 @@ test('owner page states the offer, the grant line, and does not invent a WhatsAp
   assert.match(html, /href="\/demo"/);
   assert.match(html, /property="og:title"/);
   assert.match(html, /No per-bill fee/);
+  assert.match(html, /WhatsApp us/);
+  assert.doesNotMatch(html, /Marcus/);
+  assert.doesNotMatch(html, /Hua Yuan/);
 });
 
 test('sample menu has distinct descriptions, a fixed typo, and consistent simple greens', () => {
@@ -71,9 +79,10 @@ function request(url) {
   return Promise.resolve(pending).then(() => ({ status, body }));
 }
 
-test('demo shell does not name the previous real restaurant', async () => {
+test('demo shell names Nan Hwa Chong and does not name a person', async () => {
   const html = await readFile(new URL('../demo/index.html', import.meta.url), 'utf8');
-  assert.match(html, new RegExp(restaurant.name));
-  assert.doesNotMatch(html, /Nan Hwa Chong|南华昌/);
+  assert.match(html, /Nan Hwa Chong Fish Head Steamboat/);
+  assert.match(html, /南华昌/);
+  assert.doesNotMatch(html, /Marcus|Hua Yuan/);
   assert.match(html, /noindex/);
 });

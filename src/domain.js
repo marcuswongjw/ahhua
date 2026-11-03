@@ -1,7 +1,7 @@
 import { normaliseLanguage, replyText, dishName, uiText } from './languages.js';
 import { restaurant, restaurantAddress, demoUrl } from './config.js';
 
-// Sample steamboat and zi char menu for the fictional demo house. Descriptions are illustrative.
+// Sample steamboat and zi char menu for the demo restaurant. Descriptions are illustrative.
 export const menu = [
   {
     "id": "pomfret",
@@ -3445,7 +3445,7 @@ export function generateAABillMessage(state, tableId, { hostName = 'Host', hostP
   const dateStr = new Date().toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
 
   let text = `🍲 *${restaurant.name} (${restaurant.nameZh}) · Table ${tableId} Bill Split (好友分账)*\n`;
-  text += `📍 ${restaurantAddress()} · ${restaurant.addressNote}\n`;
+  text += `📍 ${restaurant.billLocation}\n`;
   text += `📅 ${dateStr} · ${safePax} Diners\n`;
   text += `────────────────────────────\n`;
   text += `💰 *Total Bill:* ${money(summary.grandTotal)} (Dishes: ${money(summary.rawSubtotal ?? summary.subtotal)}`;
@@ -3481,7 +3481,7 @@ export function generateAABillMessage(state, tableId, { hostName = 'Host', hostP
     text += `👉 *PayNow to Table Host (${hostName})*\n`;
   }
   text += `🔗 *View the table:* ${demoUrl(tableId)}\n`;
-  text += `✨ Thank you for dining with ${restaurant.hostName}. This is a concept demo. Nothing is charged.`;
+  text += `✨ Thank you for dining with ${restaurant.hostName}! 欢聚${restaurant.nameZh}，炭火传温情。 This concept demo charges nothing.`;
 
   return text;
 }
@@ -3511,9 +3511,9 @@ export function getEReceipt(state, table, pax = 4) {
     merchant: {
       name: restaurant.receiptLegalName,
       cn: restaurant.receiptLegalNameZh,
-      gstReg: 'Sample only — not GST registered',
+      gstReg: restaurant.gstReg,
       regNo: restaurant.regNo,
-      address: `${restaurantAddress()} (${restaurant.addressNote})`,
+      address: restaurantAddress(),
       phone: restaurant.phone === 'TODO' ? 'Not listed' : restaurant.phone
     },
     receiptNo,

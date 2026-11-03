@@ -13,7 +13,7 @@ function cta(className = 'btn btn-red') {
 
 function todoNote() {
   if (whatsappHref()) return '';
-  return `<p class="todo"><strong>TODO:</strong> ${esc(contact.person)}’s WhatsApp number is not set. It is marked <code>TODO</code> in <code>src/config.js</code> (<code>contact.whatsappNumber</code>). This button only scrolls here until that field is a real number. Do not guess one.</p>`;
+  return `<p class="todo"><strong>TODO:</strong> The WhatsApp number is not set. It is marked <code>TODO</code> in <code>src/config.js</code> (<code>contact.whatsappNumber</code>). This button only scrolls here until that field is a real number. Do not guess one.</p>`;
 }
 
 export function marketingDocument() {
@@ -194,7 +194,7 @@ export function marketingDocument() {
     <section id="talk">
       <div class="wrap">
         <div class="talk">
-          <p class="eyebrow" style="color:#f0d2d3">Talk to ${esc(contact.person)}</p>
+          <p class="eyebrow" style="color:#f0d2d3">WhatsApp us</p>
           <h2>Tell us about the house.</h2>
           <p class="section-lead">How many outlets, what you cook, and whether the floor is short on Friday. We will reply like a captain: warm, polite, brief.</p>
           <div class="actions">
@@ -211,7 +211,7 @@ export function marketingDocument() {
       <strong>${esc(brand.wordmark)}</strong>
       <span>${esc(brand.line)}</span>
       <span>${esc(brand.tagline)} ${esc(brand.taglineZh)}</span>
-      <span>The diner flow is a concept demo for ${esc(restaurant.name)} (${esc(restaurant.nameZh)}), a fictional house. ${esc(restaurant.addressNote)}</span>
+      <span>The diner flow is a concept demo for ${esc(restaurant.name)} (${esc(restaurant.nameZh)}), since ${restaurant.established}. ${esc(restaurant.addressNote)}</span>
       <a href="${esc(restaurant.demoPath)}">Open the concept demo</a>
     </div>
   </footer>

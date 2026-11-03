@@ -7,10 +7,10 @@ export const QUICK_CHIPS = {
     { id: 'pairs', label: '🍲 What is the classic pairing?', question: 'What is the classic Teochew feast combination?' }
   ],
   waiting: [
-    { id: 'steamboat_story', label: '📖 What is this house?', question: 'What is this restaurant?' },
+    { id: 'steamboat_story', label: '📖 Origin of this steamboat', question: 'Tell me the story of Nan Hwa Chong since 1927' },
     { id: 'sole_fish', label: '🐟 Why sole fish in the broth?', question: 'What is the secret ingredient in the steamboat soup?' },
-    { id: 'rounds', label: '🧾 How do rounds work?', question: 'How does an order reach the kitchen?' },
-    { id: 'split', label: '💳 Can we split the bill?', question: 'Can we split the bill with PayNow?' }
+    { id: 'dessert', label: '🍧 Best dessert spots nearby?', question: 'Where can we get good local dessert after this?' },
+    { id: 'walk', label: '🚶 10-min heritage walking loop', question: 'Where should we stroll around Jalan Sultan after dinner?' }
   ]
 };
 
@@ -31,29 +31,29 @@ export const LORE_ANSWERS = {
     singlish: 'Very family friendly! Kids love our Homemade Tofu with minced meat, Sweet & Sour Pork, and Har Cheong Gai. For Ah Gong Ah Ma, Pomfret steamboat and tofu are super soft and easy to eat!'
   },
   pairs: {
-    en: 'A classic shared table: 1 charcoal fish-head steamboat in the middle, 1 prawn paste chicken, 1 sambal kang kong, 1 homemade tofu, and rice for each person.',
-    zh: '一桌常见的搭配：炭火鱼头炉放中间，加上虾酱鸡、叁巴空心菜、自制豆腐，再按人数配白饭。',
-    singlish: 'The usual table: 1 charcoal steamboat in the middle, 1 plate har cheong gai, 1 plate sambal kang kong, and rice for everyone.'
+    en: 'The classic Nan Hwa Chong communal feast: 1 Charcoal Fish Head Steamboat (centrepiece) + 1 Prawn Paste Chicken + 1 Sambal Kang Kong + 1 Homemade Tofu + Fragrant Jasmine Rice for each diner. Never fails!',
+    zh: '南华昌全桌黄金搭配：炭火鱼头炉（全桌核心） + 招牌虾酱鸡 + 叁巴空心菜 + 自制豆腐 + 适量茉莉香米饭。荤素浓淡相宜，一代代老顾客百吃不厌！',
+    singlish: 'The legendary combo: 1 Charcoal Steamboat in the middle, 1 plate Har Cheong Gai, 1 plate Sambal Kang Kong, and hot rice for everyone. Steady pom pi pi!'
   },
   steamboat_story: {
-    en: 'This is Hua Yuan, a fictional steamboat house for the TableHua demo. The menu is sample zi char and charcoal steamboat. It is not a real restaurant’s history or address.',
-    zh: '这里是华园，一间为 TableHua 演示而设的虚构鱼头炉。菜单是示例煮炒和炭火炉，不是某家真实餐厅的历史或地址。',
-    singlish: 'This one is Hua Yuan, a made-up steamboat house for the TableHua demo. Sample menu only. Not a real restaurant story, okay?'
+    en: 'Nan Hwa Chong (南华昌) was founded in 1927 at the bustling corner of North Bridge Road and Jalan Sultan. For nearly a century, we have kept the authentic Teochew charcoal chimney braziers burning bright.',
+    zh: '南华昌创建于1927年，坐落于北桥路与苏丹门街角。近一个世纪以来，我们始终坚守潮州传统炭火长筒炉灶，用炭火余温淬炼鲜鱼滋味，成为新加坡闻名遐迩的百年招牌。',
+    singlish: 'Nan Hwa Chong since 1927, nearly 100 years at Jalan Sultan corner! Old school charcoal steamboat with real mangrove charcoal. That’s why the broth is so fragrant!'
   },
   sole_fish: {
     en: 'The secret umami in traditional Teochew steamboat broth comes from sun-dried sole fish (大地鱼 / 扁鱼干). We deep-fry it until crisp and simmer it in the soup, releasing deep natural sweetness without MSG.',
     zh: '潮州鱼头炉鲜绝天下的秘密，在于特选日晒大地鱼（扁鱼干）。经大火炸至酥香后投入高汤慢熬，鱼干天然咸鲜与生姜香气交融，回味悠长。',
     singlish: 'The secret weapon is the crispy dried sole fish (Ti Po)! Fried until crispy and simmered into the broth. That’s where the deep seafood umami comes from lah!'
   },
-  rounds: {
-    en: 'Add dishes, then send the round. Staff approve it in the Staff view. Only then does the Kitchen view start cooking. Nothing is sent to a real kitchen.',
-    zh: '先把菜放进购物车，再发送这一轮。服务员在 Staff 页面批准后，Kitchen 页面才会开始做。这里没有真实厨房。',
-    singlish: 'Add the dishes, then send the round. Staff must approve it on the Staff screen. Kitchen only starts after that. This is a demo, not a real wok.'
+  dessert: {
+    en: 'Craving dessert after steamboat? 1) Rochor Beancurd on Jalan Besar (warm beancurd & dough fritters, 4 mins walk), 2) Ah Chew Desserts on Liang Seah St (mango sago pomelo), or traditional ice cendol around Kampong Gelam!',
+    zh: '吃完鱼头炉想吃甜品？1）惹兰勿刹梧槽豆花（温热滑嫩配油条，步行4分钟）、2）亮阁街阿秋甜品（杨枝甘露与生磨芝麻糊）、3）甘榜格南传统珍多冰！',
+    singlish: 'Walk 4 mins to Rochor Beancurd on Jalan Besar for hot beancurd and youtiao! Or head over to Ah Chew Desserts for mango sago pomelo. Very shiok!'
   },
-  split: {
-    en: 'Open the bill to split the sample total. The PayNow code is a picture for the demo. Nothing is charged, and TableHua does not take the payment.',
-    zh: '打开账单可以把示例总额分摊。PayNow 码只是演示图片，不会扣款，TableHua 也不代收钱。',
-    singlish: 'Open the bill and split the sample total. The PayNow picture is for show. Nothing is charged, and we don’t take the money.'
+  walk: {
+    en: 'A scenic 10-minute heritage walk right outside: Stroll down North Bridge Road to admire Sultan Mosque’s majestic golden dome, explore vibrant Haji Lane murals, or enjoy traditional Nanyang kopi across the junction!',
+    zh: '出门即是充满南洋韵味的10分钟夜景漫步：沿北桥路漫步欣赏苏丹清真寺金色穹顶，探索哈芝巷艺术壁画，或在街角老咖啡馆品味一杯牛油咖啡。',
+    singlish: 'Just step outside: walk down to Sultan Mosque for photos, check out Haji Lane murals, or cross the road to Heap Seng Leong for old school kopi with butter!'
   }
 };
 
@@ -71,27 +71,27 @@ export const STORY_CARDS = [
   },
   {
     id: 'charcoal',
-    badge: '🔥 Charcoal pot',
-    title: 'Why the pot is charcoal',
-    subtitle: 'A steady heat, not a flat ring',
-    quote: '“A ring heats the metal. Charcoal keeps the soup moving.”',
-    text: 'A chimney of charcoal under a tall pot keeps a gentle heat, so the broth stays sweet and the fish does not fall apart. This house is fictional. The method is the one cooks still use.'
+    badge: '🔥 Heritage Craft',
+    title: 'Why Charcoal Still Matters in 2026',
+    subtitle: 'A living flame for nearly 100 years',
+    quote: '“Induction heats the pot. Charcoal breathes life into the soup.”',
+    text: 'Genuine mangrove charcoal inside the central brass chimney generates 400°C infrared radiant heat. The constant gentle convection releases fish collagen into the broth without tearing delicate fillets.'
   },
   {
-    id: 'rounds',
-    badge: '01 02 03',
-    title: 'How a round reaches the wok',
-    subtitle: 'Staff approve before the kitchen starts',
+    id: 'loop',
+    badge: '🗺️ 10-Min Walk',
+    title: 'Post-Meal Walking Loop',
+    subtitle: 'Digest and explore historical Kampong Gelam',
     spots: [
-      { icon: '1', name: 'The table sends a round', dist: 'The cart stays here until you send it' },
-      { icon: '2', name: 'Staff approve', dist: 'Open Staff in this same browser' },
-      { icon: '3', name: 'Kitchen cooks', dist: 'Open Kitchen after the round is approved' }
+      { icon: '🕌', name: 'Sultan Mosque (苏丹回教堂)', dist: '4 mins walk · Iconic golden dome' },
+      { icon: '🎨', name: 'Haji Lane Murals (哈芝巷)', dist: '6 mins walk · Hip boutiques & indie art' },
+      { icon: '☕', name: 'Heap Seng Leong Kopi (协胜隆)', dist: '2 mins walk · 1950s butter kopi & toast' }
     ]
   },
   {
     id: 'slang',
-    badge: '🗣️ Teochew',
-    title: 'Three words regulars use',
+    badge: '🗣️ Teochew Dialect',
+    title: 'Sound Like a Regular at Nan Hwa Chong',
     subtitle: 'Three words that warm up every table',
     slangs: [
       { word: 'Gao (厚)', meaning: 'Thick, collagen-rich broth that coats the spoon.' },

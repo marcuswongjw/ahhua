@@ -1,7 +1,8 @@
 /**
  * TableHua brand, pricing, contact, and the demo restaurant.
- * Change this file when a real client replaces the fictional house.
- * Leave contact.whatsappNumber as TODO until Marcus supplies a number.
+ * Swap `restaurant` when another house tries the demo.
+ * `exampleRestaurant` is an unused sample of that shape.
+ * Leave contact.whatsappNumber as TODO until a real number is supplied.
  * Do not invent a phone number.
  */
 
@@ -39,10 +40,9 @@ export const outOfScope = [
 ];
 
 export const contact = {
-  person: 'Marcus',
-  cta: 'WhatsApp Marcus',
+  cta: 'WhatsApp us',
   /**
-   * TODO: replace with Marcus’s WhatsApp number.
+   * TODO: replace with the restaurant’s WhatsApp number.
    * Digits only, country code included, no plus and no spaces.
    * Example shape, not a real number: 6591234567
    */
@@ -55,28 +55,65 @@ export const site = {
 };
 
 export const restaurant = {
+  name: 'Nan Hwa Chong Fish Head Steamboat',
+  nameZh: '南华昌',
+  shortName: 'Nan Hwa Chong',
+  alsoKnownAs: '南华昌 (亚秋)',
+  cornerName: 'Nan Hwa Chong (南华昌) Fish Head Steamboat Corner',
+  cuisine: 'Authentic charcoal fish head steamboat and Teochew zi char',
+  fictional: false,
+  established: 1927,
+  heritageLine: 'NAN HWA CHONG · EST. 1927 · 百年老字号传统炭火鱼头炉',
+  blurb: 'Traditional Teochew charcoal fish-head steamboat since 1927, at the corner of North Bridge Road and Jalan Sultan.',
+  addressLines: ['812/814/816 North Bridge Road', 'Singapore 198779'],
+  addressNote: 'North Bridge Road & Jalan Sultan · Singapore',
+  billLocation: '812/814/816 North Bridge Rd · Est. 1927',
+  phone: '+65 6297 9719',
+  hostName: 'Ah Hua',
+  hostNameZh: '阿华',
+  hostRole: 'table host',
+  receiptLegalName: 'Nan Hwa Chong (1927) Pte. Ltd.',
+  receiptLegalNameZh: '南华昌（1927）私人有限公司',
+  gstReg: 'M9-0012345-X',
+  regNo: '192700012K',
+  paynowDisplayName: 'NAN HWA CHONG STEAMBOAT PTE. LTD.',
+  paynowUen: '201619270H',
+  receiptPrefix: 'NHC',
+  staffPin: '1927',
+  staffPinHint: 'Heritage Est. 1927',
+  logo: 'https://ucarecdn.com/3fcbba39-c037-4087-9aa9-c018c3ec8d87/-/crop/330x330/144,0/-/preview/',
+  demoPath: '/demo'
+};
+
+/** Unused example. Copy these fields onto `restaurant` to point the demo at another house. */
+export const exampleRestaurant = {
   name: 'Hua Yuan Steamboat House',
   nameZh: '华园鱼头炉',
   shortName: 'Hua Yuan',
+  alsoKnownAs: '华园',
+  cornerName: 'Hua Yuan Steamboat House (华园鱼头炉)',
   cuisine: 'Charcoal fish-head steamboat and Teochew-style zi char',
   fictional: true,
-  blurb: 'A fictional neighbourhood steamboat house used to show TableHua. Replace this block when a real restaurant goes live.',
+  established: null,
+  heritageLine: 'HUA YUAN · CONCEPT DEMO',
+  blurb: 'A fictional neighbourhood steamboat house. Not used unless copied over restaurant.',
   addressLines: ['18 Concept Lane', '#01-08'],
-  addressNote: 'Fictional address for this demo. Not a real outlet.',
-  // TODO: set a real client phone here. Leave TODO until then.
+  addressNote: 'Fictional address. Not a real outlet.',
+  billLocation: '18 Concept Lane · concept demo',
   phone: 'TODO',
   hostName: 'Ah Hua',
   hostNameZh: '阿华',
   hostRole: 'table host',
   receiptLegalName: 'Hua Yuan Steamboat House (demo)',
   receiptLegalNameZh: '华园鱼头炉（演示）',
+  gstReg: 'Sample only — not GST registered',
   regNo: 'DEMO-NOT-REGISTERED',
   paynowDisplayName: 'HUA YUAN STEAMBOAT HOUSE (DEMO)',
   paynowUen: 'DEMO-NOT-A-UEN',
   receiptPrefix: 'HY',
-  /** Demo floor PIN. It opens the simulated staff and kitchen views. It is not a founding year. */
   staffPin: '1927',
-  staffPinHint: 'Demo floor PIN. It is not a founding year.',
+  staffPinHint: 'Demo floor PIN',
+  logo: '/assets/seal.png',
   demoPath: '/demo'
 };
 
@@ -87,7 +124,7 @@ export function sgd(amount) {
 export function whatsappHref() {
   const n = String(contact.whatsappNumber || '');
   if (!/^[0-9]{8,15}$/.test(n)) return '';
-  const text = encodeURIComponent(`Hello ${contact.person}, I would like to ask about TableHua for my restaurant.`);
+  const text = encodeURIComponent('Hello, I would like to ask about TableHua for my restaurant.');
   return `https://wa.me/${n}?text=${text}`;
 }
 

@@ -582,11 +582,11 @@ function render() {
   const currentMember = currentMemberPhone ? getMember(state, currentMemberPhone) : null;
 
   $('#app').innerHTML = `
-  <div class="demo-bar"><span class="dot"></span> ${esc(brand.productName.toUpperCase())} CONCEPT DEMO <span class="demo-detail">Not a live restaurant · <a href="/">About ${esc(brand.productName)}</a></span></div>
+  <div class="demo-bar"><span class="dot"></span> ${esc(restaurant.shortName.toUpperCase())} (${esc(restaurant.nameZh)}) · EST. ${restaurant.established} <span class="demo-detail">${esc(brand.productName)} concept demo · <a href="/">About ${esc(brand.productName)}</a></span></div>
   <header class="topbar">
-    <a class="brand" href="${esc(restaurant.demoPath)}" aria-label="${esc(restaurant.name)} demo">
-      <span class="seal"><img class="seal-img" src="/assets/seal.png" alt="" /></span>
-      <span>${esc(restaurant.shortName)}<small>${esc(restaurant.nameZh)} · ${esc(restaurant.hostName)}</small></span>
+    <a class="brand" href="${esc(restaurant.demoPath)}" aria-label="${esc(restaurant.name)}">
+      <span class="seal"><img class="seal-img" src="${esc(restaurant.logo)}" alt="${esc(restaurant.nameZh)}" /></span>
+      <span>${esc(restaurant.shortName)}<small>${esc(restaurant.alsoKnownAs)} 鱼头炉 · EST. ${restaurant.established}</small></span>
     </a>
     <div class="top-actions">
       <div class="top-lang-dropdown" aria-label="Language selection · 选择语言">
@@ -628,7 +628,7 @@ function render() {
     </aside>
     <a class="mobile-cart-link sr-only" href="#table-cart"><span>View cart · ${count()} items</span><strong>${money(total(getTableSession(state, table).cart))} →</strong></a>
   ` : ''}
-  <footer><img class="footer-seal" src="/assets/seal.png" alt="" /> ${esc(restaurant.name)} (${esc(restaurant.nameZh)}) · concept demo <span>${esc(restaurant.addressNote)}</span></footer>`;
+  <footer><span class="footer-mark">南</span> ${esc(restaurant.cornerName)} · Traditional Teochew taste since ${restaurant.established} <span>${esc(restaurant.addressNote)}</span></footer>`;
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     const targetRole = b.dataset.role;
@@ -727,7 +727,7 @@ function updateDockSpeech() {
 function handleLoreChip(chipId) {
   dispatchOp({ type: 'RECORD_AH_HUA_EVENT', eventType: 'CHIP_CLICK' });
   const langKey = state.replyLanguage === 'zh' ? 'zh' : state.replyLanguage === 'singlish' ? 'singlish' : 'en';
-  const ans = LORE_ANSWERS[chipId]?.[langKey] || LORE_ANSWERS[chipId]?.en || `${restaurant.name} is a fictional house in this demo. I can help with dishes, sample prices, and how a round is approved.`;
+  const ans = LORE_ANSWERS[chipId]?.[langKey] || LORE_ANSWERS[chipId]?.en || `${restaurant.shortName} has served Teochew charcoal steamboat since ${restaurant.established}. I can help with dishes, sample prices, and how a round is approved.`;
   const qChip = [...QUICK_CHIPS.viewing, ...QUICK_CHIPS.waiting].find(c => c.id === chipId);
   const questionText = qChip?.label || 'Dish question';
 
@@ -876,16 +876,16 @@ function getStageGreeting(latestOrder) {
   if (state.replyLanguage === 'zh') {
     return latestOrder
       ? `第 ${latestOrder.round || 1} 轮已交给演示厨房。炭火炉在真实餐厅大约要十二分钟。您可以看吃法说明，或呼叫服务员。`
-      : `欢迎。我是${restaurant.hostNameZh}，按固定脚本招呼。您可以看菜单，或问我怎么搭配。`;
+      : `欢迎来到南华昌。我是${restaurant.hostNameZh}，按固定脚本招呼。您可以看菜单，或问我怎么搭配。`;
   }
   if (state.replyLanguage === 'singlish') {
     return latestOrder
       ? `Order ${latestOrder.id} is with the demo kitchen. A real charcoal pot takes about 12 minutes. Can ask me a saved question while you wait.`
-      : `Welcome. I’m ${restaurant.hostName}. This is a fixed script. Browse the menu, or ask me what to order.`;
+      : `Welcome to Nan Hwa Chong. I’m ${restaurant.hostName}. This is a fixed script. Browse the menu, or ask me what to order.`;
   }
   return latestOrder
     ? `Order ${latestOrder.id} is with the demo kitchen. A real charcoal pot takes about 12 minutes. You can read the notes below, or call the floor.`
-    : `Welcome. I’m ${restaurant.hostName}, on a fixed script. Browse the menu, or ask for a suggestion.`;
+    : `Welcome to Nan Hwa Chong. I’m ${restaurant.hostName}, on a fixed script. Browse the menu, or ask for a suggestion.`;
 }
 
 function renderStoryCardContent(story) {
@@ -917,7 +917,7 @@ function renderStoryCardContent(story) {
       <p class="story-text">${esc(story.text)}</p>
     `;
   }
-  if (story.id === 'rounds') {
+  if (story.id === 'loop') {
     return `
       <div class="story-badge">${esc(story.badge)}</div>
       <h3>${esc(story.title)}</h3>
@@ -977,7 +977,7 @@ function renderCenterStage(summary) {
   return `<section class="welcome">
     <div>
       <div class="eyebrow-row">
-        <span class="eyebrow">${esc(restaurant.shortName.toUpperCase())} · CONCEPT DEMO</span>
+        <span class="eyebrow">${esc(restaurant.heritageLine)}</span>
         ${peerChip()}
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
@@ -1189,7 +1189,7 @@ function openAhHuaDialog() {
         ${avatarMarkup()}
         <div>
           <h3 id="ah-hua-dialog-title">Ask ${esc(restaurant.hostName)}</h3>
-          <p>Scripted ${esc(restaurant.hostRole)} · English · 中文 · Singlish</p>
+            <p>${esc(restaurant.shortName)} host · English · 中文 · Singlish</p>
           <small class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></small>
         </div>
         <button type="button" id="sheet-speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice: on' : 'Voice: off'}</button>
@@ -1297,7 +1297,7 @@ function customer() {
   return `<section class="welcome">
     <div>
       <div class="eyebrow-row">
-        <span class="eyebrow">${esc(restaurant.shortName.toUpperCase())} · CONCEPT DEMO</span>
+        <span class="eyebrow">${esc(restaurant.heritageLine)}</span>
         ${peerChip()}
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
@@ -1383,7 +1383,7 @@ function customer() {
           ${avatarMarkup()}
           <div>
             <h2>Ask ${esc(restaurant.hostName)}</h2>
-            <p>Scripted ${esc(restaurant.hostRole)} · English · 中文 · Singlish · Melayu · Français</p>
+            <p>${esc(restaurant.shortName)} host · English · 中文 · Singlish · Melayu · Français</p>
           </div>
           <div class="reply-controls">
             <button type="button" id="speaker" class="icon-button" aria-pressed="${speaking}" ${speechSupported ? '' : 'disabled'}>${speaking ? 'Voice replies: on' : 'Turn on voice replies'}</button>
@@ -1392,7 +1392,7 @@ function customer() {
         </div>
         <div class="avatar-caption">
           <div class="host-caption-row">
-            <span class="host-role-badge">${esc(restaurant.hostName)} · fixed script, not a live chat</span>
+            <span class="host-role-badge">${esc(restaurant.hostName)} · ${esc(restaurant.shortName)} host · fixed script</span>
             <span class="host-lang-note">Replies in <b>${languages[state.replyLanguage].label}</b></span>
           </div>
           <div class="language-voice-note">${esc(T('voiceNote'))}</div>
@@ -1429,8 +1429,8 @@ function customer() {
       <section class="menu-section">
         <div class="section-top">
           <div>
-            <div class="eyebrow">${esc(restaurant.nameZh)} · SAMPLE MENU</div>
-            <h2>Steamboat and zi char.</h2>
+            <div class="eyebrow">${esc(restaurant.shortName.toUpperCase())} HERITAGE · ${esc(restaurant.nameZh)}传统鱼头炉与煮炒</div>
+            <h2>Charcoal steamboat and zi char since ${restaurant.established}.</h2>
           </div>
           <span class="sample-label">Illustrative dishes and prices</span>
         </div>
@@ -1540,7 +1540,7 @@ function customer() {
   <aside class="ah-hua-floating-dock" id="ah-hua-dock" aria-label="Ah Hua Assistant">
     <button type="button" class="dock-avatar-btn" id="dock-avatar-trigger" aria-label="Open ${esc(restaurant.hostName)}, the table host">
       <div class="dock-avatar-circle">
-        <img src="/assets/seal.png" alt="" width="36" height="36" />
+        <img src="${esc(restaurant.logo)}" alt="${esc(restaurant.nameZh)}" width="36" height="36" />
       </div>
       ${(tableCart.length || latestOrder) ? `<div class="dock-speech-bubble" id="dock-speech-text"><span>${esc(dockSpeechText)}</span></div>` : ''}
     </button>
@@ -2667,7 +2667,7 @@ function openShareBillDialog() {
   const summary = tableSummary(state, table, splitPax);
   const guests = guestBreakdown(state, table);
   let shareMode = 'even';
-  let hostName = currentMemberPhone ? (getMember(state, currentMemberPhone)?.name || currentGuest?.name || 'Marcus') : (currentGuest?.name || 'Marcus');
+  let hostName = currentMemberPhone ? (getMember(state, currentMemberPhone)?.name || currentGuest?.name || 'Table host') : (currentGuest?.name || 'Table host');
   let hostPhone = currentMemberPhone || '9123 4567';
 
   const renderContent = () => {
@@ -2696,7 +2696,7 @@ function openShareBillDialog() {
         <div class="aa-config-grid">
           <label class="aa-field">
             <span>Table Host Name (付款人姓名):</span>
-            <input type="text" id="aa-host-name" value="${esc(hostName)}" placeholder="e.g. Marcus">
+            <input type="text" id="aa-host-name" value="${esc(hostName)}" placeholder="Your name">
           </label>
           <label class="aa-field">
             <span>PayNow Mobile / UEN (收款电话):</span>
@@ -3048,7 +3048,7 @@ function openMemberDialog() {
               <input type="tel" id="member-phone-input" placeholder="e.g. 91234567" required pattern="[89][0-9]{7}" maxlength="8" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:4px;font-size:14px;box-sizing:border-box" />
             </label>
             <label style="display:block;margin-bottom:14px;font-size:11px">Full Name / Preferred Salutation
-              <input type="text" id="member-name-input" placeholder="e.g. Marcus Wong" required style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:4px;font-size:14px;box-sizing:border-box" />
+              <input type="text" id="member-name-input" placeholder="Your name" required style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:4px;font-size:14px;box-sizing:border-box" />
             </label>
             <button type="submit" class="primary wide" style="background:#8f342c;border-color:#8f342c">Join VIP &amp; Claim Perks (立即入会) →</button>
           </form>

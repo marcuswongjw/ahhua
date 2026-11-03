@@ -1581,7 +1581,7 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
   overflow: hidden;
 }
 .member-card::after {
-  content: '华';
+  content: '南华昌';
   position: absolute;
   right: -10px;
   bottom: -15px;

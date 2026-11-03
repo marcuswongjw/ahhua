@@ -376,8 +376,9 @@ test('getEReceipt formats formal Singapore tax invoice with GST Reg No', () => {
   submit(s, '11', { autoFire: true });
 
   const receipt = getEReceipt(s, '11', 2);
-  assert.equal(receipt.merchant.gstReg, 'Sample only — not GST registered');
-  assert.equal(receipt.merchant.name.includes('Hua Yuan'), true);
+  assert.equal(receipt.merchant.gstReg, 'M9-0012345-X');
+  assert.equal(receipt.merchant.name.includes('Nan Hwa Chong'), true);
+  assert.equal(receipt.merchant.address.includes('North Bridge Road'), true);
   assert.equal(receipt.table, '11');
   assert.equal(receipt.subtotal, 1800);
   assert.equal(receipt.serviceCharge, 180); // 10%
@@ -388,9 +389,9 @@ test('getEReceipt formats formal Singapore tax invoice with GST Reg No', () => {
 
 test('member registration saves profile, awards welcome points and waives tea fee', () => {
   const s = initialState();
-  const m = registerMember(s, { phone: '91234567', name: 'Marcus Wong', email: 'marcus@example.com' });
+  const m = registerMember(s, { phone: '91234567', name: 'Alex Tan', email: 'alex@example.com' });
   assert.equal(m.phone, '91234567');
-  assert.equal(m.name, 'Marcus Wong');
+  assert.equal(m.name, 'Alex Tan');
   assert.equal(m.points, 100);
   assert.equal(m.teaWaived, true);
   assert.ok(m.coupons.includes('WELCOME-TEA'));
@@ -406,7 +407,7 @@ test('member registration saves profile, awards welcome points and waives tea fe
 
 test('stored value top-up adds credit, tier upgrades and bonus points', () => {
   const s = initialState();
-  registerMember(s, { phone: '91234567', name: 'Marcus' });
+  registerMember(s, { phone: '91234567', name: 'Alex' });
 
   // Top up S$200 get S$230
   const m = topUpMemberBalance(s, '91234567', 20000, 23000);
@@ -447,7 +448,7 @@ test('coupon application adjusts table summary subtotal and tax calculation accu
 
 test('pay with member balance settles bill and deducts exact grandTotal', () => {
   const s = initialState();
-  registerMember(s, { phone: '91234567', name: 'Marcus' });
+  registerMember(s, { phone: '91234567', name: 'Alex' });
   topUpMemberBalance(s, '91234567', 10000, 11000); // balance = 11000 (S$110)
 
   addLines(s, [makeLine('chicken', 1), makeLine('rice', 2)], '14'); // Subtotal 1800, Grand Total 2158
@@ -464,7 +465,7 @@ test('pay with member balance settles bill and deducts exact grandTotal', () => 
 
 test('review capture stores 5-star rating and awards member bonus points', () => {
   const s = initialState();
-  registerMember(s, { phone: '91234567', name: 'Marcus' });
+  registerMember(s, { phone: '91234567', name: 'Alex' });
   const pointsBefore = getMember(s, '91234567').points;
 
   const rev = submitReview(s, {
@@ -492,7 +493,7 @@ test('banquet booking reserves CNY/celebration sets with deposit', () => {
     notes: 'Near entrance please'
   });
 
-  assert.ok(booking.id.startsWith('HY-BANQ-'));
+  assert.ok(booking.id.startsWith('NHC-BANQ-'));
   assert.equal(booking.depositPaid, true);
   assert.equal(booking.pax, 8);
   assert.equal(s.banquets.length, 1);
@@ -679,35 +680,35 @@ test('confirmTableSeating configures covers, tea choice and family care alerts',
 test('generateAABillMessage formats viral WhatsApp split text and portion definitions exist', () => {
   const s = initialState();
   addLines(s, [
-    makeLine('grouper', 1, 'Regular', '', 'fire', 'Marcus', '🧑'),
+    makeLine('grouper', 1, 'Regular', '', 'fire', 'Alex', '🧑'),
     makeLine('chicken', 1, 'Regular', '', 'fire', 'Sarah', '👩')
   ], '08');
   submit(s, '08');
 
   // Test Even Split Message
   const evenMsg = generateAABillMessage(s, '08', {
-    hostName: 'Marcus',
+    hostName: 'Alex',
     hostPhone: '91234567',
     mode: 'even',
     pax: 4
   });
-  assert.ok(evenMsg.includes('Hua Yuan Steamboat House'));
+  assert.ok(evenMsg.includes('Nan Hwa Chong Fish Head Steamboat'));
   assert.ok(evenMsg.includes('Table 08'));
   assert.ok(evenMsg.includes('Even Split (AA均分)'));
   assert.ok(evenMsg.includes('91234567'));
   assert.ok(evenMsg.includes('https://ahhua.vercel.app/demo?table=08'));
-  assert.equal(evenMsg.includes('North Bridge'), false);
-  assert.equal(evenMsg.includes('Nan Hwa'), false);
+  assert.ok(evenMsg.includes('North Bridge'));
+  assert.ok(evenMsg.includes('Est. 1927'));
 
   // Test Itemized Split Message
   const itemizedMsg = generateAABillMessage(s, '08', {
-    hostName: 'Marcus',
+    hostName: 'Alex',
     hostPhone: '91234567',
     mode: 'itemized',
     pax: 2
   });
   assert.ok(itemizedMsg.includes('Itemized Breakdown (按人分账)'));
-  assert.ok(itemizedMsg.includes('Marcus'));
+  assert.ok(itemizedMsg.includes('Alex'));
   assert.ok(itemizedMsg.includes('Sarah'));
   assert.ok(itemizedMsg.includes('Incl. 10% SC & 9% GST'));
 
@@ -721,7 +722,7 @@ test('generateAABillMessage formats viral WhatsApp split text and portion defini
 
 test('security guards: staff authorization, stored value tier enforcement, coupon validation, and bounded quantity', async () => {
   const s = initialState();
-  registerMember(s, { phone: '91234567', name: 'Marcus' });
+  registerMember(s, { phone: '91234567', name: 'Alex' });
 
   // 1. Invalid top-up tier rejection
   assert.throws(() => topUpMemberBalance(s, '91234567', 0, 100000), /Invalid top-up tier amount/);

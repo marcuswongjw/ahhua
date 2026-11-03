@@ -2,7 +2,7 @@
 
 TableHua, with Ah Hua your table host. Ah Hua serves every table. 每一桌，都有阿华招呼。
 
-The owner site is at `/`. The diner, staff, and kitchen concept demo is at `/demo`. Product name, tagline, host name, pricing, the WhatsApp contact, and the demo restaurant all live in `src/config.js`. The demo house is fictional. Replace that block when a real client goes live. `contact.whatsappNumber` is `TODO` until Marcus supplies a number.
+The owner site is at `/`. The diner, staff, and kitchen concept demo is at `/demo`. Product name, tagline, host name, pricing, the WhatsApp contact, and the demo restaurant all live in `src/config.js`. The demo defaults to Nan Hwa Chong Fish Head Steamboat. Replace the `restaurant` block when another house tries it. `contact.whatsappNumber` is `TODO` until a real number is supplied.
 
 Ah Hua is the default host: a gender-neutral table captain. The chat answers from a fixed script. No AI service is connected. On Vercel the demo keeps orders in this browser (Staff and Kitchen on the same device). `npm run dev` runs the small Node server, which can share a table across screens on that machine. The “live” badge appears only when that stream is actually connected.
 
