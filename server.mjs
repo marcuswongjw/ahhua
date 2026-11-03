@@ -1,7 +1,9 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
-import { initialState, applyOp, getTableSession } from './src/domain.js';
+import { initialState, applyOp } from './src/domain.js';
+import { marketingDocument } from './src/marketing.js';
+import { restaurant } from './src/config.js';
 
 const base = resolve(process.env.SERVE_DIST ? 'dist' : '.');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -87,7 +89,7 @@ export async function handleRequest(req, res) {
       const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM', 'RESOLVE_CALL', 'SETTLE_TABLE', 'TOGGLE_CART_RULE']);
       if (STAFF_OPS.has(op.type)) {
         const staffHeader = req.headers?.['x-staff-auth'];
-        if (staffHeader !== '1927' && body.staffPin !== '1927') {
+        if (staffHeader !== restaurant.staffPin && body.staffPin !== restaurant.staffPin) {
           res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ error: 'Staff authentication required for this operation' }));
           return;
@@ -116,9 +118,25 @@ export async function handleRequest(req, res) {
     return;
   }
 
-  const path = resolve(base, '.' + (pathname === '/' ? '/index.html' : pathname));
+  if (pathname === '/' || pathname === '/index.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.end(marketingDocument());
+    return;
+  }
+
+  if (pathname === '/demo' || pathname === '/demo/') pathname = '/demo/index.html';
+
+  const path = resolve(base, '.' + pathname);
   if (!path.startsWith(base + '/')) { res.writeHead(403).end(); return; }
-  try { res.writeHead(200, { 'Content-Type': mime[extname(path)] || 'text/plain; charset=utf-8' }); res.end(await readFile(path)); }
+  try {
+    let body = await readFile(path);
+    const type = mime[extname(path)] || 'text/plain; charset=utf-8';
+    if (pathname === '/demo/index.html') {
+      body = body.toString('utf8').replace('<html', '<html data-live-sync="on"');
+    }
+    res.writeHead(200, { 'Content-Type': type });
+    res.end(body);
+  }
   catch { res.writeHead(404).end('Not found'); }
 }
 
@@ -128,5 +146,5 @@ export function createServer() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT) || 4173;
-  createServer().listen(port, '127.0.0.1', () => console.log(`Ah Hua: http://127.0.0.1:${port}`));
+  createServer().listen(port, '127.0.0.1', () => console.log(`TableHua: http://127.0.0.1:${port}`));
 }

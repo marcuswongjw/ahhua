@@ -1,4 +1,4 @@
-// Pre-cached verified lore & micro-interactions for 0ms edge response
+// Saved answers for the scripted host. Not a live model.
 export const QUICK_CHIPS = {
   viewing: [
     { id: 'fish_diff', label: '🐟 Pomfret vs Grouper?', question: 'What is the difference between Pomfret and Grouper?' },

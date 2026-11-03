@@ -1,6 +1,10 @@
-# Ah Hua 阿华 — Restaurant ordering demo
+# TableHua 招呼
 
-A warm, responsive restaurant experience built from the menu and workflow in the earlier Ah Hua prototype. The earlier downloadable `ah-hua-chat-enabled.zip` was not accessible from this workspace; this is a fresh implementation of that concept.
+TableHua, with Ah Hua your table host. Ah Hua serves every table. 每一桌，都有阿华招呼。
+
+The owner site is at `/`. The diner, staff, and kitchen concept demo is at `/demo`. Product name, tagline, host name, pricing, the WhatsApp contact, and the demo restaurant all live in `src/config.js`. The demo defaults to Nan Hwa Chong Fish Head Steamboat. Replace the `restaurant` block when another house tries it. `contact.whatsappNumber` is `TODO` until a real number is supplied.
+
+Ah Hua is the default host: a gender-neutral table captain. The chat answers from a fixed script. No AI service is connected. On Vercel the demo keeps orders in this browser (Staff and Kitchen on the same device). `npm run dev` runs the small Node server, which can share a table across screens on that machine. The “live” badge appears only when that stream is actually connected.
 
 ## Explore
 
@@ -16,8 +20,8 @@ Customers can choose **English**, **中文（普通话）**, or **Singlish** in 
 - No payment SDK, payment credentials, real charges, restaurant APIs, kitchen printers, database or AI API is connected.
 - Prices, recipes, allergens and portions are illustrative and unverified. The assistant never guarantees allergy, vegan, vegetarian or halal suitability.
 - Staff and Kitchen are **public simulation controls**, not authenticated production staff systems.
-- State is local to this browser profile and website origin using `localStorage`. Tabs on the same origin synchronize. Separate devices/visitors do not share orders. The cart belongs to this browser; the table selector assigns a table when submitting an order.
-- Menu chat is a limited deterministic assistant supporting English, common Mandarin menu phrases and Singlish-style requests. It is not a connected LLM. Unknown requests receive an honest fallback. Every proposed cart update requires customer confirmation.
+- On the static Vercel deploy, state stays in this browser (`localStorage`, plus other tabs on the same browser via `BroadcastChannel`). The page does not call `/api/events`, because that route is not part of the static deploy. Separate devices do not share orders. When `server.mjs` is running, the demo page is marked to open a live stream and screens on that machine can share a table.
+- Menu chat is a fixed script in English, Mandarin, Singlish, Malay, and French. It is not a connected model. Unknown requests say so. Every proposed cart update requires customer confirmation.
 - Speech recognition requires HTTPS (or localhost), a supported browser and microphone permission. It is feature-detected; typing and manual selection remain available when unsupported or denied. Some browser implementations send audio to their speech service. This app does not record audio. Voice playback uses browser speech synthesis and installed voices; enable Turn on voice replies or press Listen to hear replies.
 - Ah Hua is an original, locally animated SVG chef. He blinks and waves, tilts while listening, and moves his mouth during actual speech playback events. This is simple speech-state animation, not phoneme-level lip sync or a generated video avatar. Reduced-motion preferences disable animation while keeping status text visible.
 - No personal details are requested. Reset demo clears local sample state.
@@ -34,7 +38,7 @@ npm run dev
 # Open http://127.0.0.1:4173
 ```
 
-Use `/?table=03` through `/?table=20` for table-specific entry links. Invalid values default to Table 08. You can change tables in Customer.
+Use `/demo?table=03` through `/demo?table=20` for table-specific entry links. Invalid values default to Table 08. A visit to `/?table=08` on the owner site forwards to the demo. You can change tables in Customer.
 
 `npm run build` creates the deployable `dist/` directory. `vercel.json` configures Vercel to build and serve it. No environment variables are required. Font loading falls back to system fonts if unavailable.
 
