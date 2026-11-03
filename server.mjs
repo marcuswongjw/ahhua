@@ -84,7 +84,7 @@ export async function handleRequest(req, res) {
         res.end(JSON.stringify({ error: 'Invalid table identifier' }));
         return;
       }
-      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM', 'RESOLVE_CALL']);
+      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM', 'RESOLVE_CALL', 'SETTLE_TABLE', 'TOGGLE_CART_RULE']);
       if (STAFF_OPS.has(op.type)) {
         const staffHeader = req.headers?.['x-staff-auth'];
         if (staffHeader !== '1927' && body.staffPin !== '1927') {
