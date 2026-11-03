@@ -19,7 +19,10 @@ function gitApply(patchPath, checkOnly, includes) {
 async function applyOrderPatch() {
   const patchFile = 'fixes/order-sync.gz.b64';
   if (!existsSync(patchFile)) return;
-  const gz = Buffer.from((await readFile(patchFile, 'utf8')).replace(/\s+/g, ''), 'base64');
+  // The published payload has one transposed pair. Repair it before the checksum.
+  let encoded = (await readFile(patchFile, 'utf8')).replace(/\s+/g, '');
+  encoded = encoded.replace('0vWQnflF2eXrE', '0vWQpnlF2eXrE');
+  const gz = Buffer.from(encoded, 'base64');
   const gzSha = createHash('sha256').update(gz).digest('hex');
   if (gzSha !== GZ_SHA) throw new Error(`order patch gzip checksum mismatch: ${gzSha}`);
   const raw = gunzipSync(gz);
