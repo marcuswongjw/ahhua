@@ -5,7 +5,8 @@ import {
   guestBreakdown, closeTableSession, getEReceipt, STORED_VALUE_TIERS, COUPON_TEMPLATES,
   getMember, registerMember, topUpMemberBalance, applyCoupon, removeCoupon, payWithMemberBalance,
   submitReview, createBanquetBooking, createQueueTicket, transferQueueToTable,
-  DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics
+  DEFAULT_CART_RULES, evaluateCartRules, recordAhHuaEvent, getAhHuaSalesMetrics,
+  confirmTableSeating, MID_MEAL_REORDER_ITEMS
 } from './domain.js';
 import { avatarMarkup } from './avatar.js';
 import { createVoicePlayer } from './voice.js';
@@ -61,6 +62,7 @@ try {
   const qParam = urlParams.get('queue');
   if (qParam) activeQueueTicket = qParam;
 } catch {}
+let seatingPromptShownForTable = null;
 
 
 state.replyLanguage = normaliseLanguage(state.replyLanguage);
@@ -178,6 +180,7 @@ function ensureDialogRoot() {
       <dialog id="review-dialog" class="bottom-sheet-dialog" aria-labelledby="review-dialog-title"></dialog>
       <dialog id="banquet-dialog" class="bottom-sheet-dialog" aria-labelledby="banquet-dialog-title"></dialog>
       <dialog id="queue-dialog" class="bottom-sheet-dialog" aria-labelledby="queue-dialog-title"></dialog>
+      <dialog id="seating-dialog" class="bottom-sheet-dialog" aria-labelledby="seating-dialog-title"></dialog>
       <dialog id="reset-dialog" aria-labelledby="reset-dialog-title">
         <form method="dialog">
           <h2 id="reset-dialog-title">Start fresh?</h2>
@@ -195,7 +198,7 @@ function ensureDialogRoot() {
       '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog',
       '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog',
       '#e-receipt-dialog', '#member-dialog', '#review-dialog', '#banquet-dialog',
-      '#queue-dialog', '#reset-dialog'
+      '#queue-dialog', '#seating-dialog', '#reset-dialog'
     ].forEach(sel => wireDialog(document.querySelector(sel)));
   }
 }
@@ -925,6 +928,8 @@ function renderStoryCard() {
 }
 
 function renderCenterStage(summary) {
+  const session = getTableSession(state, table);
+  const tableCart = session.cart;
   const activeOrders = state.orders.filter(o => o.table === table && ['pending', 'approved', 'preparing', 'ready'].includes(o.status));
   const latestOrder = activeOrders[activeOrders.length - 1] || state.orders.filter(o => o.table === table).slice(-1)[0];
   const nextRound = summary.rounds + 1;
@@ -938,6 +943,19 @@ function renderCenterStage(summary) {
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>Concierge Stage · Table companionship while kitchen prepares your meal</p>
+      <div class="seating-status-row">
+        <button type="button" class="seating-status-badge compact ${session.seatingConfirmed ? 'confirmed' : 'needs-setup'}" id="stage-open-seating-btn" title="View or edit table seating">
+          <span class="seating-status-icon">👥</span>
+          <span class="seating-status-text">
+            <strong>${session.pax || 4} Pax</strong>
+            <span class="seating-sep">·</span>
+            <span>${session.teaChoice === 'water' ? 'Water (白开水)' : (session.teaChoice === 'chrysanthemum' ? 'Chrysanthemum (胎菊王)' : 'Pu’er Tea (陈年普洱)')}</span>
+            ${session.babyChair ? '<span class="seating-sep">·</span><span>👶 High chair</span>' : ''}
+            ${session.kidsCutlery ? '<span class="seating-sep">·</span><span>🥢 Kids cutlery</span>' : ''}
+          </span>
+          <span class="seating-status-action">${session.seatingConfirmed ? 'Edit ✎' : 'Setup Seating →'}</span>
+        </button>
+      </div>
     </div>
     <div class="welcome-controls">
       <label class="table-select">TABLE NUMBER
@@ -947,6 +965,25 @@ function renderCenterStage(summary) {
   </section>
 
   <div class="stage-container">
+    ${tableCart.length ? `
+      <div class="stage-pending-cart-banner">
+        <div class="stage-pending-cart-info">
+          <div class="stage-cart-eyebrow">
+            <span class="round-badge">Round ${nextRound} In-Progress Cart</span>
+            <span class="stage-cart-time">Shared table tab</span>
+          </div>
+          <div class="stage-cart-headline">
+            <strong>${tableCart.length} item${tableCart.length > 1 ? 's' : ''} in cart (${money(total(tableCart))})</strong>
+            <small>Added by: ${tableCart.map(l => `${l.guestEmoji || '👥'} ${l.addedBy || 'Table'}`).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small>
+          </div>
+        </div>
+        <div class="stage-pending-cart-actions">
+          <button type="button" class="secondary small" id="stage-view-cart-btn">View Cart (${tableCart.length})</button>
+          <button type="button" class="primary small fire-round-btn" id="stage-fire-round-btn">🔥 Fire Round ${nextRound} Now →</button>
+        </div>
+      </div>
+    ` : ''}
+
     ${latestOrder ? `
       <div class="stage-order-tracker">
         <div class="tracker-top">
@@ -993,6 +1030,36 @@ function renderCenterStage(summary) {
         </div>
       </div>
     `}
+
+    <section class="stage-reorder-section">
+      <div class="stage-reorder-header">
+        <div>
+          <span class="eyebrow">MID-MEAL QUICK RE-ORDER · 加菜加饭加饮品</span>
+          <h3>1-Tap Mid-Meal Essentials (加单必点)</h3>
+        </div>
+        <span class="stage-reorder-hint">⚡ Top 5 communal essentials · Instant 1-tap re-order</span>
+      </div>
+      <div class="stage-reorder-grid">
+        ${MID_MEAL_REORDER_ITEMS.map(item => {
+          const soldOut = state.unavailable.includes(item.id);
+          const inCartQty = tableCart.filter(x => x.id === item.id).reduce((sum, x) => sum + x.qty, 0);
+          return `
+            <div class="stage-reorder-card ${inCartQty ? 'has-in-cart' : ''}">
+              <div class="reorder-card-icon">${item.icon}</div>
+              <div class="reorder-card-details">
+                <span class="reorder-card-tag">${item.tag}</span>
+                <strong class="reorder-card-name">${esc(item.name)}</strong>
+                <small class="reorder-card-cn">${item.cn}</small>
+                <span class="reorder-card-price">${money(item.price)}</span>
+              </div>
+              <button type="button" class="stage-reorder-add-btn" data-stage-reorder="${item.id}" ${soldOut ? 'disabled' : ''} aria-label="Add ${esc(item.name)}">
+                ${inCartQty ? `+ Add (${inCartQty})` : '+ Add'}
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </section>
 
     <div class="stage-hero-card">
       <div class="stage-hero-top">
@@ -1173,6 +1240,14 @@ function customer() {
   }
   const summary = tableSummary(state, table, splitPax);
   const tableCart = session.cart;
+
+  if (role === 'customer' && !session.seatingConfirmed && !activeQueueTicket && seatingPromptShownForTable !== table) {
+    seatingPromptShownForTable = table;
+    setTimeout(() => {
+      if (role === 'customer') openSeatingModal(false);
+    }, 250);
+  }
+
   if (customerGear === 'stage') {
     return renderCenterStage(summary);
   }
@@ -1194,6 +1269,19 @@ function customer() {
       </div>
       <h1>${esc(T('welcomeTitle'))}${table}${state.replyLanguage === 'zh' ? esc(T('welcomeTitleSuffix') || ' 桌') : ''}</h1>
       <p>${esc(T('tableSubtitle'))}</p>
+      <div class="seating-status-row">
+        <button type="button" class="seating-status-badge ${session.seatingConfirmed ? 'confirmed' : 'needs-setup'}" id="open-seating-btn" title="Click to view or edit seating pax and tea">
+          <span class="seating-status-icon">👥</span>
+          <span class="seating-status-text">
+            <strong>${session.pax || 4} Pax</strong>
+            <span class="seating-sep">·</span>
+            <span>${session.teaChoice === 'water' ? 'Water (白开水)' : (session.teaChoice === 'chrysanthemum' ? 'Chrysanthemum (胎菊王)' : 'Pu’er Tea (陈年普洱)')}</span>
+            ${session.babyChair ? '<span class="seating-sep">·</span><span>👶 High chair</span>' : ''}
+            ${session.kidsCutlery ? '<span class="seating-sep">·</span><span>🥢 Kids cutlery</span>' : ''}
+          </span>
+          <span class="seating-status-action">${session.seatingConfirmed ? 'Edit ✎' : 'Setup Seating →'}</span>
+        </button>
+      </div>
     </div>
     <div class="welcome-controls">
       <label class="table-select">TABLE NUMBER
@@ -1973,6 +2061,33 @@ function bindCustomer() {
     dispatchOp({ type: 'SET_TABLE_GEAR', table, gear: 'dock' });
     render();
   });
+  $('#open-seating-btn')?.addEventListener('click', () => openSeatingModal(true));
+  $('#stage-open-seating-btn')?.addEventListener('click', () => openSeatingModal(true));
+
+  document.querySelectorAll('[data-stage-reorder]').forEach(b => {
+    b.onclick = () => {
+      const dishId = b.dataset.stageReorder;
+      const d = dish(dishId);
+      if (!d) return;
+      const newLine = makeLine(dishId, 1, 'Regular', state.preference);
+      newLine.addedBy = currentGuest?.name || 'Table';
+      newLine.guestEmoji = currentGuest?.emoji || '👥';
+      dispatchOp({ type: 'ADD_LINES', table, lines: [newLine] });
+      hapticPulse();
+      const summary = tableSummary(state, table, splitPax);
+      render();
+      toast(`+1 ${d.name} added to Round ${summary.rounds + 1} cart!`);
+    };
+  });
+
+  $('#stage-fire-round-btn')?.addEventListener('click', () => {
+    handleOrderSubmit();
+  });
+
+  $('#stage-view-cart-btn')?.addEventListener('click', () => {
+    openMobileCart();
+  });
+
   $('#dock-avatar-trigger')?.addEventListener('click', () => {
     openAhHuaDialog();
   });
@@ -3282,6 +3397,202 @@ function openMobileCart() {
   };
 
   renderContent();
+  dialog.showModal();
+}
+
+function openSeatingModal(force = false) {
+  const dialog = $('#seating-dialog');
+  if (!dialog) return;
+  const session = getTableSession(state, table);
+  if (!force && session.seatingConfirmed) return;
+
+  let localPax = session.pax || 4;
+  let localTea = session.teaChoice || 'puer';
+  let localBabyChair = Boolean(session.babyChair);
+  let localKidsCutlery = Boolean(session.kidsCutlery);
+
+  const member = currentMemberPhone ? getMember(state, currentMemberPhone) : null;
+  const isMember = Boolean(member);
+
+  const renderModal = () => {
+    dialog.innerHTML = `
+      <div class="seating-modal-body">
+        <div class="dialog-top">
+          <span class="eyebrow">TABLE ${table} · 用餐开台确认</span>
+          <button type="button" class="close-dialog" aria-label="Close seating modal">×</button>
+        </div>
+
+        <div class="seating-modal-header">
+          <div class="header-icon">🪑</div>
+          <div>
+            <h2 id="seating-dialog-title">Welcome to Table ${table} · 欢迎光临</h2>
+            <p>Please confirm diner count and tea preference so our floor staff can set up your tableware & hot charcoal broth.</p>
+          </div>
+        </div>
+
+        <div class="seating-section">
+          <div class="section-label-row">
+            <span class="section-title">用餐人数 · Number of Diners (Pax)</span>
+            <span class="pax-indicator"><strong>${localPax}</strong> Guests</span>
+          </div>
+          <div class="pax-pill-grid" role="radiogroup" aria-label="Number of diners">
+            ${[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map(n => `
+              <button type="button" class="pax-pill ${localPax === n ? 'active' : ''}" data-pax-val="${n}">
+                ${n === 12 ? '12+ 人' : `${n} 人`}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="seating-section">
+          <div class="section-label-row">
+            <span class="section-title">功夫茶水 · Table Tea Selection (Refillable Pot)</span>
+            <span class="tea-fee-tag">${isMember ? 'VIP: Fee Waived' : 'S$4.00 / pot'}</span>
+          </div>
+          <div class="tea-option-grid" role="radiogroup" aria-label="Tea selection">
+            <label class="tea-card ${localTea === 'puer' ? 'active' : ''}">
+              <input type="radio" name="seating-tea" value="puer" ${localTea === 'puer' ? 'checked' : ''}>
+              <div class="tea-card-content">
+                <div class="tea-card-top">
+                  <span class="tea-icon">🍵</span>
+                  <strong>Aged Pu’er Tea (陈年熟普洱)</strong>
+                </div>
+                <p>Rich, earthy heritage black tea. Promotes digestion and pairs traditionally with rich fish head broth.</p>
+                <div class="tea-card-footer">
+                  <span class="tea-price">${isMember ? '<s class="waived-orig">S$4.00</s> <span class="free-text">FREE</span>' : 'S$4.00 / table pot'}</span>
+                  <span class="tea-badge">Most Popular</span>
+                </div>
+              </div>
+            </label>
+
+            <label class="tea-card ${localTea === 'chrysanthemum' ? 'active' : ''}">
+              <input type="radio" name="seating-tea" value="chrysanthemum" ${localTea === 'chrysanthemum' ? 'checked' : ''}>
+              <div class="tea-card-content">
+                <div class="tea-card-top">
+                  <span class="tea-icon">🌼</span>
+                  <strong>Chrysanthemum Tea (特级胎菊王)</strong>
+                </div>
+                <p>Fragrant yellow flower tea. Naturally cooling, floral aroma and caffeine-free for late dinners.</p>
+                <div class="tea-card-footer">
+                  <span class="tea-price">${isMember ? '<s class="waived-orig">S$4.00</s> <span class="free-text">FREE</span>' : 'S$4.00 / table pot'}</span>
+                  <span class="tea-badge cooling">Cooling</span>
+                </div>
+              </div>
+            </label>
+
+            <label class="tea-card ${localTea === 'water' ? 'active' : ''}">
+              <input type="radio" name="seating-tea" value="water" ${localTea === 'water' ? 'checked' : ''}>
+              <div class="tea-card-content">
+                <div class="tea-card-top">
+                  <span class="tea-icon">💧</span>
+                  <strong>Warm / Ice Water (免费白开水)</strong>
+                </div>
+                <p>Fresh filtered drinking water served warm or iced upon request.</p>
+                <div class="tea-card-footer">
+                  <span class="tea-price free-text">Complimentary S$0.00</span>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          ${isMember ? `
+            <div class="member-seating-callout">
+              <span>✨ <strong>Ah Hua VIP Member:</strong> Table tea & tableware fee waived! (已为您免除茶位费)</span>
+            </div>
+          ` : `
+            <div class="member-seating-callout not-member">
+              <span>💡 <button type="button" class="inline-link" id="seating-member-btn">Sign in or register as Ah Hua Member</button> to enjoy waived tea fee & earn 1 point per S$1!</span>
+            </div>
+          `}
+        </div>
+
+        <div class="seating-section">
+          <div class="section-label-row">
+            <span class="section-title">贴心关怀 · Family & Special Care</span>
+            <small>Floor staff will bring to table</small>
+          </div>
+          <div class="family-care-grid">
+            <label class="care-checkbox-card ${localBabyChair ? 'active' : ''}">
+              <input type="checkbox" id="seating-baby-chair" ${localBabyChair ? 'checked' : ''}>
+              <span class="care-icon">👶</span>
+              <div class="care-info">
+                <strong>Baby High Chair (需要宝宝椅)</strong>
+                <p>Disinfected child high chair with safety harness</p>
+              </div>
+            </label>
+
+            <label class="care-checkbox-card ${localKidsCutlery ? 'active' : ''}">
+              <input type="checkbox" id="seating-kids-cutlery" ${localKidsCutlery ? 'checked' : ''}>
+              <span class="care-icon">🥢</span>
+              <div class="care-info">
+                <strong>Children Cutlery (儿童餐具)</strong>
+                <p>Plastic bowls, spoons & cups for kids</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="seating-actions">
+          <button type="button" class="primary big-submit-btn" id="confirm-seating-btn">
+            Confirm Seating & Start Ordering (确认开台) →
+          </button>
+        </div>
+      </div>
+    `;
+
+    dialog.querySelectorAll('.pax-pill').forEach(btn => {
+      btn.onclick = () => {
+        localPax = Number(btn.dataset.paxVal) || 4;
+        renderModal();
+      };
+    });
+
+    dialog.querySelectorAll('input[name="seating-tea"]').forEach(radio => {
+      radio.onchange = () => {
+        localTea = radio.value;
+        renderModal();
+      };
+    });
+
+    const babyBox = dialog.querySelector('#seating-baby-chair');
+    if (babyBox) {
+      babyBox.onchange = () => {
+        localBabyChair = babyBox.checked;
+        renderModal();
+      };
+    }
+    const cutleryBox = dialog.querySelector('#seating-kids-cutlery');
+    if (cutleryBox) {
+      cutleryBox.onchange = () => {
+        localKidsCutlery = cutleryBox.checked;
+        renderModal();
+      };
+    }
+
+    dialog.querySelector('#seating-member-btn')?.addEventListener('click', () => {
+      closeTopLayer(dialog);
+      openMemberDialog();
+    });
+
+    dialog.querySelector('#confirm-seating-btn')?.addEventListener('click', () => {
+      splitPax = localPax;
+      dispatchOp({
+        type: 'CONFIRM_SEATING',
+        table,
+        pax: localPax,
+        babyChair: localBabyChair,
+        kidsCutlery: localKidsCutlery,
+        teaChoice: localTea,
+        isMember
+      });
+      closeTopLayer(dialog);
+      hapticPulse();
+      toast(`✅ Table ${table} ready! ${localPax} Pax · ${localTea === 'water' ? 'Water' : (localTea === 'chrysanthemum' ? 'Chrysanthemum' : 'Pu’er Tea')}`);
+      render();
+    });
+  };
+
+  renderModal();
   dialog.showModal();
 }
 

@@ -2933,7 +2933,7 @@ export const SET_MENUS = [
 ];
 
 export function getTableSession(state, tableId) {
-  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null, gear: 'dock' };
+  if (!tableId) return { cart: state.cart || [], proposal: state.proposal || [], messages: state.messages || [], status: 'ordering', pax: 4, teaFeeWaived: false, coupon: null, gear: 'dock', seatingConfirmed: false };
   if (!state.sessions) state.sessions = {};
   if (!state.sessions[tableId]) {
     state.sessions[tableId] = {
@@ -2946,10 +2946,56 @@ export function getTableSession(state, tableId) {
       teaFeeWaived: false,
       coupon: null,
       gear: 'dock',
+      seatingConfirmed: false,
+      babyChair: false,
+      kidsCutlery: false,
+      teaChoice: 'puer',
       openedAt: new Date().toISOString()
     };
   }
   return state.sessions[tableId];
+}
+
+export const MID_MEAL_REORDER_ITEMS = [
+  { id: 'rice', name: 'Steamed Jasmine Rice', cn: '香浓白米饭', price: 150, icon: '🍚', tag: 'Fast 1-min' },
+  { id: 'yam', name: 'Crispy Yam & Fish Maw', cn: '酥炸芋头鱼鳔', price: 800, icon: '🍠', tag: 'Soup favourite' },
+  { id: 'tea', name: 'Pu’er Chinese Tea (Pot)', cn: '特选陈年普洱茶', price: 400, icon: '🍵', tag: 'Hot refill' },
+  { id: 'calamansi', name: 'Sour Plum Calamansi', cn: '金桔话梅冰露', price: 320, icon: '🥤', tag: 'Ice cooling' },
+  { id: 'kai-lan', name: 'Baby Kai Lan Greens', cn: '蒜蓉芥兰时蔬', price: 800, icon: '🥬', tag: 'Fresh greens' }
+];
+
+export function confirmTableSeating(state, tableId, { pax = 4, babyChair = false, kidsCutlery = false, teaChoice = 'puer', isMember = false } = {}) {
+  const session = getTableSession(state, tableId);
+  session.pax = Math.max(1, Math.min(20, Number(pax) || 4));
+  session.seatingConfirmed = true;
+  session.babyChair = Boolean(babyChair);
+  session.kidsCutlery = Boolean(kidsCutlery);
+  session.teaChoice = teaChoice;
+
+  if (isMember) {
+    session.teaFeeWaived = true;
+  }
+
+  if (teaChoice && teaChoice !== 'water' && !state.unavailable.includes('tea')) {
+    const teaName = teaChoice === 'chrysanthemum' ? 'Chrysanthemum Tea (胎菊王)' : 'Aged Pu’er Tea (陈年普洱)';
+    const hasTea = session.cart.some(x => x.id === 'tea');
+    if (!hasTea) {
+      const teaLine = makeLine('tea', 1, 'Regular', `${teaName} · Table Tea Choice`, 'fire', 'Table Captain', '🍵');
+      session.cart.push(teaLine);
+      if (session === state.sessions?.[tableId]) {
+        state.cart = session.cart;
+      }
+    }
+  }
+
+  if (babyChair || kidsCutlery) {
+    const items = [];
+    if (babyChair) items.push('Baby High Chair (宝宝椅)');
+    if (kidsCutlery) items.push('Children Cutlery (儿童餐具)');
+    requestService(state, tableId, 'assistance', `Seating setup: ${items.join(' + ')}`);
+  }
+
+  return session;
 }
 export function makeLine(id, qty = 1, size = 'Regular', notes = '', timing = 'fire', addedBy = 'Table', guestEmoji = '👥') {
   const d = dish(id);
@@ -3196,6 +3242,16 @@ export function applyOp(state, op) {
       if (r) r.enabled = op.enabled !== undefined ? op.enabled : !r.enabled;
       break;
     }
+    case 'CONFIRM_SEATING': {
+      confirmTableSeating(state, opTable, {
+        pax: op.pax,
+        babyChair: op.babyChair,
+        kidsCutlery: op.kidsCutlery,
+        teaChoice: op.teaChoice,
+        isMember: op.isMember
+      });
+      break;
+    }
   }
 }
 const transitions = { pending: ['approved', 'rejected'], approved: ['preparing'], preparing: ['ready'], ready: ['served'] };
@@ -3326,6 +3382,8 @@ export function closeTableSession(state, table) {
     session.closedAt = new Date().toISOString();
     session.cart = [];
     session.proposal = [];
+    session.seatingConfirmed = false;
+    session.gear = 'dock';
   }
   return { ok: true, table, closedOrders: activeOrders.length };
 }

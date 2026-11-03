@@ -626,3 +626,52 @@ test('explicit line attribution defaults safely to Table without leaking viewer 
   assert.equal(namedLine.addedBy, 'Uncle Lim');
   assert.equal(namedLine.guestEmoji, '👴');
 });
+
+test('confirmTableSeating configures covers, tea choice and family care alerts', () => {
+  const s = initialState();
+  
+  // 1. Confirm seating for Table 08 with 6 pax, Pu'er tea, baby chair and kids cutlery
+  applyOp(s, {
+    type: 'CONFIRM_SEATING',
+    table: '08',
+    pax: 6,
+    babyChair: true,
+    kidsCutlery: true,
+    teaChoice: 'puer',
+    isMember: false
+  });
+
+  const session = getTableSession(s, '08');
+  assert.equal(session.pax, 6);
+  assert.equal(session.seatingConfirmed, true);
+  assert.equal(session.babyChair, true);
+  assert.equal(session.kidsCutlery, true);
+  assert.equal(session.teaChoice, 'puer');
+  assert.equal(session.teaFeeWaived, false);
+
+  // Auto-added tea line to cart
+  const teaLine = session.cart.find(x => x.id === 'tea');
+  assert.ok(teaLine);
+  assert.equal(teaLine.qty, 1);
+  assert.ok(teaLine.notes.includes('Aged Pu’er Tea'));
+
+  // Dispatched assistance service request for high chair and cutlery
+  const alert = s.calls.find(r => r.table === '08' && r.label.includes('Baby High Chair'));
+  assert.ok(alert);
+  assert.ok(alert.label.includes('Children Cutlery'));
+
+  // 2. VIP Member tea fee waiver test
+  applyOp(s, {
+    type: 'CONFIRM_SEATING',
+    table: '09',
+    pax: 4,
+    teaChoice: 'chrysanthemum',
+    isMember: true
+  });
+  const session9 = getTableSession(s, '09');
+  assert.equal(session9.pax, 4);
+  assert.equal(session9.teaFeeWaived, true);
+  const teaLine9 = session9.cart.find(x => x.id === 'tea');
+  assert.ok(teaLine9);
+  assert.ok(teaLine9.notes.includes('Chrysanthemum'));
+});
