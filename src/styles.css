@@ -1887,17 +1887,19 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
   }
 
   /* 4. Native Bottom Sheet Dialogs with Drag Bar */
+  dialog,
   dialog.bottom-sheet-dialog {
     width: 100% !important;
     max-width: 100% !important;
     margin: auto 0 0 0 !important;
     border-radius: 20px 20px 0 0 !important;
-    max-height: 90vh !important;
+    max-height: 92vh !important;
     padding: 0 0 max(16px, env(safe-area-inset-bottom)) 0 !important;
     overflow-y: auto !important;
     overscroll-behavior-y: contain !important;
-    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.28) !important;
   }
+  dialog::before,
   dialog.bottom-sheet-dialog::before {
     content: '';
     display: block;
@@ -1906,19 +1908,28 @@ body:has(.floating-order-bar) .ah-hua-floating-dock {
     border-radius: 2px;
     background: #d1d5db;
     margin: 8px auto 4px;
+    flex-shrink: 0;
   }
 
   /* Sticky Bottom Action Buttons in Sheets */
   .dialog-actions,
-  .cart-check-actions {
+  .cart-check-actions,
+  #modal-add-btn {
     position: sticky;
     bottom: 0;
     background: rgba(253, 253, 248, 0.96);
     backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .dialog-actions,
+  .cart-check-actions {
     padding: 10px 14px max(12px, env(safe-area-inset-bottom));
     margin: 14px -14px -10px -14px !important;
     border-top: 1px solid #e5e9df;
-    z-index: 10;
+  }
+  #modal-add-btn {
+    margin-top: 14px;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
   }
 
   /* 5. Touch Target Enhancements (44px minimum) */

@@ -574,7 +574,7 @@ function render() {
     </form>
   </dialog>`;
 
-  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog', '#e-receipt-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
+  ['#dish-dialog', '#bill-dialog', '#service-dialog', '#order-success-dialog', '#qr-dialog', '#steamboat-guide-dialog', '#mobile-cart-dialog', '#ah-hua-dialog', '#cart-check-dialog', '#staff-pin-dialog', '#set-menu-dialog', '#void-dialog', '#e-receipt-dialog', '#member-dialog', '#review-dialog', '#banquet-dialog', '#queue-dialog', '#reset-dialog'].forEach(sel => wireDialog($(sel)));
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     const targetRole = b.dataset.role;
