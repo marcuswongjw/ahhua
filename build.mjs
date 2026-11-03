@@ -6,6 +6,15 @@ import { spawnSync } from 'node:child_process';
 
 const GZ_SHA = '71dd2da308ac19d632312c436288f57bfa711cf2e2a60d9ff43093e63440c952';
 const PATCH_SHA = 'b37a0c2a72679b285aa4be3874a9c1f8c3afb30a9f6f7ee6ef393f2b8ef7171f';
+const SOURCE_INCLUDES = ['src/app.js', 'src/domain.js', 'tests/domain.test.js'];
+
+function gitApply(patchPath, checkOnly, includes) {
+  const args = ['apply'];
+  if (checkOnly) args.push('--check');
+  for (const include of includes || []) args.push(`--include=${include}`);
+  args.push(patchPath);
+  return spawnSync('git', args, { encoding: 'utf8' });
+}
 
 async function applyOrderPatch() {
   const patchFile = 'fixes/order-sync.gz.b64';
@@ -18,16 +27,26 @@ async function applyOrderPatch() {
   if (patchSha !== PATCH_SHA) throw new Error(`order patch checksum mismatch: ${patchSha}`);
   const patchPath = '/tmp/ahhua-order-sync.patch';
   await writeFile(patchPath, raw);
-  const check = spawnSync('git', ['apply', '--check', patchPath], { encoding: 'utf8' });
-  if (check.status === 0) {
-    const applied = spawnSync('git', ['apply', patchPath], { encoding: 'utf8' });
+
+  const full = gitApply(patchPath, true);
+  if (full.status === 0) {
+    const applied = gitApply(patchPath, false);
     if (applied.status !== 0) throw new Error(applied.stderr || applied.stdout || 'git apply failed');
     console.log('Applied order and blank-page patch');
     return;
   }
+
+  const partial = gitApply(patchPath, true, SOURCE_INCLUDES);
+  if (partial.status === 0) {
+    const applied = gitApply(patchPath, false, SOURCE_INCLUDES);
+    if (applied.status !== 0) throw new Error(applied.stderr || applied.stdout || 'git apply failed');
+    console.log('Applied order and blank-page patch to source files');
+    return;
+  }
+
   const app = await readFile('src/app.js', 'utf8');
   if (app.includes('Added ${d.name} to shared cart.')) {
-    throw new Error(check.stderr || 'Blank-page patch did not apply and src/app.js is still invalid');
+    throw new Error(partial.stderr || full.stderr || 'Blank-page patch did not apply and src/app.js is still invalid');
   }
   console.log('Order patch already present in the source');
 }
@@ -37,4 +56,4 @@ await rm('dist', { recursive: true, force: true });
 await mkdir('dist');
 await copyFile('index.html', 'dist/index.html');
 await cp('src', 'dist/src', { recursive: true });
-console.log('Built Ah Hua demo \u2192 dist (no runtime dependencies)');
+console.log('Built Ah Hua demo → dist (no runtime dependencies)');
