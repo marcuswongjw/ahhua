@@ -3162,8 +3162,13 @@ export function applyOp(state, op) {
     }
     case 'UPDATE_QTY': {
       if (cart && cart[lineIndex]) {
-        cart[lineIndex].qty += (delta || 0);
-        if (cart[lineIndex].qty <= 0) cart.splice(lineIndex, 1);
+        const safeDelta = Number(delta) || 0;
+        const newQty = cart[lineIndex].qty + safeDelta;
+        if (newQty <= 0) {
+          cart.splice(lineIndex, 1);
+        } else {
+          cart[lineIndex].qty = Math.min(20, Math.max(1, Math.round(newQty)));
+        }
         if (session) state.cart = cart;
       }
       break;
@@ -3560,8 +3565,12 @@ export function registerMember(state, { phone, name, email = '' }) {
 export function topUpMemberBalance(state, phone, payCents, creditCents) {
   const member = getMember(state, phone);
   if (!member) throw Error('Member account not found. Please register first.');
-  member.balance = (member.balance || 0) + Number(creditCents);
-  member.points = (member.points || 0) + Math.floor(payCents / 100);
+  const tier = STORED_VALUE_TIERS.find(t => t.pay === Number(payCents) && t.credit === Number(creditCents));
+  if (!tier) {
+    throw Error('Invalid top-up tier amount.');
+  }
+  member.balance = (member.balance || 0) + Number(tier.credit);
+  member.points = (member.points || 0) + Math.floor(tier.pay / 100);
   if (member.balance >= 50000) member.tier = 'Gold';
   else if (member.balance >= 20000) member.tier = 'Silver';
   return member;
@@ -3569,13 +3578,10 @@ export function topUpMemberBalance(state, phone, payCents, creditCents) {
 
 export function applyCoupon(state, table, couponCode) {
   const session = getTableSession(state, table);
-  const found = COUPON_TEMPLATES.find(c => c.code === couponCode) || {
-    code: couponCode,
-    title: 'Custom Voucher',
-    discount: 500,
-    minSpend: 4000,
-    desc: 'Promotional discount'
-  };
+  const found = COUPON_TEMPLATES.find(c => c.code === couponCode);
+  if (!found) {
+    throw Error('Invalid or expired voucher code.');
+  }
   session.coupon = found;
   return found;
 }
@@ -3611,6 +3617,7 @@ export function submitReview(state, { table, phone, rating, tags = [], comment =
     created: new Date().toISOString()
   };
   state.reviews.push(review);
+  if (state.reviews.length > 100) state.reviews = state.reviews.slice(-100);
   if (review.phone) {
     const member = getMember(state, review.phone);
     if (member) member.points = (member.points || 0) + 50;
@@ -3637,6 +3644,7 @@ export function createBanquetBooking(state, { name, phone, date, time, pax, setI
     created: new Date().toISOString()
   };
   state.banquets.push(booking);
+  if (state.banquets.length > 50) state.banquets = state.banquets.slice(-50);
   return booking;
 }
 

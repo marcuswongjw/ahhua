@@ -82,7 +82,7 @@ export async function handleRequest(req, res) {
         res.end(JSON.stringify({ error: 'Invalid table identifier' }));
         return;
       }
-      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM']);
+      const STAFF_OPS = new Set(['TRANSITION_ORDER', 'SET_UNAVAILABLE', 'TOGGLE_ORDER_ITEM', 'SETTLE_TABLE', 'TOGGLE_CART_RULE']);
       if (STAFF_OPS.has(op.type)) {
         const staffHeader = req.headers?.['x-staff-auth'];
         if (staffHeader !== '1927' && body.staffPin !== '1927') {
@@ -117,11 +117,13 @@ export async function handleRequest(req, res) {
         res.end(JSON.stringify({ error: 'Invalid state payload' }));
         return;
       }
+      const isStaff = (req.headers && req.headers['x-staff-auth'] === '1927') || body?.staffPin === '1927';
+
       // Merge table sessions cleanly so one table doesn't wipe another table's cart
       if (incoming.sessions && typeof incoming.sessions === 'object') {
         if (!sharedState.sessions) sharedState.sessions = {};
         for (const [tId, sess] of Object.entries(incoming.sessions)) {
-          if (!['__proto__', 'constructor', 'prototype'].includes(tId) && sess && typeof sess === 'object') {
+          if (!['__proto__', 'constructor', 'prototype'].includes(tId) && /^[a-zA-Z0-9_\-\s]{1,16}$/.test(tId) && sess && typeof sess === 'object') {
             sharedState.sessions[tId] = sess;
           }
         }
@@ -137,7 +139,7 @@ export async function handleRequest(req, res) {
           if (!orderMap.has(o.id)) {
             sharedState.orders.push(o);
             orderMap.set(o.id, o);
-          } else {
+          } else if (isStaff) {
             const existing = orderMap.get(o.id);
             if (existing && existing.status !== o.status) {
               existing.status = o.status;
@@ -166,7 +168,8 @@ export async function handleRequest(req, res) {
           sharedState.calls = [...active, ...completed];
         }
       }
-      if (Array.isArray(incoming.unavailable)) sharedState.unavailable = incoming.unavailable;
+      if (isStaff && Array.isArray(incoming.unavailable)) sharedState.unavailable = incoming.unavailable;
+      if (isStaff && Array.isArray(incoming.cartRules)) sharedState.cartRules = incoming.cartRules;
       if (Array.isArray(incoming.messages)) sharedState.messages = incoming.messages.slice(-80);
       if (Array.isArray(incoming.proposal)) sharedState.proposal = incoming.proposal;
 

@@ -717,3 +717,62 @@ test('generateAABillMessage formats viral WhatsApp split text and portion defini
   assert.equal(STEAMBOAT_BROTHS[0].id, 'milky');
   assert.equal(STEAMBOAT_BROTHS[1].id, 'clear');
 });
+
+test('security guards: staff authorization, stored value tier enforcement, coupon validation, and bounded quantity', async () => {
+  const s = initialState();
+  registerMember(s, { phone: '91234567', name: 'Marcus' });
+
+  // 1. Invalid top-up tier rejection
+  assert.throws(() => topUpMemberBalance(s, '91234567', 0, 100000), /Invalid top-up tier amount/);
+  assert.throws(() => topUpMemberBalance(s, '91234567', 1000, 2000), /Invalid top-up tier amount/);
+
+  // 2. Invalid coupon rejection
+  assert.throws(() => applyCoupon(s, '12', 'FAKE-VOUCHER'), /Invalid or expired voucher code/);
+
+  // 3. Max quantity bounding on UPDATE_QTY
+  addLines(s, [makeLine('rice', 18)], '12');
+  applyOp(s, { type: 'UPDATE_QTY', table: '12', lineIndex: 0, delta: 50 });
+  const sess = getTableSession(s, '12');
+  assert.equal(sess.cart[0].qty, 20); // capped at 20
+
+  // 4. Unauthorized staff operation via /api/op returns 403
+  const opReq = Object.assign(new EventEmitter(), {
+    url: '/api/op',
+    method: 'POST',
+    setEncoding() {}
+  });
+  let opStatus = 0;
+  let opBody = '';
+  const opPromise = handleRequest(opReq, {
+    writeHead(code) { opStatus = code; },
+    end(b) { opBody = b; }
+  });
+  opReq.emit('data', JSON.stringify({
+    op: { type: 'SET_UNAVAILABLE', unavailable: ['grouper'] },
+    senderId: 'unauth-client'
+  }));
+  opReq.emit('end');
+  await opPromise;
+  assert.equal(opStatus, 403);
+  assert.ok(JSON.parse(opBody).error.includes('Staff authentication required'));
+
+  // 5. Authorized staff operation via /api/op succeeds
+  const authOpReq = Object.assign(new EventEmitter(), {
+    url: '/api/op',
+    method: 'POST',
+    headers: { 'x-staff-auth': '1927' },
+    setEncoding() {}
+  });
+  let authStatus = 0;
+  const authOpPromise = handleRequest(authOpReq, {
+    writeHead(code) { authStatus = code; },
+    end() {}
+  });
+  authOpReq.emit('data', JSON.stringify({
+    op: { type: 'SET_UNAVAILABLE', unavailable: ['grouper'] },
+    senderId: 'staff-client'
+  }));
+  authOpReq.emit('end');
+  await authOpPromise;
+  assert.equal(authStatus, 200);
+});

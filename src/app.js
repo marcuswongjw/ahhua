@@ -223,9 +223,13 @@ channel?.addEventListener('message', event => {
 
 function pushServerState() {
   if (syncMode !== 'live') return;
+  const headers = { 'Content-Type': 'application/json' };
+  if (typeof isStaffAuthenticated === 'function' && isStaffAuthenticated()) {
+    headers['X-Staff-Auth'] = '1927';
+  }
   fetch('/api/state', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ state, senderId: clientId })
   }).catch(() => {});
 }
@@ -244,8 +248,13 @@ function dispatchOp(op) {
         method: 'POST',
         headers,
         body: JSON.stringify({ op, senderId: clientId })
-      }).catch(() => {
-        pushServerState();
+      }).then(async res => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Server rejected operation');
+        }
+      }).catch(err => {
+        toast(err.message || 'Operation failed');
       });
     }
     render();
